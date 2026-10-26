@@ -1,0 +1,17 @@
+- Menggunakan Laravel 
+- Domain Tuffero.com ( Di Jagoan Hosting ) dan rencana VPS Hosting di niaga hoster 
+- B2C
+- Harga, Foto, List, SKU, Varian, dan Deskripsi 
+- Tidak Perlu Login ( Usahakan ) Hanya membutuhkan email nomor HP dan alamat 
+- Ada Promosi dan Voucher ( Diskon Kuantitas ) ( Diskon Ongkir ) 
+- API Pengiriman menggunakan API langsung JNT dan Sicepat ( Datang ke agent terdekat )
+- Gudang Ada 2 sementara masih di malang 
+- Fix Midtrans ( Siap kan List dokumen yang di perlukan ) ( Maksimal Besok Ko Rifan sudah daftar dan akunnya aktif )
+- Ai CS dan Marketing ( Skrip Video ) 
+
+
+Kebutuhan Staff It :
+- Email perusahaan
+- Akses Login Jagoan Hosting
+- Akses Login NiagaHoster
+- Akses Login Midtrans
