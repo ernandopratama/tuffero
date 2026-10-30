@@ -31,3 +31,6 @@ Thumbs.db
 /graphify-out
 /.claude
 /install.ps1
+
+# Internal client documents, never push
+/TUFFERO/
