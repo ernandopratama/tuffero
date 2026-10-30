@@ -1,7 +1,7 @@
 # Tuffero E-commerce — Decision Log
 
-- **Versi:** 0.2
-- **Tanggal pembaruan:** 26 Oktober 2026
+- **Versi:** 0.3
+- **Tanggal pembaruan:** 30 Oktober 2026
 - **Tujuan:** Mencatat keputusan, asumsi sementara, pertanyaan terbuka, dan PIC konfirmasi.
 
 ## 1. Keputusan yang Sudah Disampaikan
@@ -27,6 +27,13 @@
 | D-017 | AI marketing | Skrip video, niche/tren, caption, kalender dan pengingat konten | Kebutuhan disepakati; kanal, sumber, frekuensi, dan PIC perlu ditetapkan. |
 | D-018 | Target rilis | Sebelum Ramadan 2027 | Target awal; tanggal pasti belum ditetapkan. |
 | D-019 | Desain | Dark Chocolate `#2B1B14`, Champagne Gold `#C6A15B`, Warm Ivory `#F6F0E5`, Roasted Brown `#6D4C3D`, White `#FFFFFF`, Border `#E3D5C0`; Manrope dan Playfair Display Italic sebagai aksen | Mengikuti `Tuffero_Design_System.txt`; logo asli tidak diubah. |
+
+## 1a. Keputusan Tambahan (30 Oktober 2026)
+
+| ID | Area | Keputusan | Status / dampak |
+|---|---|---|---|
+| D-020 | Kurir | Pengiriman MVP memakai **Biteship** sebagai agregator. J&T dan SiCepat dipakai melalui Biteship sejauh layanannya tersedia untuk akun dan gudang Malang. Integrasi API langsung kurir dapat dievaluasi kemudian. Kode pengiriman memakai `ShippingService` dengan provider yang dapat diganti. | Disepakati; disetujui Ko Rifan, dicatat Ernando. **Menggantikan D-014 untuk MVP.** Ketersediaan layanan J&T/SiCepat di Biteship dari Malang masih harus dikonfirmasi ke Biteship. |
+| D-021 | Frontend | Arsitektur frontend **hybrid**: halaman toko (beranda, katalog, detail produk, keranjang, checkout, status pesanan) dirender server dengan Blade + Tailwind CSS (+ Alpine.js bila perlu); area admin `/admin` memakai Vue 3 SPA (vue-router, Pinia) dengan API `/api/v1`. Backend, model, dan aturan bisnis tetap satu. | Disepakati Ernando (technical lead). Alasan: SEO, pratinjau link Instagram/WhatsApp, dan kecepatan tampil di HP untuk toko; interaktivitas untuk admin; tanpa server Node tambahan. Migrasi kode (Home ke Blade, SPA dibatasi ke `/admin`) adalah tugas terpisah. |
 
 ## 2. Asumsi Sementara (Belum Keputusan Final)
 
@@ -61,6 +68,11 @@
 | Q-017 | Status kerja sama dan akses API J&T serta SiCepat | Ko Rifan / developer | Terbuka |
 
 ## 4. Riwayat Perubahan
+
+### v0.3 — 30 Oktober 2026
+- Menambahkan D-020: Biteship untuk MVP, menggantikan D-014 (API langsung J&T dan SiCepat) untuk MVP. Q-017 berubah menjadi konfirmasi ketersediaan J&T/SiCepat melalui Biteship.
+- Menambahkan D-021: frontend hybrid (toko Blade, admin Vue).
+- Baris D-014 dan Q-017 di atas tidak dihapus agar riwayat keputusan tetap terbaca.
 
 ### v0.2 — 26 Oktober 2026
 - Memasukkan hasil rapat dan klarifikasi terbaru.

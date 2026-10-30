@@ -82,6 +82,8 @@ Gunakan sandbox terlebih dahulu. Verifikasi notifikasi dari server, proses secar
 ### FR-05 — Pengiriman
 Integrasi langsung J&T dan SiCepat bergantung pada kerja sama, dokumentasi, credential, dan pengujian API. Sistem dirancang untuk cek tarif/layanan, pembuatan resi, dan tracking jika endpoint tersedia. Simpan snapshot alamat, kurir, layanan, ongkir, resi, dan status. Kegagalan API tidak boleh membuat pengiriman ganda. Pilihan kurir oleh pelanggan versus sistem masih perlu dikonfirmasi.
 
+> **Pembaruan 30 Oktober 2026 (D-020):** untuk MVP, pengiriman memakai Biteship sebagai agregator; J&T dan SiCepat dipakai melalui Biteship bila tersedia. Integrasi API langsung kurir dapat dievaluasi kemudian. Teks FR-05 di atas dipertahankan sebagai riwayat.
+
 ### FR-06 — Promosi dan voucher
 Siapkan struktur backend dan area frontend. Fitur yang belum aktif diberi label “Coming Soon”. Fokus awal adalah promosi/voucher; diskon kuantitas belum aktif. Rule kombinasi promo, periode, kuota, minimum transaksi, cakupan SKU, dan batas penggunaan perlu disepakati. Validasi harus dilakukan di server. Diskon ongkir sementara diperkirakan ditanggung toko, tetapi belum final.
 

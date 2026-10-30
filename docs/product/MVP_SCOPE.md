@@ -42,6 +42,8 @@ Meluncurkan website B2C Tuffero dengan katalog, guest checkout, Midtrans, pengel
 - [ ] Produksi hanya setelah akun dan metode pembayaran aktif serta pengujian lolos.
 
 ### Pengiriman
+> Pembaruan 30 Oktober 2026 (D-020): integrasi MVP melalui Biteship; J&T dan SiCepat melalui Biteship bila tersedia. Butir di bawah tetap berlaku untuk provider tersebut.
+
 - [ ] Integrasi J&T dan SiCepat sesuai dokumentasi dan akses yang diberikan.
 - [ ] Cek ongkir/layanan, pembuatan resi, dan tracking jika endpoint tersedia.
 - [ ] Simpan kurir, layanan, biaya, resi, dan status.

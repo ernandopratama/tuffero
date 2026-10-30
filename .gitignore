@@ -25,3 +25,9 @@ _ide_helper.php
 Homestead.json
 Homestead.yaml
 Thumbs.db
+
+# Local tooling and reference mirrors (not part of the app)
+/theme
+/graphify-out
+/.claude
+/install.ps1

@@ -1,0 +1,58 @@
+# Development lokal: kode di-mount ke container, jadi vendor/ dan public/build dari host yang dipakai.
+# Jalankan `composer install` dan `npm run build` (atau `npm run dev`) di host sebelum `docker compose up`.
+services:
+  app:
+    build: .
+    volumes:
+      - .:/var/www/html
+    env_file: .env
+    environment:
+      DB_CONNECTION: pgsql
+      DB_HOST: db
+      DB_PORT: 5432
+    depends_on:
+      db:
+        condition: service_healthy
+
+  queue:
+    build: .
+    command: php artisan queue:work --tries=1
+    restart: unless-stopped
+    volumes:
+      - .:/var/www/html
+    env_file: .env
+    environment:
+      DB_CONNECTION: pgsql
+      DB_HOST: db
+      DB_PORT: 5432
+    depends_on:
+      db:
+        condition: service_healthy
+
+  web:
+    image: nginx:1.27-alpine
+    ports:
+      - "8080:80"
+    volumes:
+      - .:/var/www/html:ro
+      - ./docker/nginx.conf:/etc/nginx/conf.d/default.conf:ro
+    depends_on:
+      - app
+
+  db:
+    image: postgres:17-alpine
+    ports:
+      - "5433:5432"
+    environment:
+      POSTGRES_DB: ${DB_DATABASE:-tuffero}
+      POSTGRES_USER: ${DB_USERNAME:-tuffero}
+      POSTGRES_PASSWORD: ${DB_PASSWORD:-secret}
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 5s
+      retries: 10
+
+volumes:
+  pgdata:
