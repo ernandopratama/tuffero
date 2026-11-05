@@ -28,12 +28,6 @@
 		});
 	}	
 	
-	/* Slick Menu JS */
-	$('#menu').slicknav({
-		label : '',
-		prependTo : '.responsive-menu'
-	});
-
 	if($("a[href='#top']").length){
 		$(document).on("click", "a[href='#top']", function() {
 			$("html, body").animate({ scrollTop: 0 }, "slow");
@@ -74,8 +68,8 @@
 	if ($('.gallery-slider').length) {
 		const gallery_slider = new Swiper('.gallery-slider .swiper', {
 			slidesPerView : 2,
-			speed: 1000,
-			spaceBetween: 15,
+			speed: 600,
+			spaceBetween: 16,
 			loop: true,
 			autoplay: {
 				delay: 5000,
@@ -93,7 +87,7 @@
 					slidesPerView: 3,
 				},
 				991:{
-					slidesPerView: 5,
+					slidesPerView: 4,
 				}
 			}
 		});
@@ -170,17 +164,17 @@
 		});		
 	}
 	
-	if ($('.text-anime-style-2').length) {				
-		let	 staggerAmount 		= 0.03,
-			 translateXValue	= 20,
-			 delayValue 		= 0.1,
-			 easeType 			= "power2.out",
+	if ($('.text-anime-style-2').length && !window.matchMedia('(prefers-reduced-motion: reduce)').matches) {				
+		let	 staggerAmount 		= 0.07,
+			 translateXValue	= 8,
+			 delayValue 		= 0.15,
+			 easeType 			= "power3.out",
 			 animatedTextElements = document.querySelectorAll('.text-anime-style-2');
 		
 		animatedTextElements.forEach((element) => {
-			let animationSplitText = new SplitText(element, { type: "chars, words" });
-				gsap.from(animationSplitText.chars, {
-					duration: 1,
+			let animationSplitText = new SplitText(element, { type: "words" });
+				gsap.from(animationSplitText.words, {
+					duration: 0.9,
 					delay: delayValue,
 					x: translateXValue,
 					autoAlpha: 0,

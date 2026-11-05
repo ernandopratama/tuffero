@@ -100,9 +100,11 @@ class Cursor {
     }
 
     move(x, y, duration) {
+        // Bug template: pos belum ada bila update() terpanggil sebelum mouse bergerak (mis. fokus berpindah ke iframe video).
+        if (x === undefined && !this.pos) return;
         gsap.to(this.el, {
-            x: x || this.pos.x,
-            y: y || this.pos.y,
+            x: x ?? this.pos.x,
+            y: y ?? this.pos.y,
             force3D: true,
             overwrite: true,
             ease: this.options.ease,
@@ -123,5 +125,5 @@ class Cursor {
         this.visibleInt = setTimeout(() => this.visible = false, this.options.visibleTimeout);
     }
 }
-// Init cursor
-const cursor = new Cursor();
+// Init cursor: hanya perangkat dengan kursor sungguhan (layar sentuh tidak perlu pelacak mouse)
+const cursor = window.matchMedia('(hover: hover) and (pointer: fine)').matches ? new Cursor() : null;

@@ -1,0 +1,204 @@
+/* Widget chat Customer Service. Dipakai toko (Blade + Alpine) dan admin (Vue), jadi gayanya satu berkas. */
+.cs-backdrop { display: none; }
+@media (max-width: 767px) {
+    .cs-backdrop {
+        position: fixed;
+        inset: 0;
+        z-index: 155;
+        display: block;
+        background: #2B1B1473;
+        -webkit-backdrop-filter: blur(6px);
+        backdrop-filter: blur(6px);
+        opacity: 0;
+        visibility: hidden;
+        pointer-events: none;
+        transition: opacity 220ms cubic-bezier(0.22, 1, 0.36, 1), visibility 0s linear 220ms;
+    }
+    .cs-backdrop.is-on { opacity: 1; visibility: visible; pointer-events: auto; transition-delay: 0s; }
+}
+@media (prefers-reduced-motion: reduce) { .cs-backdrop { transition: none; } }
+
+/* Ukuran maskot mengalir dari 48 px (HP kecil) ke 64 px (tablet ke atas). */
+:root { --cs-bottom: 24px; --cs-width: clamp(48px, 6vw + 20px, 64px); }
+.cs-launcher {
+    position: fixed;
+    right: 20px;
+    bottom: calc(var(--cs-bottom) + env(safe-area-inset-bottom));
+    z-index: 170;
+    display: block;
+    width: var(--cs-width);
+    height: calc(var(--cs-width) * 226 / 192);
+    padding: 0;
+    border: 0;
+    border-radius: 24px;
+    background: none;
+    cursor: pointer;
+    -webkit-tap-highlight-color: transparent;
+    touch-action: manipulation;
+}
+.cs-launcher[data-status='open'] { visibility: hidden; }
+.cs-launcher:focus-visible { outline: 2px solid #2B1B14; outline-offset: 6px; }
+.cs-mascot, .cs-react, .cs-float { position: absolute; inset: 0; display: block; }
+.cs-float img { display: block; width: 100%; height: 100%; }
+.cs-face { position: absolute; inset: 0; width: 100%; height: 100%; overflow: visible; pointer-events: none; }
+
+/* Idle: hanya transform dan opacity, jadi berjalan di compositor. */
+.cs-launcher[data-status='idle'] .cs-float { animation: cs-float 3.6s ease-in-out infinite; }
+@keyframes cs-float { 50% { transform: translateY(-5px); } }
+.cs-floor {
+    position: absolute;
+    right: 8%;
+    bottom: -7px;
+    left: 8%;
+    height: 12px;
+    border-radius: 50%;
+    background: radial-gradient(closest-side, #2B1B1433, #2B1B1400);
+    transition: opacity 160ms ease;
+}
+.cs-launcher:not([data-status='idle'], [data-status='press']) .cs-floor { opacity: 0; }
+
+.cs-eye, .cs-mouth, .cs-waves { opacity: 0; }
+.cs-sparks { transform-box: fill-box; }
+.cs-spark { transform-box: fill-box; transform-origin: 0% 100%; }
+.cs-launcher[data-status='idle'] .cs-eye { animation: cs-blink 5.6s linear infinite; }
+@keyframes cs-blink { 0%, 95.9% { opacity: 0; } 96%, 98.5% { opacity: 1; } 98.6%, 100% { opacity: 0; } }
+
+/* Attention: mata tersenyum, lompatan lembut, percikan berdenyut. */
+.cs-launcher[data-attention] .cs-react { animation: cs-hop 1.1s cubic-bezier(0.22, 1, 0.36, 1) 2; }
+@keyframes cs-hop { 0%, 100% { transform: none; } 30% { transform: translateY(-10px); } 60% { transform: translateY(-2px); } }
+.cs-launcher[data-attention] .cs-eye { animation: none; opacity: 1; }
+.cs-launcher[data-attention] .cs-waves { opacity: 1; transition: opacity 200ms ease; }
+.cs-launcher[data-attention] .cs-spark { animation: cs-spark 1.1s ease-out 2; }
+.cs-launcher[data-attention] .cs-spark:nth-child(2) { animation-delay: 60ms; }
+.cs-launcher[data-attention] .cs-spark:nth-child(3) { animation-delay: 120ms; }
+@keyframes cs-spark { 0%, 100% { transform: none; } 35% { transform: scale(1.18); } }
+
+/* Press: mengecil, wink, mulut terbuka, cahaya lembut. */
+.cs-react { transition: transform 160ms cubic-bezier(0.22, 1, 0.36, 1); }
+.cs-launcher:active .cs-react, .cs-launcher[data-status='press'] .cs-react { transform: scale(0.92); }
+.cs-launcher[data-status='press'] .cs-eye-right, .cs-launcher[data-status='press'] .cs-mouth, .cs-launcher[data-status='press'] .cs-waves,
+.cs-launcher[data-status='opening'] .cs-eye-right, .cs-launcher[data-status='opening'] .cs-mouth { opacity: 1; }
+.cs-glow, .cs-ripple { position: absolute; border-radius: 50%; opacity: 0; pointer-events: none; }
+.cs-glow { inset: -16%; background: radial-gradient(closest-side, #F2882E80, #C6A15B40 60%, #C6A15B00); }
+.cs-ripple { inset: 4%; border: 2px solid #C6A15B; }
+.cs-launcher[data-status='press'] .cs-glow { animation: cs-glow 360ms cubic-bezier(0.22, 1, 0.36, 1) both; }
+.cs-launcher[data-status='press'] .cs-ripple { animation: cs-ripple 360ms cubic-bezier(0.22, 1, 0.36, 1) both; }
+@keyframes cs-glow { from { opacity: 0; transform: scale(0.7); } to { opacity: 1; transform: none; } }
+@keyframes cs-ripple { from { opacity: 0.8; transform: scale(0.7); } to { opacity: 0; transform: scale(1.3); } }
+
+@media (hover: hover) and (pointer: fine) {
+    .cs-launcher[data-status='idle']:hover .cs-react { transform: translateY(-3px); }
+    .cs-launcher[data-status='idle']:active .cs-react { transform: scale(0.92); }
+}
+
+/* Tombol Kembali ke Atas berada di pojok yang sama: dinaikkan di atas maskot. */
+.tf:has(.cs-launcher) .tf-top { bottom: calc(var(--cs-bottom) + var(--cs-width) * 226 / 192 + 12px + env(safe-area-inset-bottom)); }
+
+@media (max-width: 767px) {
+    :root { --cs-bottom: 16px; }
+    .cs-launcher { right: 16px; }
+    /* Bar beli di halaman produk menempel di bawah: maskot dan tombol Kembali ke Atas naik bersama. */
+    .tf:has(.tf-pd-sticky) { --cs-bottom: 88px; }
+    /* Jangan menutupi menu mobile atau kolom yang sedang diisi saat keyboard terbuka. */
+    .tf:has(.tf-mobile.is-open) .cs-launcher,
+    body:has(input:focus, textarea:focus, select:focus) .cs-launcher[data-status='idle'] { visibility: hidden; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .cs-launcher .cs-float, .cs-launcher .cs-eye, .cs-launcher .cs-react, .cs-launcher .cs-spark, .cs-launcher .cs-glow, .cs-launcher .cs-ripple { animation: none !important; transition: none; }
+    .cs-launcher:active .cs-react, .cs-launcher[data-status] .cs-react { transform: none; }
+}
+
+.cs-panel {
+    --cs-font: "Be Vietnam Pro", sans-serif;
+    position: fixed;
+    right: 20px;
+    bottom: 24px;
+    z-index: 160;
+    display: flex;
+    flex-direction: column;
+    width: 380px;
+    height: min(600px, calc(100dvh - 48px));
+    border: 1px solid #E3D5C0;
+    border-radius: 16px;
+    background: #F6F0E5;
+    box-shadow: 0 16px 48px -12px #2B1B1440;
+    color: #2B1B14;
+    font: 400 14px/20px var(--cs-font);
+    transform-origin: 100% 100%;
+    outline: none;
+}
+.cs-panel-sparks { position: absolute; top: -28px; right: 6px; width: 40px; height: 34px; fill: #FFB81F; stroke: #FFB81F; stroke-width: 2; stroke-linejoin: round; pointer-events: none; }
+.cs-head { position: relative; display: flex; flex: none; align-items: center; gap: 4px; min-height: 72px; padding: 8px 8px 8px 72px; border-radius: 15px 15px 0 0; background: #2B1B14; border-bottom: 2px solid #C6A15B; color: #F6F0E5; }
+.cs-avatar { position: absolute; left: 12px; bottom: 8px; width: 52px; height: auto; }
+.cs-avatar.is-hidden { opacity: 0; }
+.cs-head-text { flex: 1; min-width: 0; }
+.cs-panel .cs-title { margin: 0; color: #F6F0E5; font: 600 15px/20px var(--cs-font); letter-spacing: 0; }
+.cs-panel .cs-status { display: flex; align-items: center; gap: 6px; margin: 2px 0 0; color: #F6F0E5; font: 400 12px/16px var(--cs-font); }
+.cs-dot { flex: none; width: 8px; height: 8px; border-radius: 50%; background: #B8A898; }
+.cs-dot.is-open { background: #6FCF8E; }
+.cs-head-btn { display: grid; flex: none; place-items: center; width: 44px; height: 44px; padding: 0; border: 0; border-radius: 8px; background: none; color: #F6F0E5; cursor: pointer; transition: background-color 150ms ease, transform 160ms cubic-bezier(0.22, 1, 0.36, 1); }
+.cs-head-btn:active { transform: scale(0.94); }
+.cs-head-btn:focus-visible { outline: 2px solid #C6A15B; outline-offset: -2px; }
+
+.cs-log { display: flex; flex: 1; flex-direction: column; gap: 12px; min-height: 0; padding: 16px; overflow-y: auto; overscroll-behavior: contain; scrollbar-width: thin; scrollbar-color: #E3D5C0 transparent; outline: none; }
+.cs-log:focus-visible { box-shadow: inset 0 0 0 2px #2B1B14; }
+.cs-msg { display: flex; flex: none; align-items: flex-end; gap: 8px; animation: cs-msg 220ms cubic-bezier(0.22, 1, 0.36, 1) both; }
+@keyframes cs-msg { from { opacity: 0; transform: translateY(6px); } }
+.cs-msg-avatar { flex: none; width: 28px; height: auto; }
+.cs-bubble { display: flex; flex-direction: column; align-items: flex-start; gap: 8px; max-width: 80%; padding: 10px 14px; border: 1px solid #E3D5C0; border-radius: 14px 14px 14px 4px; background: #FFFFFF; overflow-wrap: anywhere; }
+.cs-panel .cs-bubble p, .cs-msg-user .cs-bubble { margin: 0; color: inherit; font: inherit; white-space: pre-wrap; }
+.cs-msg-user { justify-content: flex-end; }
+.cs-panel .cs-msg-user .cs-bubble { display: block; border-color: #2B1B14; border-radius: 14px 14px 4px 14px; background: #2B1B14; color: #F6F0E5; }
+.cs-panel .cs-link { color: #2B1B14; font-weight: 600; text-decoration: underline; text-underline-offset: 3px; }
+.cs-link:focus-visible { outline: 2px solid #2B1B14; outline-offset: 2px; border-radius: 2px; }
+.cs-sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
+.cs-typing { flex-direction: row; gap: 5px; padding: 14px; }
+.cs-typing i { width: 7px; height: 7px; border-radius: 50%; background: #6D4C3D; animation: cs-dots 1s ease-in-out infinite; }
+.cs-typing i:nth-child(2) { animation-delay: 120ms; }
+.cs-typing i:nth-child(3) { animation-delay: 240ms; }
+@keyframes cs-dots { 0%, 60%, 100% { opacity: 0.35; transform: none; } 30% { opacity: 1; transform: translateY(-3px); } }
+
+.cs-chips { display: flex; flex: none; flex-direction: column; align-items: flex-start; gap: 8px; padding-left: 36px; }
+/* Setelah percakapan berjalan pilihan dirapatkan, supaya jawaban terakhir tidak terdorong keluar area baca. */
+.cs-chips.is-compact { flex-flow: row wrap; padding-left: 0; }
+.cs-chip { display: inline-flex; align-items: center; gap: 8px; min-height: 40px; padding: 8px 14px; border: 1px solid #E3D5C0; border-radius: 9999px; background: #FFFFFF; color: #2B1B14; font: 500 14px/20px var(--cs-font); text-align: left; cursor: pointer; animation: cs-msg 240ms cubic-bezier(0.22, 1, 0.36, 1) both; transition: background-color 150ms ease, border-color 150ms ease, transform 160ms cubic-bezier(0.22, 1, 0.36, 1); }
+.cs-chip svg { flex: none; color: #6D4C3D; }
+.cs-chip:nth-child(2) { animation-delay: 40ms; }
+.cs-chip:nth-child(3) { animation-delay: 80ms; }
+.cs-chip:nth-child(4) { animation-delay: 120ms; }
+.cs-chip:nth-child(5) { animation-delay: 160ms; }
+.cs-chip:active:not(:disabled) { transform: scale(0.97); }
+.cs-chip:disabled { color: #2B1B14; cursor: default; }
+.cs-chip:focus-visible { outline: 2px solid #2B1B14; outline-offset: 2px; }
+
+.cs-form { display: flex; flex: none; align-items: flex-end; gap: 8px; padding: 12px 12px 8px; border-top: 1px solid #E3D5C0; background: #FFFFFF; }
+.cs-input { display: block; flex: 1; min-width: 0; min-height: 44px; max-height: 112px; padding: 11px 16px; border: 1px solid #6D4C3D; border-radius: 22px; background: #FFFFFF; color: #2B1B14; font: 400 15px/20px var(--cs-font); resize: none; field-sizing: content; }
+.cs-input::placeholder { color: #6D4C3D; opacity: 1; }
+.cs-input:focus { outline: 2px solid #2B1B14; outline-offset: -1px; }
+.cs-send { display: grid; flex: none; place-items: center; width: 44px; height: 44px; padding: 0; border: 0; border-radius: 50%; background: #2B1B14; color: #F6F0E5; opacity: 0.5; cursor: default; transition: opacity 150ms ease, transform 160ms cubic-bezier(0.22, 1, 0.36, 1); }
+.cs-send.is-ready { opacity: 1; cursor: pointer; }
+.cs-send.is-ready:active { transform: scale(0.94); }
+.cs-send:focus-visible { outline: 2px solid #2B1B14; outline-offset: 2px; }
+.cs-panel .cs-notice { flex: none; margin: 0; padding: 0 16px 10px; border-radius: 0 0 15px 15px; background: #FFFFFF; color: #6D4C3D; font: 400 12px/16px var(--cs-font); }
+
+@media (hover: hover) and (pointer: fine) {
+    .cs-head-btn:hover { background: #F6F0E51F; }
+    .cs-chip:hover:not(:disabled) { border-color: #C6A15B; background: #C6A15B26; }
+}
+
+@media (max-width: 767px) {
+    .cs-panel { right: 0; bottom: 0; left: 0; width: auto; height: 88dvh; border-width: 1px 0 0; border-radius: 20px 20px 0 0; transform-origin: 50% 100%; }
+    .cs-panel-sparks { display: none; }
+    .cs-head { border-radius: 19px 19px 0 0; }
+    .cs-chip { min-height: 44px; }
+    /* 16 px mencegah iOS memperbesar halaman saat kolom difokus. */
+    .cs-input { font-size: 16px; }
+    .cs-panel .cs-notice { padding-bottom: calc(10px + env(safe-area-inset-bottom)); border-radius: 0; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .cs-msg, .cs-chip { animation: none; }
+    .cs-typing i { animation: none; opacity: 0.6; }
+    .cs-head-btn, .cs-chip, .cs-send { transition: none; }
+}

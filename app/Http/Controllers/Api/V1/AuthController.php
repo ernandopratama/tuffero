@@ -20,15 +20,30 @@ class AuthController extends Controller
             'password' => ['required'],
         ]);
 
-        if (Auth::attempt($credentials)) {
-            $request->session()->regenerate();
+        if (! Auth::validate([...$credentials, 'is_active' => true])) {
+            return $this->error('The provided credentials do not match our records.', [], 401);
+        }
 
-            return $this->success('Login successful.', [
-                'user' => $this->accessProfile(Auth::user()),
+        $user = User::where('email', $credentials['email'])->firstOrFail();
+
+        $request->session()->regenerate();
+
+        if ($user->mfa_required) {
+            $request->session()->put('mfa', [
+                'pending_user_id' => $user->id,
+                'pending_expires_at' => now()->addMinutes(5)->getTimestamp(),
+            ]);
+
+            return $this->success('Password verified.', [
+                'mfa' => $user->mfa_totp_confirmed_at ? 'challenge' : 'setup',
             ]);
         }
 
-        return $this->error('The provided credentials do not match our records.', [], 401);
+        Auth::guard('web')->login($user);
+
+        return $this->success('Login successful.', [
+            'user' => $user->accessProfile(),
+        ]);
     }
 
     public function logout(Request $request): JsonResponse
@@ -44,24 +59,7 @@ class AuthController extends Controller
     public function user(Request $request): JsonResponse
     {
         return $this->success('User retrieved successfully.', [
-            'user' => $this->accessProfile($request->user()),
+            'user' => $request->user()->accessProfile(),
         ]);
-    }
-
-    /** @return array<string, mixed> */
-    private function accessProfile(User $user): array
-    {
-        $user->unsetRelation('roles');
-        $user->unsetRelation('permissions');
-        $roles = $user->getRoleNames()->values();
-
-        return [
-            'id' => $user->id,
-            'name' => $user->name,
-            'email' => $user->email,
-            'role' => $roles->first(),
-            'roles' => $roles,
-            'permissions' => $user->getAllPermissions()->pluck('name')->sort()->values(),
-        ];
     }
 }

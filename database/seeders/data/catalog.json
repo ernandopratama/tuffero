@@ -1,0 +1,409 @@
+[
+    {
+        "sku": "NAS-TOP-01",
+        "name": "Nastar Sultan Nanas Premium",
+        "price": 144000,
+        "compare_at_price": 150000,
+        "weight_gram": 500,
+        "net_weight_gram": 250,
+        "shelf_life_days": 21,
+        "photos": [
+            "images/Produk/detail/Nastar Sultan 1.webp",
+            "images/Produk/detail/Nastar Sultan 2.webp",
+            "images/Produk/detail/Nastar Sultan 3.webp",
+            "images/Produk/detail/Nastar Sultan 4.webp",
+            "images/Produk/detail/Nastar Sultan 5.webp",
+            "images/Produk/detail/Nastar Sultan 6.webp",
+            "images/Produk/detail/Nastar Sultan 7.webp"
+        ]
+    },
+    {
+        "sku": "NAS-CLAS-01",
+        "name": "Nastar Classic Nanas Homemade",
+        "price": 144000,
+        "compare_at_price": 150000,
+        "weight_gram": 550,
+        "net_weight_gram": null,
+        "shelf_life_days": 21,
+        "photos": [
+            "images/Produk/detail/Nastar Classic 1.webp",
+            "images/Produk/detail/Nastar Classic 2.webp",
+            "images/Produk/detail/Nastar Classic 3.webp",
+            "images/Produk/detail/Nastar Classic 4.webp",
+            "images/Produk/detail/Nastar Classic 5.webp"
+        ]
+    },
+    {
+        "sku": "NAS-APEL-01",
+        "name": "Nastar Apel Premium",
+        "price": 85000,
+        "compare_at_price": 100000,
+        "weight_gram": 500,
+        "net_weight_gram": 390,
+        "shelf_life_days": 14,
+        "photos": [
+            "images/Produk/detail/Nastar Apel 1.webp",
+            "images/Produk/detail/Nastar Apel 2.webp",
+            "images/Produk/detail/Nastar Apel 3.webp",
+            "images/Produk/detail/Nastar Apel 4.webp"
+        ]
+    },
+    {
+        "sku": "NAS-COO-01",
+        "name": "Nastar Cookies (Tanpa Telur)",
+        "price": 90250,
+        "compare_at_price": 95000,
+        "weight_gram": 500,
+        "net_weight_gram": null,
+        "shelf_life_days": 21,
+        "photos": [
+            "images/Produk/detail/Nastar Cookies 1.webp",
+            "images/Produk/detail/Nastar Cookies 2.webp",
+            "images/Produk/detail/Nastar Cookies 3.webp",
+            "images/Produk/detail/Nastar Cookies 4.webp",
+            "images/Produk/detail/Nastar Cookies 5.webp"
+        ]
+    },
+    {
+        "sku": "MAC-MIN-31",
+        "name": "Macaron Mini Isi 30 (6 Rasa)",
+        "price": 68850,
+        "compare_at_price": 85000,
+        "weight_gram": 250,
+        "net_weight_gram": null,
+        "shelf_life_days": 14,
+        "photos": [
+            "images/Produk/detail/Macaron isi 30 1.webp",
+            "images/Produk/detail/Macaron isi 30 2.webp",
+            "images/Produk/detail/Macaron isi 30 3.webp"
+        ]
+    },
+    {
+        "sku": "MAC-MIN-30",
+        "name": "Macaron Mini Isi 30 Almond",
+        "price": 63180,
+        "compare_at_price": 78000,
+        "weight_gram": 300,
+        "net_weight_gram": null,
+        "shelf_life_days": 14,
+        "photos": [
+            "images/Produk/detail/Macaron isi 30 3.webp",
+            "images/Produk/detail/Macaron isi 30 1.webp",
+            "images/Produk/detail/Macaron isi 30 2.webp"
+        ]
+    },
+    {
+        "sku": "MAC-MIN-50",
+        "name": "Macaron Mini Isi 50 Premium",
+        "price": 109250,
+        "compare_at_price": 115000,
+        "weight_gram": 500,
+        "net_weight_gram": null,
+        "shelf_life_days": 14,
+        "photos": [
+            "images/Produk/detail/Macaron isi 50 1.webp",
+            "images/Produk/detail/Macaron isi 50 2.webp",
+            "images/Produk/detail/Macaron isi 50 3.webp",
+            "images/Produk/detail/Macaron isi 50 4.webp"
+        ]
+    },
+    {
+        "sku": "MAC-REG-06",
+        "name": "Macaron Besar Regular Isi 6",
+        "price": 53350,
+        "compare_at_price": 55000,
+        "weight_gram": 200,
+        "net_weight_gram": null,
+        "shelf_life_days": 14,
+        "photos": [
+            "images/Produk/detail/macaron regular 1.webp",
+            "images/Produk/detail/macaron regular 2.webp"
+        ]
+    },
+    {
+        "sku": "PIA-OLH-02",
+        "name": "Pia Cokelat Premium",
+        "price": 57200,
+        "compare_at_price": 65000,
+        "weight_gram": 400,
+        "net_weight_gram": null,
+        "shelf_life_days": 30,
+        "photos": [
+            "images/Produk/detail/Pia premium 1.webp",
+            "images/Produk/detail/Pia premium 2.webp",
+            "images/Produk/detail/Pia premium 3.webp"
+        ]
+    },
+    {
+        "sku": "CHO-DUB-01",
+        "name": "Cokelat Dubai Kunafa Pistachio Brownies",
+        "price": 50250,
+        "compare_at_price": 75000,
+        "weight_gram": 250,
+        "net_weight_gram": 130,
+        "shelf_life_days": 30,
+        "photos": [
+            "images/Produk/detail/Dubai 1.webp",
+            "images/Produk/detail/Dubai 2.webp",
+            "images/Produk/detail/Dubai 3.webp",
+            "images/Produk/detail/Dubai 4.webp"
+        ]
+    },
+    {
+        "sku": "BRW-BOX-03",
+        "name": "Brownies Marble Box",
+        "price": 40500,
+        "compare_at_price": 50000,
+        "weight_gram": 500,
+        "net_weight_gram": null,
+        "shelf_life_days": 30,
+        "photos": [
+            "images/Produk/detail/brownies susu 1.webp",
+            "images/Produk/detail/brownies susu 2.webp",
+            "images/Produk/detail/brownies susu 3.webp",
+            "images/Produk/detail/brownies susu 4.webp"
+        ]
+    },
+    {
+        "sku": "MER-TOP-01",
+        "name": "Meringue Cookies",
+        "price": 19750,
+        "compare_at_price": 25000,
+        "weight_gram": 200,
+        "net_weight_gram": null,
+        "shelf_life_days": 60,
+        "photos": [
+            "images/Produk/detail/Meringue 1.webp",
+            "images/Produk/detail/Meringue 2.webp",
+            "images/Produk/detail/Meringue 3.webp",
+            "images/Produk/detail/Meringue 4.webp"
+        ]
+    },
+    {
+        "sku": "BUNDLING-NAS-02",
+        "name": "Paket Nastar Wisman + Classic",
+        "price": 270000,
+        "compare_at_price": 300000,
+        "weight_gram": 700,
+        "net_weight_gram": null,
+        "shelf_life_days": 21,
+        "photos": [
+            "images/Produk/detail/Nastar Classic 3.webp",
+            "images/Produk/detail/Nastar Classic 1.webp",
+            "images/Produk/detail/Nastar Classic 2.webp",
+            "images/Produk/detail/Nastar Classic 4.webp",
+            "images/Produk/detail/Nastar Classic 5.webp"
+        ]
+    },
+    {
+        "sku": "SELAI-NANAS-01",
+        "name": "Selai Nanas Nastar Sultan",
+        "price": 45100,
+        "compare_at_price": 55000,
+        "weight_gram": 600,
+        "net_weight_gram": 500,
+        "shelf_life_days": 180,
+        "photos": [
+            "images/Produk/detail/Selai 1.webp",
+            "images/Produk/detail/selai 2.webp",
+            "images/Produk/detail/selai 3.webp",
+            "images/Produk/detail/selai 4.webp",
+            "images/Produk/detail/selai 5.webp"
+        ]
+    },
+    {
+        "sku": "MAC-PAK-01",
+        "name": "Paket 2 Box Mini + 1 Box Regular",
+        "price": 70400,
+        "compare_at_price": 80000,
+        "weight_gram": 300,
+        "net_weight_gram": null,
+        "shelf_life_days": 14,
+        "photos": [
+            "images/Produk/detail/macaron regular 2.webp",
+            "images/Produk/detail/macaron regular 1.webp"
+        ]
+    },
+    {
+        "sku": "MAC-REM-01",
+        "name": "Macaron Crumbs Remahan",
+        "price": 19710,
+        "compare_at_price": 27000,
+        "weight_gram": 100,
+        "net_weight_gram": null,
+        "shelf_life_days": 30,
+        "photos": [
+            "images/Produk/detail/Macaron Crumb 1.webp",
+            "images/Produk/detail/Macaron Crumb 2.webp",
+            "images/Produk/detail/Macaron Crumb 3.webp"
+        ]
+    },
+    {
+        "sku": "MAC-RICE-01",
+        "name": "Macaron Rice Crispy Cokelat",
+        "price": 18860,
+        "compare_at_price": 23000,
+        "weight_gram": 100,
+        "net_weight_gram": null,
+        "shelf_life_days": 30,
+        "photos": [
+            "images/Produk/detail/rice cokelat 1.webp",
+            "images/Produk/detail/rice cokelat 2.webp",
+            "images/Produk/detail/rice cokelat 3.webp"
+        ]
+    },
+    {
+        "sku": "MAC-RICE-02",
+        "name": "Macaron Rice Crispy Strawberry",
+        "price": 18860,
+        "compare_at_price": 25000,
+        "weight_gram": 100,
+        "net_weight_gram": null,
+        "shelf_life_days": 30,
+        "photos": [
+            "images/Produk/detail/rice strawberry 1.webp",
+            "images/Produk/detail/rice strawberry 2.webp",
+            "images/Produk/detail/rice strawberry 3.webp",
+            "images/Produk/detail/rice strawberry 4.webp"
+        ]
+    },
+    {
+        "sku": "CHO-DUB-02",
+        "name": "Paket 2 Cokelat Dubai",
+        "price": 99000,
+        "compare_at_price": 150000,
+        "weight_gram": 500,
+        "net_weight_gram": null,
+        "shelf_life_days": 30,
+        "photos": [
+            "images/Produk/detail/Dubai 2.webp",
+            "images/Produk/detail/Dubai 1.webp",
+            "images/Produk/detail/Dubai 3.webp",
+            "images/Produk/detail/Dubai 4.webp"
+        ]
+    },
+    {
+        "sku": "COO-BIT-02",
+        "name": "Choco Chips Cookies",
+        "price": 8500,
+        "compare_at_price": null,
+        "weight_gram": 50,
+        "net_weight_gram": null,
+        "shelf_life_days": 30,
+        "photos": [
+            "images/Produk/detail/Cookies 1.webp",
+            "images/Produk/detail/Cookies 2.webp",
+            "images/Produk/detail/Cookies 3.webp"
+        ]
+    },
+    {
+        "sku": "COO-LUM-01",
+        "name": "Chocopia Lumer",
+        "price": 8550,
+        "compare_at_price": 9000,
+        "weight_gram": 50,
+        "net_weight_gram": null,
+        "shelf_life_days": 30,
+        "photos": [
+            "images/Produk/detail/Chocopia Lumer 1.webp",
+            "images/Produk/detail/Chocopia Lumer 2.webp",
+            "images/Produk/detail/Chocopia Lumer 3.webp"
+        ]
+    },
+    {
+        "sku": "TERASI-KING-01",
+        "name": "Terasi Oven King 1 Toples",
+        "price": 28000,
+        "compare_at_price": null,
+        "weight_gram": 100,
+        "net_weight_gram": null,
+        "shelf_life_days": 730,
+        "photos": [
+            "images/Produk/thumb/terasi1.webp"
+        ]
+    },
+    {
+        "sku": "TERASI-KING-02",
+        "name": "Terasi Oven King 2 Toples",
+        "price": 66000,
+        "compare_at_price": 70000,
+        "weight_gram": 250,
+        "net_weight_gram": null,
+        "shelf_life_days": 730,
+        "photos": [
+            "images/Produk/thumb/terasi2.webp"
+        ]
+    },
+    {
+        "sku": "TERASI-KING-03",
+        "name": "Terasi Oven King 3 Toples",
+        "price": 95000,
+        "compare_at_price": 105000,
+        "weight_gram": 350,
+        "net_weight_gram": null,
+        "shelf_life_days": 730,
+        "photos": [
+            "images/Produk/thumb/terasi3.webp"
+        ]
+    },
+    {
+        "sku": "TERASI-SACHET-12",
+        "name": "Terasi Oven King 12 Sachet",
+        "price": 26000,
+        "compare_at_price": null,
+        "weight_gram": 100,
+        "net_weight_gram": null,
+        "shelf_life_days": 730,
+        "photos": [
+            "images/Produk/thumb/sachet12.webp"
+        ]
+    },
+    {
+        "sku": "BUMBU-HTM-01",
+        "name": "Sambal Bebek Bumbu Hitam 1 Pouch",
+        "price": 19500,
+        "compare_at_price": 25000,
+        "weight_gram": 200,
+        "net_weight_gram": null,
+        "shelf_life_days": 60,
+        "photos": [
+            "images/Produk/thumb/sambal1.webp"
+        ]
+    },
+    {
+        "sku": "BUMBU-HTM-03",
+        "name": "Sambal Bebek Bumbu Hitam 3 Pouch",
+        "price": 45000,
+        "compare_at_price": 75000,
+        "weight_gram": 450,
+        "net_weight_gram": null,
+        "shelf_life_days": 60,
+        "photos": [
+            "images/Produk/thumb/sambal3.webp"
+        ]
+    },
+    {
+        "sku": "BUMBU-HTM-05",
+        "name": "Sambal Bebek Bumbu Hitam 5 Pouch",
+        "price": 72500,
+        "compare_at_price": 125000,
+        "weight_gram": 750,
+        "net_weight_gram": null,
+        "shelf_life_days": 60,
+        "photos": [
+            "images/Produk/thumb/sambal5.webp"
+        ]
+    },
+    {
+        "sku": "BUMBU-HTM-02",
+        "name": "Bundling 2 Sambal + 1 Terasi",
+        "price": 63000,
+        "compare_at_price": null,
+        "weight_gram": 500,
+        "net_weight_gram": null,
+        "shelf_life_days": 60,
+        "photos": [
+            "images/Produk/thumb/bundling.webp"
+        ]
+    }
+]

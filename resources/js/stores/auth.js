@@ -1,6 +1,9 @@
 import { defineStore } from 'pinia';
 import api from '../utils/api';
 
+// Header, guard rute, dan checkout bisa bertanya bersamaan; cukup satu request.
+let userRequest = null;
+
 export const useAuthStore = defineStore('auth', {
     state: () => ({
         user: null,
@@ -31,13 +34,30 @@ export const useAuthStore = defineStore('auth', {
             // Get CSRF cookie first for Sanctum SPA auth (must use same origin with credentials)
             await api.get('/sanctum/csrf-cookie', { baseURL: '/' });
 
-            const response = await api.post('/auth/login', credentials);
+            const { data } = await api.post('/auth/login', credentials);
 
-            if (response.data.success) {
-                this.setUser(response.data.data.user);
-                return true;
+            if (data.data.user) {
+                this.setUser(data.data.user);
             }
-            return false;
+
+            // null = login selesai; 'setup' atau 'challenge' = masih butuh langkah MFA.
+            return data.data.mfa || null;
+        },
+
+        async startMfaSetup() {
+            const { data } = await api.post('/auth/mfa/setup');
+            return data.data;
+        },
+
+        async confirmMfa(code) {
+            const { data } = await api.post('/auth/mfa/confirm', { code });
+            this.setUser(data.data.user);
+            return data.data.recovery_codes;
+        },
+
+        async verifyMfa(payload) {
+            const { data } = await api.post('/auth/mfa/verify', payload);
+            this.setUser(data.data.user);
         },
 
         async logout() {
@@ -46,7 +66,12 @@ export const useAuthStore = defineStore('auth', {
             this.isAuthenticated = false;
         },
 
-        async fetchUser() {
+        fetchUser() {
+            userRequest ??= this.loadUser().finally(() => { userRequest = null; });
+            return userRequest;
+        },
+
+        async loadUser() {
             try {
                 const response = await api.get('/auth/user');
                 if (response.data.success) {

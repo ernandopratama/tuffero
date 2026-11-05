@@ -34,3 +34,13 @@ Thumbs.db
 
 # Internal client documents, never push
 /TUFFERO/
+
+# Data produk internal (bukan untuk repository)
+/docs/Data Produk Tuffero.xlsx
+
+# Akun uji lokal berisi password, dibuat DemoAccountSeeder
+/docs/DEMO_ACCOUNTS.local.md
+
+# Dokumentasi proyek dan catatan kerja: hanya lokal, tidak di-push
+/docs/
+/pertanyaan_31-10-26.txt

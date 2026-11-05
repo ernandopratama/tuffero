@@ -15,7 +15,8 @@ api.interceptors.response.use(
     (response) => response,
     (error) => {
         // Handle 401 Unauthorized globally
-        if (error.response && error.response.status === 401 && router.currentRoute.value.name !== 'Login') {
+        // /auth/user dipanggil penjaga rute untuk memeriksa sesi; penjaga itu yang memutuskan arah. Mengalihkan di sini membuat perulangan tanpa henti.
+        if (error.response && error.response.status === 401 && error.config?.url !== '/auth/user' && router.currentRoute.value.meta.requiresAuth) {
             router.push({ name: 'Login' });
         }
         return Promise.reject(error);

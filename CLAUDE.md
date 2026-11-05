@@ -121,7 +121,7 @@ Expected technologies include:
 
 - Laravel 13.
 - PHP.
-- PostgreSQL.
+- MySQL 8.4 (Decision Log D-024).
 - Tailwind CSS 4.
 - Vite.
 - Blade (storefront).
@@ -148,13 +148,15 @@ Verify the actual installed versions and implementation before making assumption
 
 ### Frontend engineering
 
-Tuffero uses a hybrid frontend (Decision Log D-021):
+Tuffero uses a hybrid frontend (Decision Log D-053, which replaces D-047):
 
-- Storefront pages (home, catalog, product detail, cart, checkout, order status) are server-rendered with Blade and Tailwind CSS, using Alpine.js only where interactivity is needed. Server rendering is required for SEO, link previews on Instagram/WhatsApp, and fast first load on mobile.
-- The admin area under `/admin` is a Vue 3 SPA (vue-router, Pinia) that talks to the `/api/v1` API.
-- Do not mix the two: no Vue SPA pages in the storefront, no Blade pages in the admin area.
-- Both share the same Tailwind design tokens and the same backend models, services, and business rules.
-- As of 2026-10-30 the code is not yet migrated: the homepage is still a Vue page and the SPA catch-all still covers every path. That migration is a separate, planned task.
+- Storefront pages are rendered by the server with Blade and Tailwind CSS, with Alpine.js (`@alpinejs/csp`) only where interaction is needed. See `resources/views/store` and `resources/js/store`.
+- `/admin` and `/login` stay a Vue 3 SPA (vue-router, Pinia) talking to the `/api/v1` API.
+- Do not mix them: no Vue pages in the storefront, no Blade pages in the admin area.
+- Storefront text lives in `lang/{id,en}/store.php` (Indonesian default, English for public pages only, D-036). The admin area is Indonesian only.
+- Use Blade `{{ }}`. Do not use `{!! !!}` or `x-html` for user data. Storefront writes go through the existing `/api/v1` endpoints with the CSRF token.
+- Storefront pages must keep per-page title, description, Open Graph, canonical, and `hreflang` in the first HTML, plus `sitemap.xml` and `robots.txt`.
+- The storefront and admin share the same Tailwind design tokens and the same backend models, services, and business rules.
 
 - Follow the existing architecture of the area you are working in.
 - Reuse existing layouts, partials, and components where appropriate.
