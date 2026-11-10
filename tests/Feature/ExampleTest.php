@@ -3,10 +3,14 @@
 namespace Tests\Feature;
 
 // use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
 
 class ExampleTest extends TestCase
 {
+    // Beranda kini dirender server dan membaca katalog (D-053).
+    use RefreshDatabase;
+
     /**
      * A basic test example.
      */

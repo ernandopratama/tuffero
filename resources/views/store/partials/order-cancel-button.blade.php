@@ -1,0 +1,2 @@
+{{-- Tombol "Ajukan Pembatalan" bergaya lingkaran + panah yang melebar saat hover (diadaptasi dari Uiverse.io, cssbuttons-io); membuka modal pembatalan. Gaya: .tf-learn di public/css/tuffero-landing.css. --}}
+<button type="button" class="tf-learn" aria-haspopup="dialog" @click="openCancel"><span class="tf-learn-circle" aria-hidden="true"><span class="tf-learn-arrow"></span></span><span class="tf-learn-text">{{ $c['cancel']['submit'] }}</span></button>
