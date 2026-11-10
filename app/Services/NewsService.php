@@ -7,6 +7,8 @@ use App\Models\Campaign;
 use App\Models\NewsItem;
 use App\Models\User;
 use Illuminate\Http\UploadedFile;
+use Illuminate\Support\Arr;
+use Illuminate\Support\Carbon;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
@@ -109,10 +111,10 @@ class NewsService
 
         $version = md5($items->pluck('key')->implode('|').'|'.$items->pluck('stamp')->implode('|'));
 
-        return ['items' => $items->map(fn (array $item) => \Illuminate\Support\Arr::except($item, ['stamp']))->all(), 'version' => $version];
+        return ['items' => $items->map(fn (array $item) => Arr::except($item, ['stamp']))->all(), 'version' => $version];
     }
 
-    /** @param array<string, string> $words @return array<string, mixed> */
+    /** @param array<string, mixed> $words @return array<string, mixed> */
     private function fromNews(NewsItem $n, string $locale, array $words): array
     {
         $hasLink = $n->cta_url && $n->textFor('cta_label', $locale);
@@ -130,7 +132,7 @@ class NewsService
         ];
     }
 
-    /** @param array<string, string> $words @return array<string, mixed> */
+    /** @param array<string, mixed> $words @return array<string, mixed> */
     private function fromCampaign(Campaign $c, bool $live, string $locale, array $words): array
     {
         return [
@@ -148,7 +150,7 @@ class NewsService
 
     private function day(\DateTimeInterface $date, string $locale): string
     {
-        return \Illuminate\Support\Carbon::instance($date)->locale($locale)->translatedFormat('j M Y');
+        return Carbon::instance($date)->locale($locale)->translatedFormat('j M Y');
     }
 
     /** Jumlah item yang akan tampil sekarang; untuk indikator slot di admin. */

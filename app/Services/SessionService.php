@@ -4,6 +4,7 @@ namespace App\Services;
 
 use App\Models\AuditLog;
 use App\Models\User;
+use Illuminate\Database\Query\Builder;
 use Illuminate\Support\Facades\DB;
 
 /**
@@ -81,7 +82,7 @@ class SessionService
         });
     }
 
-    private function table(): \Illuminate\Database\Query\Builder
+    private function table(): Builder
     {
         return DB::table(config('session.table', 'sessions'));
     }

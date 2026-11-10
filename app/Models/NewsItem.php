@@ -2,13 +2,19 @@
 
 namespace App\Models;
 
+use Carbon\CarbonInterface;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Attributes\Scope;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\SoftDeletes;
 
-/** Berita, update, atau promo manual di popup beranda toko (D-085). Dikelola Marketing dan Super Admin. */
+/**
+ * Berita, update, atau promo manual di popup beranda toko (D-085). Dikelola Marketing dan Super Admin.
+ *
+ * @property CarbonInterface|null $starts_at
+ * @property CarbonInterface|null $ends_at
+ */
 #[Fillable(['kind', 'title', 'title_en', 'body', 'body_en', 'cta_label', 'cta_label_en', 'cta_url', 'starts_at', 'ends_at', 'sort_order', 'is_published'])]
 class NewsItem extends Model
 {

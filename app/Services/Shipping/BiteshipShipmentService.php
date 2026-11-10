@@ -117,7 +117,7 @@ class BiteshipShipmentService
             return false;
         }
 
-        $event = $payload['event'] ?? null;
+        $event = $payload['event'];
         $biteshipId = $payload['order_id'] ?? null;
 
         if (! in_array($event, ['order.status', 'order.waybill_id'], true) || ! is_string($biteshipId) || $biteshipId === '') {

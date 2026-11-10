@@ -3,6 +3,7 @@
 namespace Tests\Feature;
 
 use App\Models\Campaign;
+use App\Models\GalleryPhoto;
 use App\Models\Product;
 use App\Models\User;
 use App\Services\ImageService;
@@ -77,7 +78,7 @@ class ImageConversionTest extends TestCase
         $id = $this->post('/api/v1/admin/gallery-photos', ['title' => 'Foto', 'category' => 'nastar', 'image' => UploadedFile::fake()->image('foto.jpeg', 900, 900)], ['Accept' => 'application/json'])
             ->assertCreated()->json('data.id');
 
-        $this->assertWebp(\App\Models\GalleryPhoto::findOrFail($id)->image_path);
+        $this->assertWebp(GalleryPhoto::findOrFail($id)->image_path);
         $this->post('/api/v1/admin/gallery-photos', ['title' => 'Foto', 'category' => 'nastar', 'image' => UploadedFile::fake()->image('foto.webp', 900, 900)], ['Accept' => 'application/json'])
             ->assertUnprocessable();
     }

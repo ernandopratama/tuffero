@@ -56,12 +56,12 @@ class User extends Authenticatable
         return $this->hasMany(Order::class);
     }
 
-    /** @return array<string, mixed> */
     public function avatarUrl(): ?string
     {
         return $this->avatar_path ? '/storage/'.$this->avatar_path : null;
     }
 
+    /** @return array<string, mixed> */
     public function accessProfile(): array
     {
         $this->unsetRelation('roles');

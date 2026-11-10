@@ -208,7 +208,7 @@ class VoucherService
      * setelah voucher pertama, jadi total potongan tidak pernah melebihi subtotal. Minimum belanja tiap voucher
      * dibandingkan dengan subtotal penuh. Dengan $lock, baris voucher dikunci (urut id, tanpa kebuntuan) untuk checkout.
      *
-     * @param  list<string>  $codes
+     * @param  list<mixed>  $codes
      * @return list<array{voucher: Voucher, discount: int}>
      *
      * @throws ValidationException

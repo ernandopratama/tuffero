@@ -3,9 +3,9 @@
 namespace App\Http\Requests\Admin;
 
 use App\Models\GalleryPhoto;
+use App\Services\ImageService;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
-use App\Services\ImageService;
 
 class GalleryPhotoRequest extends FormRequest
 {

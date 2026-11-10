@@ -27,7 +27,7 @@ class MentionedInComment extends Notification
     /** @return array<string, string> */
     public function toArray(object $notifiable): array
     {
-        $noun = ['order' => 'pesanan', 'voucher' => 'voucher', 'content' => 'konten promo', 'video' => 'video'][$this->kind] ?? 'catatan';
+        $noun = ['order' => 'pesanan', 'voucher' => 'voucher', 'content' => 'konten promo', 'video' => 'video'][$this->kind];
 
         return [
             'event' => 'mention',
