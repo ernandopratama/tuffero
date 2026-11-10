@@ -1,0 +1,22 @@
+---
+# Deploy branch dev ke Jagoan Hosting (tuffero.ernando.my.id). Dipakai oleh cPanel Git Version Control → Deploy HEAD Commit.
+# Repo cPanel hanya sumber; aplikasi berjalan di APP. Document Root domain harus APP/public.
+deployment:
+  tasks:
+    - export REPO=/home/ernando2/repositories/tuffero-dev
+    - export APP=/home/ernando2/tuffero.ernando.my.id
+    - export PATH=/opt/alt/alt-nodejs24/root/usr/bin:/usr/local/bin:/usr/bin:/bin
+    # Berhenti bila .env belum dibuat: jangan pernah menjalankan aplikasi tanpa konfigurasi dev.
+    - test -f "$APP/.env"
+    # Salin kode. -rlt tanpa -p supaya izin folder APP (750, grup nobody) tidak tertimpa izin repo (700).
+    # --delete membuang file yang dihapus di Git; path di --exclude tidak pernah disentuh (milik server).
+    - /bin/rsync -rlt --delete --exclude=/.git/ --exclude=/.cpanel.yml --exclude=/.env --exclude=/vendor/ --exclude=/node_modules/ --exclude=/storage/ --exclude=/public/build/ --exclude=/public/storage --exclude=/bootstrap/cache/*.php --exclude=/.htaccess --exclude=/.user.ini --exclude=/php.ini --exclude=/cgi-bin/ --exclude=/.well-known/ --exclude=/public/.well-known/ --exclude=/public/.user.ini --exclude=/public/php.ini "$REPO/" "$APP/"
+    # Struktur storage dari repo hanya dibuat bila belum ada; isi (upload, log, sesi) tetap.
+    - /bin/rsync -rlt --ignore-existing "$REPO/storage/" "$APP/storage/"
+    - cd "$APP" && /home/ernando2/bin/composer install --no-dev --optimize-autoloader --no-interaction --no-progress
+    - cd "$APP" && npm ci && npm run build
+    # symlink() PHP diblokir hosting, jadi link storage dibuat lewat shell.
+    - cd "$APP" && { [ -L public/storage ] || ln -s ../storage/app/public public/storage; }
+    - cd "$APP" && php artisan migrate --force
+    - cd "$APP" && php artisan optimize
+    - cd "$APP" && php artisan queue:restart
