@@ -1,5 +1,7 @@
 <?php
 
+use App\Services\MidtransService;
+
 return [
 
     /*
@@ -43,7 +45,7 @@ return [
             }
 
             return $value === ''
-                ? \App\Services\MidtransService::DEFAULT_PAYMENT_METHODS
+                ? MidtransService::DEFAULT_PAYMENT_METHODS
                 : array_values(array_filter(array_map('trim', explode(',', $value))));
         })(),
     ],

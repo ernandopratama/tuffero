@@ -7,6 +7,7 @@ use App\Models\Product;
 use App\Models\User;
 use Database\Seeders\RolePermissionSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Vite;
 use PHPUnit\Framework\Attributes\DataProvider;
 use Tests\TestCase;
 
@@ -253,7 +254,16 @@ class StorefrontPagesTest extends TestCase
 
     public function test_store_pages_do_not_load_vue_bundle(): void
     {
-        $this->withVite();
-        $this->get('/tentang-kami')->assertOk()->assertDontSee('resources/js/app.js', false)->assertSee('resources/js/store.js', false);
+        // File hot sendiri: tanpa ini hasil bergantung pada ada tidaknya public/hot (dev server) dan public/build (hash nama berkas).
+        $hot = storage_path('framework/testing/vite-hot');
+        file_put_contents($hot, 'http://localhost:5173');
+        Vite::useHotFile($hot);
+
+        try {
+            $this->withVite();
+            $this->get('/tentang-kami')->assertOk()->assertDontSee('resources/js/app.js', false)->assertSee('resources/js/store.js', false);
+        } finally {
+            @unlink($hot);
+        }
     }
 }
