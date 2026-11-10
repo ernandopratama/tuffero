@@ -43,7 +43,7 @@ return [
             }
 
             return $value === ''
-                ? AppServicesMidtransService::DEFAULT_PAYMENT_METHODS
+                ? \App\Services\MidtransService::DEFAULT_PAYMENT_METHODS
                 : array_values(array_filter(array_map('trim', explode(',', $value))));
         })(),
     ],
