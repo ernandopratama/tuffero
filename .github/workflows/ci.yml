@@ -65,8 +65,11 @@ jobs:
         run: npm ci
 
       # Sebagian test merender view dengan @vite, jadi manifest harus ada.
+      # Plugin laravel:fonts mengunduh font dari CDN saat build; timeout jaringan kadang terjadi di runner, jadi ulangi sampai 3 kali.
       - name: Build assets
-        run: npm run build
+        run: |
+          for i in 1 2 3; do npm run build && exit 0; sleep 10; done
+          exit 1
 
       - name: Prepare environment
         run: |

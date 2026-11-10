@@ -11,6 +11,8 @@ class OrderItem extends Model
 {
     /**
      * Hanya untuk foto di halaman pesanan; nama, harga, dan jumlah tetap dari snapshot. Bisa null bila varian dihapus.
+     *
+     * @return BelongsTo<ProductVariant, $this>
      */
     public function variant(): BelongsTo
     {
