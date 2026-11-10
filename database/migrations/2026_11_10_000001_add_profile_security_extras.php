@@ -20,8 +20,9 @@ return new class extends Migration
             $table->string('browser', 40);
             $table->string('os', 40);
             $table->string('ip_address', 45)->nullable();
-            $table->timestamp('first_seen_at');
-            $table->timestamp('last_seen_at');
+            // useCurrent: MariaDB (server dev) menolak TIMESTAMP NOT NULL kedua tanpa default, dan memberi kolom pertama ON UPDATE otomatis.
+            $table->timestamp('first_seen_at')->useCurrent();
+            $table->timestamp('last_seen_at')->useCurrent();
             $table->unique(['user_id', 'fingerprint']);
         });
     }
