@@ -3,15 +3,12 @@ deployment:
   tasks:
     - export REPOPATH=/home/ernando2/repositories/tuffero-dev
     - export DEPLOYPATH=/home/ernando2/tuffero.ernando.my.id
-    - export PATH=/opt/alt/alt-nodejs24/root/usr/bin:/opt/alt/php85/usr/bin:/usr/local/bin:/usr/bin:/bin
+    - export PATH=/opt/alt/php85/usr/bin:/usr/local/bin:/usr/bin:/bin
     - /usr/bin/test -f $DEPLOYPATH/.env
     - cd $REPOPATH && /usr/local/cpanel/3rdparty/bin/git archive HEAD | /bin/tar -x -C $DEPLOYPATH
     - /bin/mkdir -p $DEPLOYPATH/storage/app/public $DEPLOYPATH/storage/framework/cache/data $DEPLOYPATH/storage/framework/sessions $DEPLOYPATH/storage/framework/views $DEPLOYPATH/storage/logs $DEPLOYPATH/bootstrap/cache
     - /bin/chmod -R u+rwX $DEPLOYPATH/storage $DEPLOYPATH/bootstrap/cache
     - cd $DEPLOYPATH && /home/ernando2/bin/composer install --no-dev --optimize-autoloader --no-interaction --no-progress
-    - ulimit -a
-    - export RAYON_NUM_THREADS=1 UV_THREADPOOL_SIZE=2
-    - cd $DEPLOYPATH && npm install --no-audit --no-fund && node --disable-wasm-trap-handler --max-old-space-size=512 node_modules/vite/bin/vite.js build
     - cd $DEPLOYPATH && /usr/bin/test -L public/storage || /bin/ln -s ../storage/app/public $DEPLOYPATH/public/storage
     - cd $DEPLOYPATH && /opt/alt/php85/usr/bin/php artisan migrate --force
     - cd $DEPLOYPATH && /opt/alt/php85/usr/bin/php artisan optimize
