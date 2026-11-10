@@ -9,8 +9,9 @@ deployment:
     - /bin/mkdir -p $DEPLOYPATH/storage/app/public $DEPLOYPATH/storage/framework/cache/data $DEPLOYPATH/storage/framework/sessions $DEPLOYPATH/storage/framework/views $DEPLOYPATH/storage/logs $DEPLOYPATH/bootstrap/cache
     - /bin/chmod -R u+rwX $DEPLOYPATH/storage $DEPLOYPATH/bootstrap/cache
     - cd $DEPLOYPATH && /home/ernando2/bin/composer install --no-dev --optimize-autoloader --no-interaction --no-progress
-    - export RAYON_NUM_THREADS=1 UV_THREADPOOL_SIZE=2 NODE_OPTIONS=--max-old-space-size=768
-    - cd $DEPLOYPATH && npm install --no-audit --no-fund && npm run build
+    - ulimit -a
+    - export RAYON_NUM_THREADS=1 UV_THREADPOOL_SIZE=2
+    - cd $DEPLOYPATH && npm install --no-audit --no-fund && node --max-old-space-size=512 --max-semi-space-size=1 node_modules/vite/bin/vite.js build
     - cd $DEPLOYPATH && /usr/bin/test -L public/storage || /bin/ln -s ../storage/app/public $DEPLOYPATH/public/storage
     - cd $DEPLOYPATH && /opt/alt/php85/usr/bin/php artisan migrate --force
     - cd $DEPLOYPATH && /opt/alt/php85/usr/bin/php artisan optimize
