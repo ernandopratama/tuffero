@@ -5,7 +5,7 @@ deployment:
     - export DEPLOYPATH=/home/ernando2/tuffero.ernando.my.id
     - export PATH=/opt/alt/alt-nodejs24/root/usr/bin:/opt/alt/php85/usr/bin:/usr/local/bin:/usr/bin:/bin
     - /usr/bin/test -f $DEPLOYPATH/.env
-    - /bin/rsync -rlt --delete --exclude=/.git/ --exclude=/.cpanel.yml --exclude=/.env --exclude=/vendor/ --exclude=/node_modules/ --exclude=/storage/ --exclude=/public/build/ --exclude=/public/storage --exclude=/bootstrap/cache/*.php --exclude=/.htaccess --exclude=/.user.ini --exclude=/php.ini --exclude=/cgi-bin/ --exclude=/.well-known/ --exclude=/public/.well-known/ --exclude=/public/.user.ini --exclude=/public/php.ini $REPOPATH/ $DEPLOYPATH/
+    - cd $REPOPATH && /usr/local/cpanel/3rdparty/bin/git archive HEAD | /bin/tar -x -C $DEPLOYPATH
     - /bin/mkdir -p $DEPLOYPATH/storage/app/public $DEPLOYPATH/storage/framework/cache/data $DEPLOYPATH/storage/framework/sessions $DEPLOYPATH/storage/framework/views $DEPLOYPATH/storage/logs $DEPLOYPATH/bootstrap/cache
     - /bin/chmod -R u+rwX $DEPLOYPATH/storage $DEPLOYPATH/bootstrap/cache
     - cd $DEPLOYPATH && /home/ernando2/bin/composer install --no-dev --optimize-autoloader --no-interaction --no-progress
