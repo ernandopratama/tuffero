@@ -257,11 +257,12 @@ class StorefrontPagesTest extends TestCase
         // File hot sendiri: tanpa ini hasil bergantung pada ada tidaknya public/hot (dev server) dan public/build (hash nama berkas).
         $hot = storage_path('framework/testing/vite-hot');
         file_put_contents($hot, 'http://localhost:5173');
+        // withVite() mengembalikan instance Vite asli, jadi file hot harus dipasang sesudahnya.
+        $this->withVite();
         Vite::useHotFile($hot);
 
         try {
-            $this->withVite();
-            $this->get('/tentang-kami')->assertOk()->assertDontSee('resources/js/app.js', false)->assertSee('resources/js/store.js', false);
+            $this->get('/tentang-kami')->assertOk()->assertDontSee('resources/js/app.js', false)->assertSee('http://localhost:5173/resources/js/store.js', false);
         } finally {
             @unlink($hot);
         }
