@@ -74,6 +74,6 @@ class AccountAddressController extends Controller
     /** @return array<string, mixed> */
     private function present(CustomerAddress $address): array
     {
-        return $address->only(['id', 'label', 'recipient_name', 'phone', 'street', 'district', 'city', 'province', 'postal_code', 'is_default']);
+        return $address->only(['id', 'label', 'recipient_name', 'phone', 'street', 'district', 'city', 'province', 'postal_code', 'latitude', 'longitude', 'is_default']);
     }
 }

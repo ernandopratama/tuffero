@@ -240,7 +240,7 @@ class AdminManagementTest extends TestCase
         $admin = $this->staff('store-admin');
 
         $keys = collect($this->actingAs($admin)->getJson('/api/v1/admin/settings')->assertOk()->json('data.settings'))->pluck('key');
-        $this->assertTrue($keys->every(fn (string $key) => str_starts_with($key, 'contact.') || str_starts_with($key, 'reviews.')));
+        $this->assertTrue($keys->every(fn (string $key) => str_starts_with($key, 'contact.') || str_starts_with($key, 'reviews.') || str_starts_with($key, 'discount.')));
         $this->assertContains('contact.whatsapp_number', $keys->all());
 
         $this->patchJson('/api/v1/admin/settings/contact.whatsapp_number', ['value' => '+6281231481755'])->assertOk();
@@ -296,5 +296,17 @@ class AdminManagementTest extends TestCase
             ->assertJsonPath('data.items.0.mfa_enrolled', true)
             ->assertJsonMissingPath('data.items.0.mfa_totp_secret')
             ->assertJsonMissingPath('data.items.0.password');
+    }
+
+    public function test_user_list_filters_by_role_and_active_status(): void
+    {
+        $admin = $this->staff('super-admin');
+        $this->staff('marketing', ['email' => 'mkt-off@example.test', 'is_active' => false]);
+
+        $by = fn (string $query) => collect($this->actingAs($admin)->getJson("/api/v1/admin/users?{$query}")->assertOk()->json('data.items'))->pluck('email');
+
+        $this->assertSame(['mkt-off@example.test'], $by('role=marketing')->all());
+        $this->assertSame(['mkt-off@example.test'], $by('is_active=0')->all());
+        $this->assertNotContains('mkt-off@example.test', $by('is_active=1'));
     }
 }

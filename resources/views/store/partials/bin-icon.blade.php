@@ -1,0 +1,4 @@
+{{-- Ikon tempat sampah beranimasi untuk tombol Hapus (diadaptasi dari Uiverse.io, vinodjangid07). --}}
+<svg class="tf-bin-top" viewBox="0 0 39 7" fill="none" aria-hidden="true"><line x2="39" y1="5" y2="5" stroke="currentColor" stroke-width="4"></line><line x1="12" x2="26.0357" y1="1.5" y2="1.5" stroke="currentColor" stroke-width="3"></line></svg>
+<svg class="tf-bin-bottom" viewBox="0 0 33 39" fill="none" aria-hidden="true"><path d="M2 0V35C2 36.1 2.9 37 4 37H29C30.1 37 31 36.1 31 35V0" stroke="currentColor" stroke-width="4"></path><path d="M12 6V29M21 6V29" stroke="currentColor" stroke-width="4"></path></svg>
+<svg class="tf-bin-garbage" viewBox="0 0 89 80" fill="currentColor" aria-hidden="true"><path d="M20.5 10.5L37.5 15.5L42.5 11.5L51.5 12.5L68.75 0L72 11.5L79.5 12.5H88.5L87 22L68.75 31.5L75.5066 25L86 26L87 35.5L77.5 48L70.5 49.5L80 50L77.5 71.5L63.5 58.5L53.5 68.5L65.5 70.5L45.5 73L35.5 79.5L28 67L16 63L12 51.5L0 48L16 25L22.5 17L20.5 10.5Z"></path></svg>

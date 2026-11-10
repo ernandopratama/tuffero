@@ -37,6 +37,13 @@
     touch-action: manipulation;
 }
 .cs-launcher[data-status='open'] { visibility: hidden; }
+/* Bisa dipindah dengan tekan tahan (utils/chatDrag.js): tanpa seleksi teks atau menu tekan-lama, dan terangkat saat digeser. */
+.cs-launcher { -webkit-user-select: none; user-select: none; -webkit-touch-callout: none; }
+.cs-launcher[data-dragging] { cursor: grabbing; will-change: transform; }
+.cs-launcher[data-dragging][data-status] .cs-react { transform: scale(1.12); }
+.cs-launcher[data-dragging] .cs-float { animation-play-state: paused; }
+.cs-launcher[data-dragging] .cs-glow { opacity: 1; }
+.cs-launcher[data-dragging] .cs-floor { opacity: 0.5; }
 .cs-launcher:focus-visible { outline: 2px solid #2B1B14; outline-offset: 6px; }
 .cs-mascot, .cs-react, .cs-float { position: absolute; inset: 0; display: block; }
 .cs-float img { display: block; width: 100%; height: 100%; }
@@ -99,6 +106,11 @@
     .cs-launcher { right: 16px; }
     /* Bar beli di halaman produk menempel di bawah: maskot dan tombol Kembali ke Atas naik bersama. */
     .tf:has(.tf-pd-sticky) { --cs-bottom: 88px; }
+    /* Navbar bawah smartphone (tinggi 64px + jarak 12px): maskot dan tombol Kembali ke Atas berdiri di atasnya. */
+    .tf:has(.tf-bnav) { --cs-bottom: 88px; }
+    /* Sama untuk navbar bawah dashboard admin; maskot disembunyikan selama menu cepatnya terbuka. */
+    body:has(.admin-bnav) { --cs-bottom: 88px; }
+    body:has(.admin-bnav.is-open) .cs-launcher { visibility: hidden; }
     /* Jangan menutupi menu mobile atau kolom yang sedang diisi saat keyboard terbuka. */
     .tf:has(.tf-mobile.is-open) .cs-launcher,
     body:has(input:focus, textarea:focus, select:focus) .cs-launcher[data-status='idle'] { visibility: hidden; }
@@ -152,6 +164,21 @@
 .cs-panel .cs-msg-user .cs-bubble { display: block; border-color: #2B1B14; border-radius: 14px 14px 4px 14px; background: #2B1B14; color: #F6F0E5; }
 .cs-panel .cs-link { color: #2B1B14; font-weight: 600; text-decoration: underline; text-underline-offset: 3px; }
 .cs-link:focus-visible { outline: 2px solid #2B1B14; outline-offset: 2px; border-radius: 2px; }
+/* Lanjutkan ke WhatsApp: tombol ikon bulat dengan tooltip di kanannya (hover di perangkat ber-mouse, atau fokus keyboard).
+   Hijau tua WhatsApp agar ikon putih tetap kontras (sekitar 4:1). Nama aksesibelnya dari aria-label, jadi tooltip hanya tampilan. */
+.cs-panel .cs-wa { position: relative; display: inline-grid; place-items: center; width: 36px; height: 36px; border-radius: 50%; background: #128C7E; color: #FFFFFF; text-decoration: none; transition: background-color 150ms ease, transform 160ms cubic-bezier(0.22, 1, 0.36, 1); }
+.cs-wa svg { width: 20px; height: 20px; fill: currentColor; }
+.cs-wa:active { transform: scale(0.94); }
+.cs-wa:focus-visible { outline: 2px solid #2B1B14; outline-offset: 2px; border-radius: 50%; }
+.cs-wa::after { content: attr(data-tip); position: absolute; top: 50%; left: calc(100% + 8px); padding: 4px 8px; border-radius: 6px; background: #2B1B14; color: #F6F0E5; font: 600 12px/16px var(--cs-font); white-space: nowrap; pointer-events: none; opacity: 0; transform: translate(-4px, -50%); transition: opacity 150ms ease, transform 150ms cubic-bezier(0.22, 1, 0.36, 1); }
+.cs-wa:focus-visible::after { opacity: 1; transform: translate(0, -50%); }
+@media (hover: hover) and (pointer: fine) {
+    .cs-wa:hover { background: #0F7A6E; }
+    .cs-wa:hover::after { opacity: 1; transform: translate(0, -50%); transition-delay: 200ms; }
+}
+@media (prefers-reduced-motion: reduce) {
+    .cs-wa, .cs-wa::after { transition: none; }
+}
 .cs-sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
 .cs-typing { flex-direction: row; gap: 5px; padding: 14px; }
 .cs-typing i { width: 7px; height: 7px; border-radius: 50%; background: #6D4C3D; animation: cs-dots 1s ease-in-out infinite; }
@@ -168,10 +195,53 @@
 .cs-chip:nth-child(3) { animation-delay: 80ms; }
 .cs-chip:nth-child(4) { animation-delay: 120ms; }
 .cs-chip:nth-child(5) { animation-delay: 160ms; }
+.cs-chip:nth-child(6) { animation-delay: 200ms; }
+/* Tombol saran dari FAQ: dibedakan dari menu tetap lewat judul kecil dan garis emas. */
+.cs-panel .cs-chips-label { flex-basis: 100%; margin: 8px 0 0; color: #6D4C3D; font: 600 11px/16px var(--cs-font); letter-spacing: 0.08em; text-transform: uppercase; animation: cs-msg 240ms cubic-bezier(0.22, 1, 0.36, 1) 240ms both; }
+.cs-chip-faq { border-color: #C6A15B; animation-delay: 280ms; }
 .cs-chip:active:not(:disabled) { transform: scale(0.97); }
 .cs-chip:disabled { color: #2B1B14; cursor: default; }
 .cs-chip:focus-visible { outline: 2px solid #2B1B14; outline-offset: 2px; }
 
+.cs-flow { display: flex; flex: none; flex-direction: column; gap: 10px; margin-left: 36px; padding: 12px; border: 1px solid #E3D5C0; border-radius: 14px; background: #FFFFFF; }
+.cs-field { display: flex; flex: 1; min-width: 0; flex-direction: column; gap: 4px; color: #2B1B14; font: 500 13px/18px var(--cs-font); }
+.cs-field input, .cs-field select { box-sizing: border-box; width: 100%; min-height: 44px; padding: 10px 12px; border: 1px solid #6D4C3D; border-radius: 12px; background: #FFFFFF; color: #2B1B14; font: 400 15px/20px var(--cs-font); }
+.cs-field input::placeholder { color: #6D4C3D; opacity: 1; }
+.cs-field input:focus, .cs-field select:focus { outline: 2px solid #2B1B14; outline-offset: -1px; }
+.cs-field-row { display: flex; gap: 8px; }
+.cs-field-row .cs-field:first-child { flex: 0 0 88px; }
+.cs-flow-error { margin: 0; color: #9B2C1B; font: 500 13px/18px var(--cs-font); }
+.cs-flow-actions { display: flex; gap: 8px; }
+.cs-flow-submit, .cs-flow-cancel { min-height: 44px; padding: 8px 16px; border-radius: 9999px; font: 600 14px/20px var(--cs-font); cursor: pointer; }
+.cs-flow-submit { flex: 1; border: 0; background: #2B1B14; color: #F6F0E5; }
+.cs-flow-submit:disabled { opacity: 0.5; cursor: default; }
+.cs-flow-cancel { border: 1px solid #E3D5C0; background: #FFFFFF; color: #2B1B14; }
+.cs-flow-submit:focus-visible, .cs-flow-cancel:focus-visible { outline: 2px solid #2B1B14; outline-offset: 2px; }
+/* Menu dan FAQ versi ringkas di atas kolom pesan, setelah percakapan berjalan. Baris tombol muncul di atas tab dan bisa digeser ke samping. */
+.cs-dock { flex: none; border-top: 1px solid #E3D5C0; background: #F6F0E5; }
+.cs-dock-tabs { display: flex; gap: 6px; padding: 8px 12px; }
+.cs-dock-tab { display: inline-flex; align-items: center; gap: 6px; min-height: 32px; padding: 4px 12px; border: 1px solid #E3D5C0; border-radius: 9999px; background: #FFFFFF; color: #2B1B14; font: 600 12px/16px var(--cs-font); cursor: pointer; transition: background-color 150ms ease, border-color 150ms ease, transform 160ms cubic-bezier(0.22, 1, 0.36, 1); }
+.cs-dock-tab::after { content: ''; width: 6px; height: 6px; border-right: 1.5px solid currentColor; border-bottom: 1.5px solid currentColor; transform: translateY(1px) rotate(-135deg); transition: transform 200ms cubic-bezier(0.22, 1, 0.36, 1); }
+.cs-dock-tab[aria-expanded='true'] { border-color: #C6A15B; background: #C6A15B33; }
+.cs-dock-tab[aria-expanded='true']::after { transform: translateY(-2px) rotate(45deg); }
+.cs-dock-tab:active { transform: scale(0.97); }
+.cs-dock-tab:focus-visible { outline: 2px solid #2B1B14; outline-offset: 2px; }
+.cs-dock-row { overflow-x: auto; overscroll-behavior-x: contain; scroll-snap-type: x proximity; scrollbar-width: none; padding: 10px 12px 0; -webkit-mask-image: linear-gradient(90deg, #000 calc(100% - 24px), transparent); mask-image: linear-gradient(90deg, #000 calc(100% - 24px), transparent); }
+.cs-dock-row::-webkit-scrollbar { display: none; }
+.cs-dock-chips { display: flex; gap: 8px; width: max-content; padding-right: 24px; }
+.cs-dock .cs-chip { flex: none; min-height: 36px; padding: 6px 12px; white-space: nowrap; scroll-snap-align: start; animation: none; }
+.cs-dock-enter-active, .cs-dock-leave-active { transition: opacity 150ms ease; }
+.cs-dock-enter-from, .cs-dock-leave-to { opacity: 0; }
+@media (hover: hover) and (pointer: fine) {
+    .cs-dock-tab:hover { border-color: #C6A15B; }
+}
+@media (max-width: 767px) {
+    .cs-dock-tab { min-height: 36px; }
+    .cs-dock .cs-chip { min-height: 40px; }
+}
+@media (prefers-reduced-motion: reduce) {
+    .cs-dock-tab, .cs-dock-tab::after, .cs-dock-enter-active, .cs-dock-leave-active { transition: none; }
+}
 .cs-form { display: flex; flex: none; align-items: flex-end; gap: 8px; padding: 12px 12px 8px; border-top: 1px solid #E3D5C0; background: #FFFFFF; }
 .cs-input { display: block; flex: 1; min-width: 0; min-height: 44px; max-height: 112px; padding: 11px 16px; border: 1px solid #6D4C3D; border-radius: 22px; background: #FFFFFF; color: #2B1B14; font: 400 15px/20px var(--cs-font); resize: none; field-sizing: content; }
 .cs-input::placeholder { color: #6D4C3D; opacity: 1; }
@@ -181,6 +251,8 @@
 .cs-send.is-ready:active { transform: scale(0.94); }
 .cs-send:focus-visible { outline: 2px solid #2B1B14; outline-offset: 2px; }
 .cs-panel .cs-notice { flex: none; margin: 0; padding: 0 16px 10px; border-radius: 0 0 15px 15px; background: #FFFFFF; color: #6D4C3D; font: 400 12px/16px var(--cs-font); }
+.cs-panel .cs-notice-link { color: #2B1B14; font-weight: 600; text-decoration: underline; text-underline-offset: 2px; }
+.cs-notice-link:focus-visible { outline: 2px solid #2B1B14; outline-offset: 2px; border-radius: 2px; }
 
 @media (hover: hover) and (pointer: fine) {
     .cs-head-btn:hover { background: #F6F0E51F; }
@@ -198,7 +270,7 @@
 }
 
 @media (prefers-reduced-motion: reduce) {
-    .cs-msg, .cs-chip { animation: none; }
+    .cs-msg, .cs-chip, .cs-panel .cs-chips-label { animation: none; }
     .cs-typing i { animation: none; opacity: 0.6; }
     .cs-head-btn, .cs-chip, .cs-send { transition: none; }
 }

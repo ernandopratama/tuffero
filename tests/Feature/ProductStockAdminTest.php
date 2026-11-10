@@ -5,6 +5,7 @@ namespace Tests\Feature;
 use App\Models\AuditLog;
 use App\Models\InventoryStock;
 use App\Models\Product;
+use App\Models\ProductCategory;
 use App\Models\ProductVariant;
 use App\Models\User;
 use App\Models\Warehouse;
@@ -78,6 +79,8 @@ class ProductStockAdminTest extends TestCase
             'marketing tidak ubah produk' => ['marketing', 'postJson', '/api/v1/admin/products', 403],
             'pemilik tidak ubah stok' => ['owner', 'postJson', '/api/v1/admin/stock/adjust', 403],
             'cs tidak ubah stok' => ['customer-service', 'postJson', '/api/v1/admin/stock/adjust', 403],
+            'admin toko lihat stok' => ['store-admin', 'getJson', '/api/v1/admin/stock', 200],
+            'admin toko tidak ubah stok' => ['store-admin', 'postJson', '/api/v1/admin/stock/adjust', 403],
         ];
     }
 
@@ -148,7 +151,7 @@ class ProductStockAdminTest extends TestCase
     public function test_publish_requires_an_active_variant(): void
     {
         $this->actingAs($this->staff('store-admin'));
-        $product = $this->product();
+        $product = $this->product(['product_category_id' => ProductCategory::where('slug', 'nastar')->value('id')]);
 
         $this->patchJson("/api/v1/admin/products/{$product->id}", ['is_published' => true])
             ->assertUnprocessable()
@@ -275,9 +278,33 @@ class ProductStockAdminTest extends TestCase
             ->assertJsonPath('data.items.0.actor', $user->name);
     }
 
-    public function test_stock_cannot_go_negative_or_below_reserved(): void
+    public function test_product_list_filters_by_status_and_category(): void
     {
         $this->actingAs($this->staff('store-admin'));
+        $category = ProductCategory::create(['name_id' => 'Kue', 'name_en' => 'Cakes', 'slug' => 'kue-filter']);
+        $this->product(['name' => 'Tayang', 'is_published' => true, 'product_category_id' => $category->id]);
+        $this->product(['name' => 'Konsep']);
+
+        $this->getJson('/api/v1/admin/products?status=published')->assertJsonCount(1, 'data.items')->assertJsonPath('data.items.0.name', 'Tayang');
+        $this->getJson('/api/v1/admin/products?status=draft')->assertJsonCount(1, 'data.items')->assertJsonPath('data.items.0.name', 'Konsep');
+        $this->getJson('/api/v1/admin/products?category_id='.$category->id)->assertJsonCount(1, 'data.items')->assertJsonPath('data.items.0.name', 'Tayang');
+        $this->getJson('/api/v1/admin/products?status=bogus')->assertJsonCount(2, 'data.items');
+    }
+
+    public function test_stock_list_filters_by_variant_active(): void
+    {
+        $this->actingAs($this->staff('store-admin'));
+        $this->variant(['sku' => 'AKTIF-1']);
+        $this->variant(['sku' => 'MATI-1', 'is_active' => false]);
+
+        $this->getJson('/api/v1/admin/stock?active=1')->assertJsonCount(1, 'data.items')->assertJsonPath('data.items.0.sku', 'AKTIF-1');
+        $this->getJson('/api/v1/admin/stock?active=0')->assertJsonCount(1, 'data.items')->assertJsonPath('data.items.0.sku', 'MATI-1');
+        $this->getJson('/api/v1/admin/stock')->assertJsonCount(2, 'data.items');
+    }
+
+    public function test_stock_cannot_go_negative_or_below_reserved(): void
+    {
+        $this->actingAs($this->staff('warehouse'));
         $variant = $this->variant();
 
         $this->postJson('/api/v1/admin/stock/adjust', $this->adjustBody($variant, -1))

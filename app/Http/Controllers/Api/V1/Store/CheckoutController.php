@@ -44,6 +44,14 @@ class CheckoutController extends Controller
         // Hanya dari session, tidak pernah dari body. Pesanan staf bukan pesanan pelanggan.
         $data['user_id'] = $user?->getRoleNames()->isEmpty() ? $user->id : null;
         $data['address'] = [...$data['address'], 'recipient' => $data['customer_name'], 'phone' => $data['customer_phone']];
+        // Titik peta disimpan sebagai angka 7 desimal (sekitar 1 cm), atau tidak disimpan sama sekali.
+        foreach (['latitude', 'longitude'] as $field) {
+            if (isset($data['address'][$field])) {
+                $data['address'][$field] = round((float) $data['address'][$field], 7);
+            } else {
+                unset($data['address'][$field]);
+            }
+        }
 
         ['order' => $order, 'token' => $token] = $checkout->place($data, $key);
 

@@ -17,25 +17,26 @@ class RolePermissionSeeder extends Seeder
     private const ROLES = [
         'owner' => [
             'audit.view', 'reports.view', 'products.view', 'vouchers.view', 'content.view', 'stock.view',
+            'customers.view', 'customers.deactivate',
             'orders.view', 'orders.cancel_final', 'shipments.view', 'payments.view',
-            'refunds.view', 'refunds.decide', 'comments.create',
+            'refunds.view', 'refunds.decide', 'comments.create', 'news.view',
         ],
         'store-admin' => [
-            'products.view', 'products.manage', 'vouchers.view', 'vouchers.manage', 'stock.view', 'stock.adjust',
+            'customers.view', 'products.view', 'products.manage', 'categories.manage', 'campaigns.manage', 'vouchers.view', 'vouchers.manage', 'stock.view',
             'orders.view', 'orders.update_status', 'orders.cancel', 'shipments.view', 'shipments.manage',
-            'payments.view', 'settings.manage_contact', 'reviews.manage', 'comments.create',
+            'payments.view', 'settings.manage_contact', 'reviews.manage', 'faqs.manage', 'comments.create', 'news.view',
         ],
         'customer-service' => [
             'products.view', 'stock.view', 'orders.view', 'orders.cancel_request', 'shipments.view',
-            'refunds.view', 'refunds.process', 'comments.create',
+            'refunds.view', 'refunds.process', 'faqs.manage', 'comments.create', 'news.view',
         ],
         'warehouse' => [
             'products.view', 'stock.view', 'stock.adjust', 'orders.view_fulfillment', 'orders.update_status',
-            'shipments.view', 'shipments.manage', 'comments.create',
+            'shipments.view', 'shipments.manage', 'comments.create', 'news.view',
         ],
         'marketing' => [
             'reports.view_summary', 'products.view', 'vouchers.view', 'vouchers.manage',
-            'content.view', 'content.manage', 'comments.create',
+            'content.view', 'content.manage', 'comments.create', 'news.view', 'news.manage',
         ],
     ];
 

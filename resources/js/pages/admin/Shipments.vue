@@ -1,79 +1,114 @@
 <script setup>
-import { onMounted, ref, watch } from 'vue';
+import { computed, nextTick, ref } from 'vue';
+import { useRouter } from 'vue-router';
 import OrderActions from '../../components/OrderActions.vue';
-import api from '../../utils/api';
-import { apiError } from '../../utils/apiError';
+import AppModal from '../../components/ui/AppModal.vue';
+import DataTable from '../../components/ui/DataTable.vue';
+import FilterSelect from '../../components/ui/FilterSelect.vue';
+import IconAction from '../../components/ui/IconAction.vue';
+import PageHeader from '../../components/ui/PageHeader.vue';
+import TableToolbar from '../../components/ui/TableToolbar.vue';
+import { useDataTable } from '../../composables/useDataTable';
+import { useAuthStore } from '../../stores/auth';
 import { formatDate } from '../../utils/datetime';
-import { SHIPPING_STATUS } from '../../utils/orderLabels';
+import { SHIPPING_STATUS, TONE_CLASS } from '../../utils/orderLabels';
 
-const items = ref([]);
-const meta = ref({ current_page: 1, last_page: 1, total: 0 });
-const page = ref(1);
-const loading = ref(true);
-const error = ref('');
+const COLUMNS = [
+    { key: 'order_number', label: 'Nomor' },
+    { key: 'recipient', label: 'Penerima' },
+    { key: 'courier', label: 'Kurir' },
+    { key: 'shipping_status', label: 'Status' },
+    { key: 'shipped_at', label: 'Dikirim' },
+    { key: 'waybill_id', label: 'Resi' },
+    { key: 'actions', label: 'Aksi' },
+];
+const SHIPPING_TONE = { pending: 'neutral', packing: 'warn', shipped: 'info', delivered: 'ok' };
 
-async function load() {
-    loading.value = true;
-    error.value = '';
-    try {
-        const { data } = await api.get('/admin/shipments', { params: { page: page.value } });
-        items.value = data.data.items;
-        meta.value = data.data.meta;
-    } catch (e) {
-        error.value = apiError(e).message;
-    } finally {
-        loading.value = false;
+const { rows, meta, page, perPage, search, filter, loading, error, load } = useDataTable('/admin/shipments', { filters: { shipping_status: '' } });
+
+const auth = useAuthStore();
+const router = useRouter();
+const canManage = computed(() => auth.can('shipments.manage'));
+const canFinish = computed(() => auth.can('orders.update_status'));
+
+// Langkah berikutnya per baris menentukan ikon tombol kelola. Izin sebenarnya tetap dijaga server.
+function nextStep(row) {
+    if (row.status === 'processing' && canManage.value) {
+        return row.shipment ? { icon: 'truck', label: 'Tandai dikirim', tone: 'primary' } : { icon: 'box', label: 'Proses pesanan', tone: 'primary' };
     }
+    if (row.status === 'shipped' && (canFinish.value || canManage.value)) return { icon: 'edit', label: 'Kelola pengiriman', tone: 'default' };
+    return null;
 }
 
-watch(page, load);
-onMounted(load);
+const printLabel = (row) => window.open(`${router.resolve({ name: 'AdminOrderLabel', params: { id: row.id } }).href}?print=1`, '_blank', 'noopener');
+
+const dialog = ref(null);
+const active = ref(null);
+async function manage(row) {
+    active.value = row;
+    await nextTick();
+    dialog.value.showModal();
+}
+function onUpdated() {
+    dialog.value.close();
+    load();
+}
 </script>
 
 <template>
-  <h1 class="font-heading text-headline-lg-mobile lg:text-headline-lg">Pengiriman</h1>
-  <p class="mt-space-sm text-secondary">Nomor resi diisi manual sampai Biteship tersambung.</p>
-
-  <p v-if="loading" role="status" class="mt-space-lg text-secondary">Memuat pengiriman...</p>
-  <div v-else-if="error" role="alert" class="mt-space-lg rounded bg-error-surface p-space-md text-on-error-surface">
-    {{ error }}
-    <button type="button" class="ml-2 underline" @click="load">Coba lagi</button>
+  <div class="flex flex-wrap items-end justify-between gap-space-md">
+    <PageHeader title="Pengiriman" description="Kirim lewat Biteship untuk resi otomatis, atau isi nomor resi manual sebagai cadangan." />
+    <TableToolbar v-model="search" placeholder="Cari nomor atau nama pemesan">
+      <FilterSelect v-model="filter.shipping_status" label="Status" :options="SHIPPING_STATUS" />
+    </TableToolbar>
   </div>
-  <p v-else-if="!items.length" class="mt-space-lg rounded-lg border border-border bg-surface p-space-lg text-secondary">Belum ada pesanan untuk dikirim.</p>
-  <template v-else>
-    <div class="mt-space-lg overflow-x-auto rounded-lg border border-border bg-surface">
-      <table class="w-full min-w-[860px] text-left align-top text-body-sm">
-        <thead class="border-b border-border text-label-md">
-          <tr>
-            <th scope="col" class="px-4 py-3">Nomor</th>
-            <th scope="col" class="px-4 py-3">Penerima</th>
-            <th scope="col" class="px-4 py-3">Kurir</th>
-            <th scope="col" class="px-4 py-3">Status</th>
-            <th scope="col" class="px-4 py-3">Dikirim</th>
-            <th scope="col" class="px-4 py-3">Resi dan aksi</th>
-          </tr>
-        </thead>
-        <tbody>
-          <tr v-for="item in items" :key="item.id" class="border-b border-border align-top last:border-b-0">
-            <td class="whitespace-nowrap px-4 py-3 font-mono">{{ item.order_number }}</td>
-            <td class="px-4 py-3">{{ item.recipient }}<span class="block text-secondary">{{ item.city }}</span></td>
-            <td class="px-4 py-3">{{ item.shipping_courier.toUpperCase() }} {{ item.shipping_service.toUpperCase() }}</td>
-            <td class="px-4 py-3">{{ SHIPPING_STATUS[item.shipping_status] || item.shipping_status }}</td>
-            <td class="whitespace-nowrap px-4 py-3">{{ formatDate(item.shipped_at) }}</td>
-            <td class="px-4 py-3">
-              <span v-if="item.waybill_id" class="mb-space-xs block font-mono">{{ item.waybill_id }}</span>
-              <OrderActions :order="item" @updated="load" />
-            </td>
-          </tr>
-        </tbody>
-      </table>
-    </div>
-    <nav class="mt-space-md flex items-center justify-between gap-space-md" aria-label="Halaman pengiriman">
-      <p class="text-body-sm text-secondary">Halaman {{ meta.current_page }} dari {{ meta.last_page }} ({{ meta.total }} pengiriman)</p>
-      <div class="flex gap-space-sm">
-        <button type="button" :disabled="page <= 1" class="rounded border border-secondary px-3 py-1.5 text-label-md hover:bg-accent-tint-15 disabled:opacity-50" @click="page -= 1">Sebelumnya</button>
-        <button type="button" :disabled="page >= meta.last_page" class="rounded border border-secondary px-3 py-1.5 text-label-md hover:bg-accent-tint-15 disabled:opacity-50" @click="page += 1">Berikutnya</button>
+
+  <DataTable
+    v-model:page="page"
+    v-model:per-page="perPage"
+    class="mt-space-lg"
+    caption="Daftar pengiriman"
+    empty-text="Belum ada pesanan untuk dikirim."
+    min-width="min-w-[960px]"
+    :columns="COLUMNS"
+    :rows="rows"
+    :meta="meta"
+    :loading="loading"
+    :error="error"
+    @retry="load"
+  >
+    <template #cell-order_number="{ row }"><span class="whitespace-nowrap font-mono">{{ row.order_number }}</span></template>
+    <template #cell-recipient="{ row }">
+      <span class="block text-label-md">{{ row.recipient || '-' }}</span>
+      <span class="block text-body-sm text-secondary">{{ row.city }}</span>
+    </template>
+    <template #cell-courier="{ row }">
+      <span class="block text-label-md uppercase">{{ row.shipping_courier }}</span>
+      <span class="block text-body-sm uppercase text-secondary">{{ row.shipping_service }}</span>
+    </template>
+    <template #cell-shipping_status="{ row }">
+      <span class="inline-flex whitespace-nowrap rounded-full px-2.5 py-1 text-label-sm" :class="TONE_CLASS[SHIPPING_TONE[row.shipping_status] || 'neutral']">{{ SHIPPING_STATUS[row.shipping_status] || row.shipping_status }}</span>
+    </template>
+    <template #cell-shipped_at="{ row }">
+      <span class="whitespace-nowrap" :class="row.shipped_at ? '' : 'text-secondary'">{{ row.shipped_at ? formatDate(row.shipped_at) : 'Belum dikirim' }}</span>
+    </template>
+    <template #cell-waybill_id="{ row }">
+      <template v-if="row.waybill_id">
+        <span class="block whitespace-nowrap font-mono text-label-md">{{ row.waybill_id }}</span>
+        <span class="block text-body-sm text-secondary">{{ row.shipment?.provider === 'biteship' ? 'Biteship' : 'Resi manual' }}</span>
+      </template>
+      <span v-else class="text-secondary">Belum ada resi</span>
+    </template>
+    <template #cell-actions="{ row }">
+      <div class="flex items-center justify-center gap-1">
+        <IconAction v-if="canManage && row.waybill_id" icon="printer" label="Cetak resi" :subject="row.order_number" @click="printLabel(row)" />
+        <IconAction v-if="nextStep(row)" v-bind="nextStep(row)" :subject="row.order_number" @click="manage(row)" />
+        <span v-if="!(canManage && row.waybill_id) && !nextStep(row)" class="text-secondary">-</span>
       </div>
-    </nav>
-  </template>
+    </template>
+  </DataTable>
+
+  <AppModal ref="dialog" variant="update" size="xl" :title="active?.order_number || 'Pengiriman'" subtitle="Kelola pengiriman" @close="active = null">
+    <OrderActions v-if="active" :key="active.id" :order="active" start-open @updated="onUpdated" />
+  </AppModal>
 </template>

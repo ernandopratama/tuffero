@@ -10,7 +10,7 @@ use Illuminate\Support\Facades\DB;
  */
 class OrderExpiryService
 {
-    public function __construct(private InventoryService $inventory) {}
+    public function __construct(private InventoryService $inventory, private VoucherService $vouchers) {}
 
     public function expireDue(): int
     {
@@ -30,6 +30,7 @@ class OrderExpiryService
                     }
 
                     $this->inventory->releaseOrder($order, 'Batas bayar lewat');
+                    $this->vouchers->release($order);
 
                     $order->update(['status' => Order::EXPIRED, 'payment_status' => 'expired']);
                     $order->histories()->create(['status_type' => 'order', 'from_status' => Order::PENDING_PAYMENT, 'to_status' => Order::EXPIRED, 'source' => 'system']);

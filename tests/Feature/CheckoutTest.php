@@ -186,6 +186,67 @@ class CheckoutTest extends TestCase
         $this->getJson('/api/v1/cart')->assertJsonCount(0, 'data.items');
     }
 
+    public function test_cart_selection_drives_totals_and_blocks_checkout_when_nothing_is_selected(): void
+    {
+        $this->variant('NAS-01');
+        $this->variant('MAC-01');
+        $this->addToCart('NAS-01', 2);
+        $this->addToCart('MAC-01', 1);
+
+        $this->getJson('/api/v1/cart')->assertJsonPath('data.subtotal', 150000)->assertJsonPath('data.selected_count', 2)->assertJsonPath('data.can_checkout', true);
+
+        $this->putJson('/api/v1/cart/selection', ['skus' => ['MAC-01']])
+            ->assertOk()
+            ->assertJsonPath('data.subtotal', 50000)
+            ->assertJsonPath('data.selected_count', 1)
+            ->assertJsonPath('data.items.0.selected', false)
+            ->assertJsonPath('data.items.1.selected', true);
+
+        $this->putJson('/api/v1/cart/selection', ['skus' => []])
+            ->assertOk()
+            ->assertJsonPath('data.subtotal', 0)
+            ->assertJsonPath('data.can_checkout', false);
+        $this->checkout()->assertUnprocessable()->assertJsonValidationErrors('cart');
+
+        // Menambah produk lagi mencentangnya kembali.
+        $this->addToCart('NAS-01', 1);
+        $this->getJson('/api/v1/cart')->assertJsonPath('data.items.0.selected', true)->assertJsonPath('data.selected_count', 1);
+    }
+
+    public function test_checkout_buys_only_selected_items_and_keeps_the_rest_in_the_cart(): void
+    {
+        $nastar = $this->variant('NAS-01');
+        $macaron = $this->variant('MAC-01');
+        $this->addToCart('NAS-01', 2);
+        $this->addToCart('MAC-01', 1);
+        $this->putJson('/api/v1/cart/selection', ['skus' => ['NAS-01']])->assertOk();
+
+        $response = $this->checkout()->assertCreated();
+        $order = Order::with('items')->where('public_ref', $response->json('data.public_ref'))->firstOrFail();
+
+        $this->assertSame(100000, $order->subtotal);
+        $this->assertSame(['NAS-01'], $order->items->pluck('sku_snapshot')->all());
+        $this->assertSame(2, $this->stock($nastar)->reserved);
+        $this->assertSame(0, $this->stock($macaron)->reserved);
+
+        $this->getJson('/api/v1/cart')->assertJsonCount(1, 'data.items')->assertJsonPath('data.items.0.sku', 'MAC-01');
+    }
+
+    public function test_cart_selection_validates_input_and_ignores_unavailable_items(): void
+    {
+        $this->variant('NAS-01');
+        $this->addToCart('NAS-01', 1);
+
+        $this->putJson('/api/v1/cart/selection', [])->assertUnprocessable()->assertJsonValidationErrors('skus');
+        $this->putJson('/api/v1/cart/selection', ['skus' => [['x']]])->assertUnprocessable();
+
+        ProductVariant::where('sku', 'NAS-01')->update(['is_active' => false]);
+        $this->putJson('/api/v1/cart/selection', ['skus' => ['NAS-01']])
+            ->assertOk()
+            ->assertJsonPath('data.items.0.selected', false)
+            ->assertJsonPath('data.can_checkout', false);
+    }
+
     public function test_snapshot_does_not_change_when_price_changes_later(): void
     {
         $variant = $this->variant();
@@ -350,6 +411,18 @@ class CheckoutTest extends TestCase
         $this->postJson('/api/v1/shipping/rates', ['postal_code' => 'abc'])->assertUnprocessable();
     }
 
+    public function test_shipping_rates_are_limited_to_ten_per_minute(): void
+    {
+        $this->variant();
+        $this->addToCart();
+
+        foreach (range(1, 10) as $i) {
+            $this->postJson('/api/v1/shipping/rates', ['postal_code' => '65111'])->assertOk();
+        }
+
+        $this->postJson('/api/v1/shipping/rates', ['postal_code' => '65111'])->assertTooManyRequests();
+    }
+
     public function test_checkout_is_closed_outside_local_until_biteship_is_connected(): void
     {
         $this->variant();
@@ -370,6 +443,45 @@ class CheckoutTest extends TestCase
             'kode pos salah' => [['address' => ['street' => 'x', 'district' => 'x', 'city' => 'x', 'province' => 'x', 'postal_code' => '1']], 'address.postal_code'],
             'alamat kosong' => [['address' => []], 'address'],
         ];
+    }
+
+    public function test_checkout_stores_map_pin_rounded(): void
+    {
+        $this->variant();
+        $this->addToCart();
+
+        $ref = $this->checkout(['address' => [...$this->body()['address'], 'latitude' => -7.871234567891, 'longitude' => '112.52345678912']])->assertCreated()->json('data.public_ref');
+        $saved = Order::where('public_ref', $ref)->firstOrFail()->shipping_address;
+        $this->assertSame([-7.8712346, 112.5234568], [$saved['latitude'], $saved['longitude']]);
+    }
+
+    public function test_checkout_without_map_pin_stores_no_coordinates(): void
+    {
+        $this->variant();
+        $this->addToCart();
+
+        $ref = $this->checkout(['address' => [...$this->body()['address'], 'latitude' => null, 'longitude' => null]])->assertCreated()->json('data.public_ref');
+        $this->assertArrayNotHasKey('latitude', Order::where('public_ref', $ref)->firstOrFail()->shipping_address);
+    }
+
+    /** @return array<string, array{array<string, mixed>}> */
+    public static function invalidPinProvider(): array
+    {
+        return [
+            'di luar Indonesia' => [['latitude' => 51.5, 'longitude' => -0.12]],
+            'hanya satu sisi' => [['latitude' => -7.9]],
+            'bukan angka' => [['latitude' => 'x', 'longitude' => 'y']],
+        ];
+    }
+
+    #[DataProvider('invalidPinProvider')]
+    public function test_checkout_rejects_invalid_map_pin(array $pin): void
+    {
+        $this->variant();
+        $this->addToCart();
+
+        $this->checkout(['address' => [...$this->body()['address'], ...$pin]])->assertUnprocessable();
+        $this->assertSame(0, Order::count());
     }
 
     #[DataProvider('invalidBodyProvider')]
@@ -396,6 +508,22 @@ class CheckoutTest extends TestCase
         $this->getJson("/api/v1/orders/{$ref}")->assertNotFound();
         $this->withHeader('X-Order-Token', 'salah')->getJson("/api/v1/orders/{$ref}")->assertNotFound();
         $this->withHeader('X-Order-Token', $token)->getJson("/api/v1/orders/{$ref}")->assertOk()->assertJsonPath('data.total', 112000);
+    }
+
+    public function test_order_items_show_product_photo_and_keep_snapshot_when_variant_is_deleted(): void
+    {
+        $variant = $this->variant();
+        $variant->product->images()->create(['path' => 'products/1/foto.webp', 'alt' => 'Foto', 'sort_order' => 0]);
+        $this->addToCart();
+        $ref = $this->checkout()->assertCreated()->json('data.public_ref');
+
+        $this->getJson("/api/v1/orders/{$ref}")->assertOk()->assertJsonPath('data.items.0.photo', '/storage/products/1/foto.webp');
+
+        Order::where('public_ref', $ref)->firstOrFail()->items()->update(['product_variant_id' => null]);
+
+        $this->getJson("/api/v1/orders/{$ref}")->assertOk()
+            ->assertJsonPath('data.items.0.photo', null)
+            ->assertJsonPath('data.items.0.product_name', 'Produk NAS-01');
     }
 
     public function test_lookup_needs_matching_contact_and_gives_same_answer_on_failure(): void

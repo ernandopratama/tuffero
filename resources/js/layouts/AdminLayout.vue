@@ -2,6 +2,9 @@
 import { computed, defineAsyncComponent, nextTick, onBeforeUnmount, onMounted, reactive, ref, watch } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import AdminIcon from '../components/AdminIcon.vue';
+import ActionTooltip from '../components/ui/ActionTooltip.vue';
+import AdminBottomNav from '../components/AdminBottomNav.vue';
+import NotificationBell from '../components/NotificationBell.vue';
 import { useAuthStore } from '../stores/auth';
 import { menuFor, OVERVIEW, ROLE_LABELS } from '../utils/adminMenu';
 
@@ -42,7 +45,8 @@ const crumb = computed(() => {
 });
 
 watch(crumb, ([, page]) => { document.title = `${page} · Admin Tuffero`; }, { immediate: true });
-watch(() => route.fullPath, () => { panelOpen.value = false; profileOpen.value = false; });
+// Di desktop panel menetap supaya konten tidak bergeser tiap pindah halaman; drawer mobile menutup sendiri.
+watch(() => route.fullPath, () => { if (!desktop.value) panelOpen.value = false; profileOpen.value = false; });
 
 // ---- tooltip dock: satu elemen fixed, jadi tidak terpotong dan tidak tertutup konten ----
 // Tunda 300 ms di item pertama; pindah ke item lain langsung tampil tanpa animasi.
@@ -79,6 +83,71 @@ async function openPanel() {
 
 function closePanel() {
     panelOpen.value = false;
+    nextTick(() => panelTrigger.value?.focus());
+}
+
+// Animasi lewat Web Animations. Panel dan dock sama-sama dua kartu: di desktop lebar panel menyusut ke lebar dock (58px),
+// kartu daftar memendek ke tinggi daftar dock, dan isinya memudar lebih dulu, jadi pada akhirnya bentuknya identik dengan dock.
+// `panelLeaving` menahan dock sampai panel selesai menyusut. Mobile: geser dan pudar.
+const EASE = 'cubic-bezier(0.32, 0.72, 0, 1)';
+const DOCK_WIDTH = 58;
+const panelLeaving = ref(false);
+const dock = ref(null);
+const dockNav = ref(null);
+
+// Tinggi kartu daftar dock; dock sedang disembunyikan, jadi ditampilkan sesaat tanpa sempat digambar.
+function dockNavHeight() {
+    const prev = dock.value.style.display;
+    dock.value.style.display = 'flex';
+    const height = dockNav.value.offsetHeight;
+    dock.value.style.display = prev;
+    return height;
+}
+
+function runPanelAnimations(el, steps, duration, done) {
+    el._animations?.forEach((animation) => animation.cancel());
+    const reduce = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    el._animations = steps.map(({ target, frames }) => target.animate(frames, { duration: reduce ? 0 : duration, easing: EASE, fill: 'forwards' }));
+    Promise.all(el._animations.map((animation) => animation.finished)).then(() => {
+        el._animations.forEach((animation) => animation.cancel());
+        done();
+    }, () => {});
+}
+
+function desktopSteps(el, entering) {
+    const nav = el.querySelector('[data-panel-nav]');
+    const full = `${nav.offsetHeight}px`;
+    const small = `${dockNavHeight()}px`;
+    const width = [`${DOCK_WIDTH}px`, `${el.offsetWidth}px`];
+    const fade = [{ opacity: 0 }, { opacity: 0, offset: 0.35 }, { opacity: 1 }];
+    const order = (frames) => (entering ? frames : [...frames].reverse());
+    return [
+        { target: el, frames: order(width.map((value) => ({ width: value }))) },
+        { target: nav, frames: order([{ maxHeight: small }, { maxHeight: full }]) },
+        ...[...el.querySelectorAll('[data-panel-fade]')].map((target) => ({
+            target,
+            frames: entering ? fade : [{ opacity: 1 }, { opacity: 0, offset: 0.55 }, { opacity: 0 }],
+        })),
+    ];
+}
+
+function onPanelEnter(el, done) {
+    const steps = desktop.value
+        ? desktopSteps(el, true)
+        : [{ target: el, frames: [{ transform: 'translateX(-16px)', opacity: 0 }, { transform: 'none', opacity: 1 }] }];
+    runPanelAnimations(el, steps, 320, done);
+}
+
+function onPanelLeave(el, done) {
+    panelLeaving.value = desktop.value;
+    const steps = desktop.value
+        ? desktopSteps(el, false)
+        : [{ target: el, frames: [{ transform: 'none', opacity: 1 }, { transform: 'translateX(-8px)', opacity: 0 }] }];
+    runPanelAnimations(el, steps, 260, done);
+}
+
+function onPanelAfterLeave() {
+    panelLeaving.value = false;
     nextTick(() => panelTrigger.value?.focus());
 }
 
@@ -175,11 +244,13 @@ const initials = computed(() => (auth.user?.name || '?').split(/\s+/).slice(0, 2
     <p class="sr-only" role="status" aria-live="polite">{{ crumb[1] }}</p>
 
     <!-- Bilah atas melayang -->
-    <div class="sticky top-0 z-30 px-3 pt-3 lg:px-5 lg:pt-4">
+    <div id="admin-topbar" class="sticky top-0 z-30 px-3 pt-3 lg:px-5 lg:pt-4">
+      <!-- Latar blur seluruh area bilah atas (termasuk celah di sekeliling kapsul), memudar ke bawah supaya konten yang digulir tidak terlihat tajam di balik bilah -->
+      <div class="pointer-events-none absolute inset-x-0 -bottom-5 top-0 -z-10 bg-background/55 backdrop-blur-xl [mask-image:linear-gradient(to_bottom,black_70%,transparent)]" aria-hidden="true"></div>
     <header class="flex h-14 items-center gap-2 rounded-full border border-border bg-surface/95 pl-2 pr-2 shadow-card backdrop-blur-md sm:gap-3 lg:pl-3">
       <button
         type="button"
-        class="flex size-10 shrink-0 items-center justify-center rounded-full text-secondary transition-[transform,background-color] duration-[160ms] ease-out-strong hover:bg-accent-tint-15 hover:text-primary focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary active:scale-[0.97] lg:hidden"
+        class="flex size-10 shrink-0 items-center justify-center rounded-full text-secondary transition-[transform,background-color] duration-[160ms] ease-out-strong hover:bg-accent-tint-15 hover:text-primary focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary active:scale-[0.97] max-md:hidden lg:hidden"
         :aria-expanded="panelOpen"
         aria-controls="admin-menu-panel"
         aria-label="Buka menu"
@@ -198,7 +269,9 @@ const initials = computed(() => (auth.user?.name || '?').split(/\s+/).slice(0, 2
         <span class="truncate" aria-current="page">{{ crumb[1] }}</span>
       </nav>
 
-      <div ref="profileWrap" class="relative ml-auto md:ml-0">
+      <div class="ml-auto flex items-center gap-1 md:ml-0">
+      <NotificationBell />
+      <div ref="profileWrap" class="relative">
         <button
           ref="profileButton"
           type="button"
@@ -208,7 +281,7 @@ const initials = computed(() => (auth.user?.name || '?').split(/\s+/).slice(0, 2
           @click="toggleProfile($event.detail === 0)"
           @keydown.down.prevent="!profileOpen && toggleProfile(true)"
         >
-          <span class="flex size-8 items-center justify-center rounded-full bg-primary text-label-md text-accent" aria-hidden="true">{{ initials }}</span>
+          <span class="flex size-8 items-center justify-center overflow-hidden rounded-full bg-primary text-label-md text-accent" aria-hidden="true"><img v-if="auth.user?.avatar_url" :src="auth.user.avatar_url" alt="" class="size-full object-cover"><template v-else>{{ initials }}</template></span>
           <span class="hidden text-left sm:block">
             <span class="block text-body-sm leading-tight text-secondary">Selamat datang</span>
             <span class="block max-w-40 truncate text-label-md leading-tight">{{ auth.user?.name }}</span>
@@ -261,12 +334,14 @@ const initials = computed(() => (auth.user?.name || '?').split(/\s+/).slice(0, 2
           </div>
         </Transition>
       </div>
+      </div>
     </header>
     </div>
 
-    <div class="flex items-start gap-4 px-3 pb-8 pt-4 lg:px-5">
+    <!-- Di smartphone ruang bawah disisakan untuk navbar bawah (64px + jarak). -->
+    <div class="flex items-start gap-4 px-3 pb-28 pt-4 md:pb-8 lg:px-5">
       <!-- Dock ikon (desktop) -->
-      <aside class="sticky top-[92px] z-20 hidden max-h-[calc(100vh-108px)] shrink-0 flex-col gap-3 lg:flex [@media(max-height:820px)]:gap-2" aria-label="Navigasi cepat">
+      <aside ref="dock" class="sticky top-[92px] z-20 hidden max-h-[calc(100vh-108px)] shrink-0 flex-col gap-3 [@media(max-height:820px)]:gap-2" :class="panelOpen || panelLeaving ? 'lg:hidden' : 'lg:flex'" aria-label="Navigasi cepat">
         <!-- Perluas menu di paling atas, tema di bawahnya -->
         <div class="flex shrink-0 flex-col gap-2 rounded-[28px] border border-border bg-surface p-2 shadow-card [@media(max-height:820px)]:gap-1.5">
           <div @pointerenter="showTip($event, 'Perluas menu')" @pointerleave="hideTip" @focusin="showTip($event, 'Perluas menu')" @focusout="hideTip">
@@ -297,7 +372,7 @@ const initials = computed(() => (auth.user?.name || '?').split(/\s+/).slice(0, 2
         </div>
 
         <!-- Bila daftar lebih tinggi dari layar, hanya bagian ini yang menggulir; tooltip fixed jadi tidak ikut terpotong -->
-        <nav class="flex min-h-0 flex-col gap-2 overflow-y-auto overscroll-contain rounded-[28px] border border-border bg-surface p-2 shadow-card [scrollbar-width:none] [@media(max-height:820px)]:gap-1.5" aria-label="Menu admin" @scroll.passive="hideTip">
+        <nav ref="dockNav" class="flex min-h-0 flex-col gap-2 overflow-y-auto overscroll-contain rounded-[28px] border border-border bg-surface p-2 shadow-card [scrollbar-width:none] [@media(max-height:820px)]:gap-1.5" aria-label="Menu admin" @scroll.passive="hideTip">
           <router-link
             v-for="item in railItems"
             :key="item.label"
@@ -329,6 +404,83 @@ const initials = computed(() => (auth.user?.name || '?').split(/\s+/).slice(0, 2
         aria-hidden="true"
       >{{ tip.label }}</span>
 
+      <!-- Menu diperluas: di desktop menggantikan dock dan mendorong konten (satu lapisan, tidak menimpa); di mobile menjadi drawer -->
+      <Transition :css="false" @enter="onPanelEnter" @leave="onPanelLeave" @after-leave="onPanelAfterLeave">
+        <aside
+          v-if="panelOpen"
+          id="admin-menu-panel"
+          ref="panel"
+          class="fixed inset-y-3 left-3 z-50 flex w-72 max-w-[calc(100vw-1.5rem)] origin-left flex-col gap-3 lg:sticky lg:inset-y-auto lg:left-auto lg:top-[92px] lg:z-20 lg:h-[calc(100vh-108px)] lg:shrink-0 [@media(max-height:820px)]:gap-2"
+          :role="desktop ? 'navigation' : 'dialog'"
+          :aria-modal="desktop ? undefined : 'true'"
+          aria-label="Menu admin"
+        >
+          <!-- Dua kartu, sama seperti dock, supaya saat menyusut bentuknya sudah sama dan tidak terbelah -->
+          <div class="flex shrink-0 flex-col gap-2 overflow-hidden rounded-[28px] border border-border bg-surface shadow-float lg:shadow-card p-2 [@media(max-height:820px)]:gap-1.5">
+            <div data-panel-fade class="flex min-w-[268px] items-center justify-between pl-3 [@media(max-height:820px)]:h-9">
+              <img src="/images/Logo/Tuffero Script Logo Black - NoBckgrnd.webp" alt="Tuffero" class="h-8 w-auto">
+              <button
+                type="button"
+                class="flex size-10 items-center justify-center rounded-full text-secondary transition-[transform,background-color] duration-[160ms] ease-out-strong hover:bg-accent-tint-15 hover:text-primary focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary active:scale-[0.97] [@media(max-height:820px)]:size-9"
+                aria-label="Tutup menu"
+                @click="closePanel"
+              >
+                <AdminIcon name="collapse" />
+              </button>
+            </div>
+            <!-- Tema gelap dan terang: fungsinya masih akan datang -->
+            <button
+              type="button"
+              data-panel-fade
+              class="flex h-10 min-w-[268px] cursor-not-allowed items-center gap-3 rounded-2xl px-2 text-label-md text-secondary/50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary [@media(max-height:820px)]:h-9"
+              aria-disabled="true"
+              @click.prevent
+            >
+              <AdminIcon name="sun" />
+              <span class="whitespace-nowrap">Tema gelap</span>
+              <span class="ml-auto rounded-full bg-secondary-tint-12 px-2 py-0.5 text-label-sm normal-case">Segera</span>
+            </button>
+          </div>
+
+          <div data-panel-nav class="flex min-h-0 flex-1 flex-col overflow-hidden rounded-[28px] border border-border bg-surface shadow-float lg:shadow-card">
+            <nav data-panel-fade class="min-w-[268px] flex-1 overflow-y-auto p-2 [scrollbar-color:var(--color-border)_transparent] [scrollbar-width:thin]" aria-label="Semua menu">
+            <router-link
+              :to="OVERVIEW.to"
+              class="mt-1 flex h-11 items-center gap-3 rounded-2xl px-2 text-label-md transition-[transform,background-color] duration-[160ms] ease-out-strong hover:bg-accent-tint-15 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary active:scale-[0.98]"
+              :class="isActive(OVERVIEW) ? 'bg-accent' : ''"
+              :aria-current="isActive(OVERVIEW) ? 'page' : undefined"
+            >
+              <AdminIcon :name="OVERVIEW.icon" />
+              {{ OVERVIEW.label }}
+            </router-link>
+
+            <div v-for="group in menu" :key="group.label" class="mt-4">
+              <p class="px-2 pb-1 text-label-sm uppercase text-secondary">{{ group.label }}</p>
+              <ul class="flex flex-col gap-0.5">
+                <li v-for="item in group.items" :key="item.label">
+                  <router-link
+                    v-if="item.to"
+                    :to="item.to"
+                    class="flex h-11 items-center gap-3 rounded-2xl px-2 text-label-md transition-[transform,background-color] duration-[160ms] ease-out-strong hover:bg-accent-tint-15 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary active:scale-[0.98]"
+                    :class="isActive(item) ? 'bg-accent' : ''"
+                    :aria-current="isActive(item) ? 'page' : undefined"
+                  >
+                    <AdminIcon :name="item.icon" />
+                    {{ item.label }}
+                  </router-link>
+                  <div v-else class="flex h-11 items-center gap-3 rounded-2xl px-2 text-label-md text-secondary">
+                    <AdminIcon :name="item.icon" />
+                    {{ item.label }}
+                    <span class="ml-auto rounded-full bg-secondary-tint-12 px-2 py-0.5 text-label-sm normal-case">Segera</span>
+                  </div>
+                </li>
+              </ul>
+            </div>
+            </nav>
+          </div>
+        </aside>
+      </Transition>
+
       <main id="admin-main" tabindex="-1" class="min-w-0 flex-1 focus:outline-none">
         <div class="mx-auto max-w-[1328px]">
           <router-view></router-view>
@@ -336,75 +488,13 @@ const initials = computed(() => (auth.user?.name || '?').split(/\s+/).slice(0, 2
       </main>
     </div>
 
-    <!-- Menu diperluas: panel melayang di desktop, drawer di mobile -->
+    <!-- Latar drawer, hanya di mobile; di desktop panel ikut alur halaman, jadi tidak perlu latar -->
     <Transition enter-active-class="transition-opacity duration-200 ease-out-strong" enter-from-class="opacity-0" leave-active-class="transition-opacity duration-150 ease-out-strong" leave-to-class="opacity-0">
-      <div v-if="panelOpen" class="fixed inset-0 z-40 bg-primary/40 lg:bg-transparent" aria-hidden="true" @click="closePanel"></div>
+      <div v-if="panelOpen" class="fixed inset-0 z-40 bg-primary/40 lg:hidden" aria-hidden="true" @click="closePanel"></div>
     </Transition>
 
-    <Transition
-      enter-active-class="transition-[opacity,transform] duration-300 ease-drawer"
-      enter-from-class="-translate-x-4 opacity-0"
-      leave-active-class="transition-[opacity,transform] duration-200 ease-out-strong"
-      leave-to-class="-translate-x-2 opacity-0"
-    >
-      <aside
-        v-if="panelOpen"
-        id="admin-menu-panel"
-        ref="panel"
-        class="fixed inset-y-3 left-3 z-50 flex w-72 max-w-[calc(100vw-1.5rem)] origin-left flex-col rounded-[28px] border border-border bg-surface shadow-float"
-        :role="desktop ? 'navigation' : 'dialog'"
-        :aria-modal="desktop ? undefined : 'true'"
-        aria-label="Menu admin"
-      >
-        <div class="flex items-center justify-between px-5 pb-2 pt-5">
-          <img src="/images/Logo/Tuffero Script Logo Black - NoBckgrnd.webp" alt="Tuffero" class="h-8 w-auto">
-          <button
-            type="button"
-            class="flex size-10 items-center justify-center rounded-full text-secondary transition-[transform,background-color] duration-[160ms] ease-out-strong hover:bg-accent-tint-15 hover:text-primary focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary active:scale-[0.97]"
-            aria-label="Tutup menu"
-            @click="closePanel"
-          >
-            <AdminIcon name="collapse" />
-          </button>
-        </div>
-
-        <nav class="flex-1 overflow-y-auto px-3 pb-4 [scrollbar-color:var(--color-border)_transparent] [scrollbar-width:thin]" aria-label="Semua menu">
-          <router-link
-            :to="OVERVIEW.to"
-            class="mt-1 flex h-11 items-center gap-3 rounded-2xl px-3 text-label-md transition-[transform,background-color] duration-[160ms] ease-out-strong hover:bg-accent-tint-15 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary active:scale-[0.98]"
-            :class="isActive(OVERVIEW) ? 'bg-accent' : ''"
-            :aria-current="isActive(OVERVIEW) ? 'page' : undefined"
-          >
-            <AdminIcon :name="OVERVIEW.icon" />
-            {{ OVERVIEW.label }}
-          </router-link>
-
-          <div v-for="group in menu" :key="group.label" class="mt-4">
-            <p class="px-3 pb-1 text-label-sm uppercase text-secondary">{{ group.label }}</p>
-            <ul class="flex flex-col gap-0.5">
-              <li v-for="item in group.items" :key="item.label">
-                <router-link
-                  v-if="item.to"
-                  :to="item.to"
-                  class="flex h-11 items-center gap-3 rounded-2xl px-3 text-label-md transition-[transform,background-color] duration-[160ms] ease-out-strong hover:bg-accent-tint-15 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary active:scale-[0.98]"
-                  :class="isActive(item) ? 'bg-accent' : ''"
-                  :aria-current="isActive(item) ? 'page' : undefined"
-                >
-                  <AdminIcon :name="item.icon" />
-                  {{ item.label }}
-                </router-link>
-                <div v-else class="flex h-11 items-center gap-3 rounded-2xl px-3 text-label-md text-secondary">
-                  <AdminIcon :name="item.icon" />
-                  {{ item.label }}
-                  <span class="ml-auto rounded-full bg-secondary-tint-12 px-2 py-0.5 text-label-sm normal-case">Segera</span>
-                </div>
-              </li>
-            </ul>
-          </div>
-        </nav>
-      </aside>
-    </Transition>
-
+    <AdminBottomNav :menu="menu" :is-active="isActive" />
+    <ActionTooltip />
     <CustomerServiceWidget v-if="CS_WIDGET_ROLES.includes(auth.activeRole)" />
   </div>
 </template>

@@ -1,6 +1,11 @@
 <script setup>
 import { computed, onMounted, reactive, ref } from 'vue';
 import AdminIcon from '../../components/AdminIcon.vue';
+import AvatarEditor from '../../components/ui/AvatarEditor.vue';
+import ActivityCard from '../../components/ActivityCard.vue';
+import MfaResetDialog from '../../components/MfaResetDialog.vue';
+import NotificationPrefsCard from '../../components/NotificationPrefsCard.vue';
+import SessionsCard from '../../components/SessionsCard.vue';
 import { useAuthStore } from '../../stores/auth';
 import api from '../../utils/api';
 import { apiError } from '../../utils/apiError';
@@ -12,9 +17,8 @@ const profile = ref(null);
 const loading = ref(true);
 const loadError = ref('');
 
-const form = reactive({ name: '', email: '', current_password: '' });
+const form = reactive({ name: '', email: '', phone: '', current_password: '', mfa_code: '' });
 const saving = ref(false);
-const saved = ref(false);
 const formError = ref('');
 const fieldErrors = ref({});
 
@@ -26,7 +30,17 @@ const pwFieldErrors = ref({});
 const reveal = ref(false);
 
 const emailChanged = computed(() => !!profile.value && form.email.trim() !== profile.value.email);
-const dirty = computed(() => !!profile.value && (form.name.trim() !== profile.value.name || emailChanged.value));
+// Nomor HP diseragamkan seperti di server (+628xxx) supaya "0812..." dan "+62812..." tidak dianggap berbeda.
+const normalizePhone = (value) => {
+    const digits = String(value || '').replace(/\D/g, '').replace(/^(62|0)/, '');
+    return digits ? `+62${digits}` : '';
+};
+const phoneChanged = computed(() => !!profile.value && normalizePhone(form.phone) !== (profile.value.phone || ''));
+// Email dan nomor HP adalah jalur pemulihan akun: butuh password saat ini, dan kode autentikator bila MFA aktif.
+const sensitiveChanged = computed(() => emailChanged.value || phoneChanged.value);
+const needsMfa = computed(() => sensitiveChanged.value && !!profile.value?.mfa?.enabled);
+const dirty = computed(() => !!profile.value && (form.name.trim() !== profile.value.name || sensitiveChanged.value));
+const saveBlocked = computed(() => !dirty.value || (sensitiveChanged.value && !form.current_password) || (needsMfa.value && form.mfa_code.trim().length < 6));
 const initials = computed(() => (profile.value?.name || '?').split(/\s+/).slice(0, 2).map((part) => part[0]).join('').toUpperCase());
 const since = computed(() => (profile.value?.created_at ? new Intl.DateTimeFormat('id-ID', { month: 'long', year: 'numeric' }).format(new Date(profile.value.created_at)) : ''));
 
@@ -44,7 +58,9 @@ function fill(data) {
     profile.value = data;
     form.name = data.name;
     form.email = data.email;
+    form.phone = data.phone || '';
     form.current_password = '';
+    form.mfa_code = '';
 }
 
 async function load() {
@@ -60,19 +76,30 @@ async function load() {
     }
 }
 
+const mfaDialog = ref(null);
+// Autentikator diganti: sisa kode pemulihan di kartu Keamanan ikut diperbarui.
+function onMfaReplaced(data) {
+    profile.value = { ...profile.value, mfa: data.mfa };
+}
+
+// Foto berubah: bilah atas ikut berubah tanpa memuat ulang halaman.
+function onAvatar(data) {
+    profile.value = { ...profile.value, ...data };
+    if (data.user) auth.setUser(data.user);
+}
+
 async function save() {
     saving.value = true;
-    saved.value = false;
     formError.value = '';
     fieldErrors.value = {};
     try {
-        const body = { name: form.name.trim(), email: form.email.trim() };
-        if (emailChanged.value) body.current_password = form.current_password;
-        const { data } = await api.patch('/admin/profile', body);
+        const body = { name: form.name.trim(), email: form.email.trim(), phone: form.phone.trim() || null };
+        if (sensitiveChanged.value) body.current_password = form.current_password;
+        if (needsMfa.value) body.mfa_code = form.mfa_code.trim();
+        const { data } = await api.patch('/admin/profile', body, { toast: 'Profil tersimpan.' });
         fill(data.data);
         // Nama di bilah atas ikut berubah tanpa memuat ulang halaman.
         auth.setUser(data.data.user);
-        saved.value = true;
     } catch (e) {
         const { message, fields } = apiError(e);
         fieldErrors.value = fields;
@@ -119,7 +146,7 @@ onMounted(load);
 
     <template v-else>
       <header class="flex animate-rise items-center gap-4 rounded-card border border-border bg-surface p-6 shadow-card">
-        <span class="flex size-16 shrink-0 items-center justify-center rounded-full bg-primary font-heading text-headline-sm text-accent" aria-hidden="true">{{ initials }}</span>
+        <AvatarEditor :src="profile.avatar_url" :name="profile.name" size="size-20" @changed="onAvatar" />
         <div class="min-w-0">
           <h1 class="truncate font-heading text-headline-md">{{ profile.name }}</h1>
           <p class="truncate text-body-sm text-secondary">{{ profile.email }}</p>
@@ -138,28 +165,44 @@ onMounted(load);
             <form class="mt-4 grid gap-4" novalidate @submit.prevent="save">
               <div>
                 <label for="profile-name" class="text-label-md">Nama</label>
-                <input id="profile-name" v-model="form.name" required maxlength="255" autocomplete="name" :class="[input, fieldErrors.name ? 'border-error' : 'border-secondary']" :aria-invalid="!!fieldErrors.name" :aria-describedby="fieldErrors.name ? 'profile-name-error' : undefined" @input="saved = false">
+                <input id="profile-name" v-model="form.name" required maxlength="255" autocomplete="name" :class="[input, fieldErrors.name ? 'border-error' : 'border-secondary']" :aria-invalid="!!fieldErrors.name" :aria-describedby="fieldErrors.name ? 'profile-name-error' : undefined">
                 <p v-if="fieldErrors.name" id="profile-name-error" role="alert" class="mt-1 text-body-sm text-error">{{ fieldErrors.name[0] }}</p>
               </div>
 
               <div>
                 <label for="profile-email" class="text-label-md">Email</label>
-                <input id="profile-email" v-model="form.email" type="email" required maxlength="255" autocomplete="email" :class="[input, fieldErrors.email ? 'border-error' : 'border-secondary']" :aria-invalid="!!fieldErrors.email" aria-describedby="profile-email-hint" @input="saved = false">
-                <p id="profile-email-hint" class="mt-1 text-body-sm text-secondary">Dipakai untuk masuk. Mengganti email meminta password saat ini.</p>
+                <input id="profile-email" v-model="form.email" type="email" required maxlength="255" autocomplete="email" :class="[input, fieldErrors.email ? 'border-error' : 'border-secondary']" :aria-invalid="!!fieldErrors.email" aria-describedby="profile-email-hint">
+                <p id="profile-email-hint" class="mt-1 text-body-sm text-secondary">Dipakai untuk masuk dan pemulihan akun.</p>
                 <p v-if="fieldErrors.email" role="alert" class="mt-1 text-body-sm text-error">{{ fieldErrors.email[0] }}</p>
               </div>
 
-              <div v-if="emailChanged" class="animate-pop origin-top">
-                <label for="profile-current" class="text-label-md">Password saat ini</label>
-                <input id="profile-current" v-model="form.current_password" type="password" required autocomplete="current-password" :class="[input, fieldErrors.current_password ? 'border-error' : 'border-secondary']" :aria-invalid="!!fieldErrors.current_password">
-                <p v-if="fieldErrors.current_password" role="alert" class="mt-1 text-body-sm text-error">{{ fieldErrors.current_password[0] }}</p>
+              <div>
+                <label for="profile-phone" class="text-label-md">Nomor HP <span class="font-normal text-secondary">(opsional)</span></label>
+                <input id="profile-phone" v-model="form.phone" type="tel" inputmode="tel" maxlength="20" autocomplete="tel" placeholder="081234567890" :class="[input, fieldErrors.phone ? 'border-error' : 'border-secondary']" :aria-invalid="!!fieldErrors.phone" aria-describedby="profile-phone-hint">
+                <p id="profile-phone-hint" class="mt-1 text-body-sm text-secondary">Nomor seluler Indonesia. Disimpan sebagai +628xxx dan belum terverifikasi.</p>
+                <p v-if="fieldErrors.phone" role="alert" class="mt-1 text-body-sm text-error">{{ fieldErrors.phone[0] }}</p>
+              </div>
+
+              <!-- Mengganti email atau nomor HP: konfirmasi identitas dulu -->
+              <div v-if="sensitiveChanged" class="animate-pop origin-top grid gap-4 rounded-2xl border border-accent bg-accent-tint-12 p-4">
+                <p class="flex items-start gap-2 text-body-sm"><AdminIcon name="shield" :size="16" class="mt-0.5 shrink-0" />Email dan nomor HP dipakai untuk memulihkan akun, jadi perubahannya perlu dikonfirmasi{{ needsMfa ? ' dengan password dan kode autentikator' : ' dengan password saat ini' }}.</p>
+                <div>
+                  <label for="profile-current" class="text-label-md">Password saat ini</label>
+                  <input id="profile-current" v-model="form.current_password" type="password" required autocomplete="current-password" :class="[input, fieldErrors.current_password ? 'border-error' : 'border-secondary']" :aria-invalid="!!fieldErrors.current_password">
+                  <p v-if="fieldErrors.current_password" role="alert" class="mt-1 text-body-sm text-error">{{ fieldErrors.current_password[0] }}</p>
+                </div>
+                <div v-if="needsMfa">
+                  <label for="profile-mfa" class="text-label-md">Kode autentikator</label>
+                  <input id="profile-mfa" v-model="form.mfa_code" inputmode="numeric" autocomplete="one-time-code" maxlength="12" placeholder="123456" :class="[input, 'font-mono tracking-widest', fieldErrors.mfa_code ? 'border-error' : 'border-secondary']" :aria-invalid="!!fieldErrors.mfa_code" aria-describedby="profile-mfa-hint">
+                  <p id="profile-mfa-hint" class="mt-1 text-body-sm text-secondary">6 digit dari aplikasi autentikator Anda. Satu kode hanya bisa dipakai sekali.</p>
+                  <p v-if="fieldErrors.mfa_code" role="alert" class="mt-1 text-body-sm text-error">{{ fieldErrors.mfa_code[0] }}</p>
+                </div>
               </div>
 
               <p v-if="formError" role="alert" class="rounded-xl bg-error-surface px-4 py-2.5 text-body-sm text-on-error-surface">{{ formError }}</p>
-              <p v-if="saved" role="status" class="flex items-center gap-2 rounded-xl bg-success-surface px-4 py-2.5 text-body-sm text-success"><AdminIcon name="check" :size="16" />Profil tersimpan.</p>
 
               <div>
-                <button type="submit" :class="primaryButton" :disabled="saving || !dirty || (emailChanged && !form.current_password)">{{ saving ? 'Menyimpan...' : 'Simpan perubahan' }}</button>
+                <button type="submit" :class="primaryButton" :disabled="saving || saveBlocked">{{ saving ? 'Menyimpan...' : 'Simpan perubahan' }}</button>
               </div>
             </form>
           </section>
@@ -233,9 +276,15 @@ onMounted(load);
             </div>
           </dl>
           <p v-if="profile.mfa.enabled && profile.mfa.recovery_codes_left <= 2" role="note" class="mt-4 rounded-2xl bg-accent-tint-15 px-4 py-3 text-body-sm">Kode pemulihan hampir habis. Minta Super Admin mereset MFA Anda untuk membuat kode baru.</p>
-          <p class="mt-4 text-body-sm text-secondary">MFA diaktifkan saat masuk dan hanya Super Admin yang bisa mereset atau mengubah kewajibannya. Ini mencegah akun yang dibajak mematikan pengamannya sendiri.</p>
+          <p class="mt-4 text-body-sm text-secondary">MFA diaktifkan saat masuk. Mengganti autentikator butuh password dan kode yang sekarang, jadi akun yang dibajak tidak bisa mengganti pengamannya sendiri. Hanya Super Admin yang bisa mereset MFA yang hilang atau mengubah kewajibannya.</p>
+          <button v-if="profile.mfa.enabled" type="button" :class="`mt-4 inline-flex min-h-10 items-center gap-1.5 rounded-full border border-secondary px-4 text-label-md hover:bg-accent-tint-15 ${'transition-[transform,background-color] duration-[160ms] ease-out-strong focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary active:scale-[0.97]'}`" @click="mfaDialog.open()"><AdminIcon name="shield" :size="16" />Ganti autentikator</button>
         </section>
       </div>
+
+      <SessionsCard class="mt-4" />
+      <NotificationPrefsCard class="mt-4" />
+      <ActivityCard class="mt-4" />
+      <MfaResetDialog ref="mfaDialog" @replaced="onMfaReplaced" />
     </template>
   </div>
 </template>

@@ -4,7 +4,9 @@ namespace App\Services;
 
 use App\Models\AuditLog;
 use App\Models\User;
+use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 
 /**
@@ -12,12 +14,17 @@ use Illuminate\Support\Str;
  */
 class ProfileService
 {
+    public function __construct(private ImageService $images) {}
+
     /** @return array<string, mixed> */
     public function show(User $user): array
     {
         return [
             'name' => $user->name,
             'email' => $user->email,
+            'phone' => $user->phone,
+            'phone_verified' => $user->phone_verified_at !== null,
+            'avatar_url' => $user->avatarUrl(),
             'role' => $user->getRoleNames()->first(),
             'mfa' => [
                 'enabled' => $user->mfa_totp_confirmed_at !== null,
@@ -28,15 +35,26 @@ class ProfileService
         ];
     }
 
-    /** @param array{name: string, email: string} $data */
+    /** @param array{name?: string, email?: string, phone?: string|null} $data */
     public function update(User $user, array $data): User
     {
         $changes = [];
 
-        foreach (['name', 'email'] as $field) {
-            if ($user->{$field} !== $data[$field]) {
-                $changes[$field] = ['old' => $user->{$field}, 'new' => $data[$field]];
-                $user->forceFill([$field => $data[$field]]);
+        foreach (['name', 'email', 'phone'] as $field) {
+            if (! array_key_exists($field, $data) || $user->{$field} === $data[$field]) {
+                continue;
+            }
+
+            // Nomor HP tidak ditulis utuh ke Audit Log: hanya empat digit terakhir.
+            $mask = fn (?string $phone) => $phone ? '+62••••'.substr($phone, -4) : null;
+            $changes[$field] = $field === 'phone'
+                ? ['old' => $mask($user->phone), 'new' => $mask($data[$field])]
+                : ['old' => $user->{$field}, 'new' => $data[$field]];
+            $user->forceFill([$field => $data[$field]]);
+
+            // Nomor baru belum terverifikasi.
+            if ($field === 'phone') {
+                $user->forceFill(['phone_verified_at' => null]);
             }
         }
 
@@ -45,6 +63,39 @@ class ProfileService
                 $user->save();
                 AuditLog::record('profile.updated', $user, $changes, $user->id);
             });
+        }
+
+        return $user;
+    }
+
+    /** Foto profil: JPG/JPEG/PNG, dipotong persegi 512 px, disimpan WebP. Berkas lama dihapus. */
+    public function setAvatar(User $user, UploadedFile $file): User
+    {
+        $old = $user->avatar_path;
+        $path = $this->images->storeWebp($file, "avatars/{$user->id}", 512, 85, true);
+
+        DB::transaction(function () use ($user, $path) {
+            $user->forceFill(['avatar_path' => $path])->save();
+            AuditLog::record('profile.avatar_changed', $user, [], $user->id);
+        });
+
+        if ($old) {
+            Storage::disk('public')->delete($old);
+        }
+
+        return $user;
+    }
+
+    public function removeAvatar(User $user): User
+    {
+        $old = $user->avatar_path;
+
+        if ($old) {
+            DB::transaction(function () use ($user) {
+                $user->forceFill(['avatar_path' => null])->save();
+                AuditLog::record('profile.avatar_removed', $user, [], $user->id);
+            });
+            Storage::disk('public')->delete($old);
         }
 
         return $user;

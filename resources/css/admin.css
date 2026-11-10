@@ -10,6 +10,12 @@
     /* Kartu, tabel, dan dialog halaman admin yang sudah ada ikut membulat seperti desain (rounded-lg = 24 px). */
     --radius-lg: 1.5rem;
     --radius-card: 1.5rem;
+    /* Warna kepala modal CRUD: Tambah hijau (success), Lihat biru, Ubah kuning, Hapus merah (error). */
+    --color-info: #1F5F8B;
+    --color-info-surface: #DCEBF5;
+    --color-warning: #7A5200;
+    --color-warning-surface: #FBE8BD;
+
     --shadow-card: 0 8px 30px -4px rgb(43 27 20 / 0.08);
     --shadow-pop: 0 12px 24px -4px rgb(43 27 20 / 0.16);
     --shadow-float: 0 24px 60px -12px rgb(43 27 20 / 0.35);
@@ -18,11 +24,20 @@
     --animate-pop: pop 150ms var(--ease-out-strong) both;
     --animate-grow: grow 400ms var(--ease-out-strong) both;
     --animate-dot: dot 240ms var(--ease-out-strong) both;
+    --animate-ring: ring 700ms var(--ease-out-strong) both;
     --animate-pulse-soft: pulse-soft 1.6s ease-in-out infinite;
 
     @keyframes rise {
         from { opacity: 0; transform: translateY(8px); }
         to { opacity: 1; transform: none; }
+    }
+    @keyframes ring {
+        0% { transform: rotate(0); }
+        20% { transform: rotate(14deg); }
+        40% { transform: rotate(-12deg); }
+        60% { transform: rotate(8deg); }
+        80% { transform: rotate(-4deg); }
+        100% { transform: rotate(0); }
     }
     @keyframes pop {
         from { opacity: 0; transform: scale(0.95); }
@@ -70,4 +85,14 @@ button.rounded {
 
 button:not(:disabled):active {
     transform: scale(0.97);
+}
+
+/* Modal terbuka: halaman di belakangnya terkunci, hanya isi modal yang bisa digulir. */
+html:has(dialog[open]) {
+    overflow: hidden;
+    scrollbar-gutter: stable;
+}
+
+dialog[open] {
+    overscroll-behavior: contain;
 }

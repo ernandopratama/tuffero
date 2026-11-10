@@ -53,6 +53,8 @@ class AdminAccessTest extends TestCase
             'cs mengajukan pembatalan' => ['customer-service', 'orders.cancel_request', true],
             'cs tidak memberi ACC' => ['customer-service', 'orders.cancel', false],
             'cs tidak mengubah stok' => ['customer-service', 'stock.adjust', false],
+            'admin toko melihat stok' => ['store-admin', 'stock.view', true],
+            'admin toko tidak mengubah stok' => ['store-admin', 'stock.adjust', false],
             'gudang melihat data pengemasan' => ['warehouse', 'orders.view_fulfillment', true],
             'gudang tidak melihat pesanan penuh' => ['warehouse', 'orders.view', false],
             'gudang tidak melihat pembayaran' => ['warehouse', 'payments.view', false],
@@ -195,7 +197,7 @@ class AdminAccessTest extends TestCase
 
     public function test_admin_pages_do_not_load_storefront_bootstrap(): void
     {
-        foreach (['/login', '/admin', '/admin/forbidden'] as $path) {
+        foreach (['/login', '/lupa-kata-sandi', '/admin', '/admin/forbidden'] as $path) {
             $this->get($path)->assertOk()->assertDontSee('bootstrap.min.css');
         }
 

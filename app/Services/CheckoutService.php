@@ -21,6 +21,7 @@ class CheckoutService
         private CartService $cart,
         private ShippingProvider $shipping,
         private InventoryService $inventory,
+        private VoucherService $vouchers,
     ) {}
 
     /**
@@ -42,6 +43,9 @@ class CheckoutService
         if (! $summary['can_checkout']) {
             throw ValidationException::withMessages(['cart' => 'cart_changed']);
         }
+
+        // Hanya item yang dicentang yang dibeli; sisanya tetap di keranjang.
+        $summary['items'] = array_values(array_filter($summary['items'], fn (array $item) => $item['selected']));
 
         $rate = collect($this->shipping->rates($data['address'], $summary['weight_gram']))
             ->first(fn (array $rate) => $rate['courier'] === $data['courier'] && $rate['service'] === $data['service']);
@@ -65,7 +69,9 @@ class CheckoutService
             return ['order' => $order, 'token' => null];
         }
 
-        $this->cart->clear();
+        foreach ($summary['items'] as $item) {
+            $this->cart->remove($item['sku']);
+        }
 
         return ['order' => $order, 'token' => $token];
     }
@@ -93,7 +99,7 @@ class CheckoutService
 
     /**
      * @param  array<string, mixed>  $data
-     * @param  array{items: list<array<string, mixed>>, subtotal: int, weight_gram: int, can_checkout: bool}  $summary
+     * @param  array{items: list<array<string, mixed>>, subtotal: int, saving: int, weight_gram: int, can_checkout: bool, selected_count: int}  $summary
      * @param  array{courier: string, service: string, label: string, fee: int}  $rate
      */
     private function createOrder(array $data, array $summary, array $rate, string $idempotencyKey, string $token): Order
@@ -101,6 +107,13 @@ class CheckoutService
         $warehouse = $this->allocateWarehouse($summary['items']);
         $minutes = (int) Setting::where('key', 'checkout.reservation_minutes')->value('value') ?: 60;
         $expiresAt = now()->addMinutes($minutes);
+
+        // Voucher dikunci dan dihitung di dalam transaksi ini; kode salah menggagalkan seluruh checkout.
+        $codes = array_values(array_filter([...($data['voucher_codes'] ?? []), $data['voucher_code'] ?? null], 'filled'));
+        $applied = $codes
+            ? $this->vouchers->redeem($codes, $summary['subtotal'], $data['user_id'] ?? null, $data['customer_phone'])
+            : [];
+        $discount = array_sum(array_column($applied, 'discount'));
 
         $order = Order::create([
             'user_id' => $data['user_id'] ?? null,
@@ -119,11 +132,17 @@ class CheckoutService
             'payment_status' => 'pending',
             'shipping_status' => 'pending',
             'subtotal' => $summary['subtotal'],
-            'discount_total' => 0,
+            'discount_total' => $discount,
+            'voucher_code' => $applied[0]['voucher']->code ?? null,
+            'voucher_code_2' => $applied[1]['voucher']->code ?? null,
             'shipping_fee' => $rate['fee'],
-            'total' => $summary['subtotal'] + $rate['fee'],
+            'total' => $summary['subtotal'] - $discount + $rate['fee'],
             'expires_at' => $expiresAt,
         ]);
+
+        foreach ($applied as $row) {
+            $this->vouchers->record($row['voucher'], $order, $row['discount'], $data['user_id'] ?? null);
+        }
 
         foreach ($summary['items'] as $item) {
             $order->items()->create([

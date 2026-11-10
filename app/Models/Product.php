@@ -4,10 +4,11 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\SoftDeletes;
 
-#[Fillable(['name', 'slug', 'description', 'badges', 'is_published'])]
+#[Fillable(['name', 'name_en', 'slug', 'product_category_id', 'product_type_id', 'description', 'description_en', 'translation_mode', 'badges', 'is_published'])]
 class Product extends Model
 {
     use SoftDeletes;
@@ -23,6 +24,18 @@ class Product extends Model
             'is_published' => 'boolean',
             'badges' => 'array',
         ];
+    }
+
+    /** @return BelongsTo<ProductCategory, $this> */
+    public function category(): BelongsTo
+    {
+        return $this->belongsTo(ProductCategory::class, 'product_category_id');
+    }
+
+    /** @return BelongsTo<ProductType, $this> */
+    public function type(): BelongsTo
+    {
+        return $this->belongsTo(ProductType::class, 'product_type_id');
     }
 
     /** @return HasMany<ProductVariant, $this> */

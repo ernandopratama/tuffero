@@ -1,20 +1,52 @@
 <script setup>
-import { onMounted, reactive, ref, watch } from 'vue';
+import { computed, onMounted, reactive, ref } from 'vue';
 import { useRouter } from 'vue-router';
+import AdminIcon from '../../components/AdminIcon.vue';
+import AppModal from '../../components/ui/AppModal.vue';
+import IconAction from '../../components/ui/IconAction.vue';
+import DataTable from '../../components/ui/DataTable.vue';
+import FilterSelect from '../../components/ui/FilterSelect.vue';
+import TableToolbar from '../../components/ui/TableToolbar.vue';
+import { useDataTable } from '../../composables/useDataTable';
 import api from '../../utils/api';
 import { apiError } from '../../utils/apiError';
 import { useAuthStore } from '../../stores/auth';
+import PageHeader from '../../components/ui/PageHeader.vue';
+import AddButton from '../../components/ui/AddButton.vue';
 
 const auth = useAuthStore();
 const router = useRouter();
 const rupiah = new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', maximumFractionDigits: 0 });
 
-const products = ref([]);
-const meta = ref({ current_page: 1, last_page: 1, total: 0 });
-const search = ref('');
-const page = ref(1);
-const loading = ref(true);
-const error = ref('');
+const COLUMNS = [
+    { key: 'name', label: 'Produk', cellClass: 'text-left' },
+    { key: 'variants', label: 'Varian' },
+    { key: 'price', label: 'Harga jual' },
+    { key: 'is_published', label: 'Status' },
+    { key: 'actions', label: 'Aksi' },
+];
+const STATUS = { published: 'Tayang', draft: 'Draf' };
+
+const { rows, meta, page, perPage, search, filter, loading, error, load } = useDataTable('/admin/products', { filters: { status: '', category_id: '' } });
+
+const categories = ref([]);
+const categoryOptions = computed(() => categories.value.map((c) => ({ value: c.id, label: c.name_id })));
+
+// Pintasan "Jadikan draf": produk hilang dari toko tetapi datanya utuh, dan bisa dipublikasikan lagi dari halaman ubah.
+const drafting = ref(null);
+const actionError = ref('');
+async function makeDraft(product) {
+    drafting.value = product.id;
+    actionError.value = '';
+    try {
+        await api.patch(`/admin/products/${product.id}`, { is_published: false }, { toast: `${product.name} dijadikan draf.` });
+        await load();
+    } catch (e) {
+        actionError.value = `${product.name}: ${apiError(e).message}`;
+    } finally {
+        drafting.value = null;
+    }
+}
 
 const dialog = ref(null);
 const form = reactive({ name: '', description: '' });
@@ -30,23 +62,18 @@ function priceRange(product) {
     return low === high ? rupiah.format(low) : `${rupiah.format(low)} - ${rupiah.format(high)}`;
 }
 
-async function load() {
-    loading.value = true;
-    error.value = '';
-    try {
-        const { data } = await api.get('/admin/products', { params: { page: page.value, search: search.value || undefined } });
-        products.value = data.data.items;
-        meta.value = data.data.meta;
-    } catch (e) {
-        error.value = apiError(e).message;
-    } finally {
-        loading.value = false;
-    }
-}
+const press = 'transition-[transform,background-color] duration-[160ms] ease-out-strong focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary active:scale-[0.97] disabled:opacity-60 disabled:active:scale-100';
+const field = 'mt-1 block w-full rounded-2xl border border-secondary bg-surface px-3 py-2 text-body-md font-normal focus:outline-2 focus:outline-primary';
 
-function applySearch() {
-    if (page.value === 1) load();
-    else page.value = 1;
+const categoryName = (product) => categories.value.find((c) => c.id === product.product_category_id)?.name_id || 'Tanpa kategori';
+// Halaman toko per varian: /produk/<sku>. Varian aktif pertama mewakili produk.
+const storePath = (product) => { const variant = product.variants.find((v) => v.is_active); return variant ? `/produk/${variant.sku.toLowerCase()}` : ''; };
+const activeCount = (product) => product.variants.filter((variant) => variant.is_active).length;
+
+// Harga coret varian aktif termurah, hanya bila lebih tinggi dari harga jualnya.
+function strikePrice(product) {
+    const cheapest = product.variants.filter((variant) => variant.is_active).sort((a, b) => a.price - b.price)[0];
+    return cheapest?.compare_at_price > cheapest?.price ? cheapest.compare_at_price : null;
 }
 
 function openForm() {
@@ -73,92 +100,100 @@ async function create() {
     }
 }
 
-watch(page, load);
-onMounted(load);
+// Daftar kategori hanya untuk pilihan filter; bila gagal, filter kategori kosong.
+onMounted(async () => {
+    try {
+        categories.value = (await api.get('/admin/categories')).data.data.items;
+    } catch {
+        categories.value = [];
+    }
+});
 </script>
 
 <template>
   <div class="flex flex-wrap items-end justify-between gap-space-md">
-    <div>
-      <h1 class="font-heading text-headline-lg-mobile lg:text-headline-lg">Produk dan Harga</h1>
-      <p class="mt-space-sm text-secondary">Produk baru tersimpan sebagai draf sampai dipublikasikan.</p>
+    <PageHeader title="Produk dan Harga" description="Produk baru tersimpan sebagai draf sampai dipublikasikan." />
+    <div class="flex flex-1 flex-wrap items-center justify-end gap-2">
+      <TableToolbar v-model="search" placeholder="Cari nama atau SKU">
+        <FilterSelect v-model="filter.status" label="Status" :options="STATUS" />
+        <FilterSelect v-model="filter.category_id" label="Kategori" :options="categoryOptions" />
+      </TableToolbar>
+      <AddButton v-if="auth.can('products.manage')" label="Tambah produk" @click="openForm" />
     </div>
-    <button v-if="auth.can('products.manage')" type="button" class="rounded bg-accent px-4 py-2 text-label-md hover:bg-accent-hover focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary" @click="openForm">Tambah produk</button>
   </div>
 
-  <form class="mt-space-lg flex max-w-md gap-space-sm" role="search" @submit.prevent="applySearch">
-    <label class="w-full text-label-md">
-      Cari nama atau SKU
-      <input v-model="search" type="search" class="mt-1 w-full rounded border border-secondary bg-surface px-3 py-2 text-body-md focus:outline-2 focus:outline-primary">
-    </label>
-    <button class="self-end rounded border border-secondary px-4 py-2 text-label-md hover:bg-accent-tint-15 focus-visible:outline-2 focus-visible:outline-primary">Cari</button>
-  </form>
+  <p v-if="actionError" role="alert" class="mt-space-md rounded-2xl bg-error-surface px-4 py-3 text-body-sm text-on-error-surface">{{ actionError }}</p>
 
-  <p v-if="loading" role="status" class="mt-space-lg text-secondary">Memuat produk...</p>
-  <div v-else-if="error" role="alert" class="mt-space-lg rounded bg-error-surface p-space-md text-on-error-surface">
-    {{ error }}
-    <button type="button" class="ml-2 underline" @click="load">Coba lagi</button>
-  </div>
-  <p v-else-if="!products.length" class="mt-space-lg rounded-lg border border-border bg-surface p-space-lg text-secondary">Belum ada produk.</p>
-  <template v-else>
-    <div class="relative mt-space-lg overflow-x-auto rounded-lg border border-border bg-surface">
-      <table class="w-full min-w-[720px] text-left text-body-sm">
-        <thead class="border-b border-border text-label-md">
-          <tr>
-            <th scope="col" class="px-4 py-3">Produk</th>
-            <th scope="col" class="px-4 py-3">Varian</th>
-            <th scope="col" class="px-4 py-3">Harga jual</th>
-            <th scope="col" class="px-4 py-3">Status</th>
-            <th scope="col" class="px-4 py-3"><span class="sr-only">Aksi</span></th>
-          </tr>
-        </thead>
-        <tbody>
-          <tr v-for="product in products" :key="product.id" class="border-b border-border last:border-b-0">
-            <td class="px-4 py-3">
-              <div class="flex items-center gap-space-sm">
-                <img v-if="product.images[0]" :src="product.images[0].url" :alt="product.images[0].alt" width="44" height="44" class="size-11 rounded object-cover">
-                <div v-else class="size-11 rounded bg-accent-tint-12" aria-hidden="true"></div>
-                <span class="text-label-md">{{ product.name }}</span>
-              </div>
-            </td>
-            <td class="px-4 py-3">{{ product.variants.length }}</td>
-            <td class="whitespace-nowrap px-4 py-3">{{ priceRange(product) }}</td>
-            <td class="px-4 py-3">
-              <span class="rounded-full px-2 py-0.5 text-label-sm" :class="product.is_published ? 'bg-success-surface text-success' : 'bg-secondary-tint-12'">{{ product.is_published ? 'Tayang' : 'Draf' }}</span>
-            </td>
-            <td class="px-4 py-3 text-right">
-              <router-link :to="{ name: 'AdminProductEdit', params: { id: product.id } }" class="text-label-md underline focus-visible:outline-2 focus-visible:outline-primary">{{ auth.can('products.manage') ? 'Ubah' : 'Lihat' }}</router-link>
-            </td>
-          </tr>
-        </tbody>
-      </table>
-    </div>
-    <nav class="mt-space-md flex items-center justify-between gap-space-md" aria-label="Halaman produk">
-      <p class="text-body-sm text-secondary">Halaman {{ meta.current_page }} dari {{ meta.last_page }} ({{ meta.total }} produk)</p>
-      <div class="flex gap-space-sm">
-        <button type="button" :disabled="page <= 1" class="rounded border border-secondary px-3 py-1.5 text-label-md hover:bg-accent-tint-15 disabled:opacity-50" @click="page -= 1">Sebelumnya</button>
-        <button type="button" :disabled="page >= meta.last_page" class="rounded border border-secondary px-3 py-1.5 text-label-md hover:bg-accent-tint-15 disabled:opacity-50" @click="page += 1">Berikutnya</button>
+  <DataTable
+    v-model:page="page"
+    v-model:per-page="perPage"
+    class="mt-space-lg"
+    caption="Daftar produk"
+    empty-text="Belum ada produk."
+    min-width="min-w-[900px]"
+    :columns="COLUMNS"
+    :rows="rows"
+    :meta="meta"
+    :loading="loading"
+    :error="error"
+    @retry="load"
+  >
+    <template #cell-name="{ row }">
+      <div class="inline-flex max-w-sm items-center gap-3 text-left">
+        <img v-if="row.images[0]" :src="row.images[0].url" :alt="row.images[0].alt || row.name" width="56" height="56" loading="lazy" class="size-14 shrink-0 rounded-2xl border border-border object-cover">
+        <span v-else class="grid size-14 shrink-0 place-items-center rounded-2xl border border-dashed border-border bg-accent-tint-12 text-secondary" aria-hidden="true"><AdminIcon name="tag" :size="20" /></span>
+        <span class="min-w-0">
+          <span class="block truncate text-label-md">{{ row.name }}</span>
+          <span class="block truncate text-body-sm text-secondary">{{ categoryName(row) }}</span>
+        </span>
       </div>
-    </nav>
-  </template>
+    </template>
+    <template #cell-variants="{ row }">
+      <span class="block text-label-md tabular-nums">{{ row.variants.length }} varian</span>
+      <span class="block text-body-sm" :class="activeCount(row) ? 'text-secondary' : 'text-error'">{{ activeCount(row) ? `${activeCount(row)} aktif` : 'Tidak ada yang aktif' }}</span>
+    </template>
+    <template #cell-price="{ row }">
+      <span class="block whitespace-nowrap text-label-md tabular-nums">{{ priceRange(row) }}</span>
+      <span v-if="strikePrice(row)" class="block whitespace-nowrap text-body-sm tabular-nums text-secondary line-through">{{ rupiah.format(strikePrice(row)) }}</span>
+    </template>
+    <template #cell-is_published="{ row }">
+      <div class="flex flex-col items-center gap-1">
+        <span class="inline-flex items-center gap-1.5 whitespace-nowrap rounded-full px-2.5 py-1 text-label-sm" :class="row.is_published ? 'bg-success-surface text-success' : 'bg-secondary-tint-12 text-secondary'">
+          <i class="size-1.5 rounded-full" :class="row.is_published ? 'bg-success' : 'bg-secondary'" aria-hidden="true"></i>{{ row.is_published ? 'Tayang' : 'Draf' }}
+        </span>
+        <span v-if="row.translation_outdated" class="inline-flex items-center gap-1 whitespace-nowrap text-label-sm text-warning"><AdminIcon name="alert" :size="12" />Terjemahan usang</span>
+      </div>
+    </template>
+    <template #cell-actions="{ row }">
+      <div class="flex items-center justify-center gap-1">
+        <IconAction v-if="row.is_published && storePath(row)" icon="eye" label="Lihat di toko" :subject="row.name" :href="storePath(row)" />
+        <IconAction v-if="row.is_published && auth.can('products.manage')" icon="undo" label="Jadikan draf" :subject="row.name" :disabled="drafting === row.id" @click="makeDraft(row)" />
+        <IconAction :icon="auth.can('products.manage') ? 'edit' : 'sliders'" :label="auth.can('products.manage') ? 'Ubah' : 'Lihat detail'" :subject="row.name" :to="{ name: 'AdminProductEdit', params: { id: row.id } }" />
+      </div>
+    </template>
+  </DataTable>
 
-  <dialog ref="dialog" aria-labelledby="product-form-title" class="m-auto w-[calc(100%-2rem)] max-w-lg rounded-lg border border-border bg-surface p-space-lg text-primary backdrop:bg-primary/50">
-    <form class="space-y-space-md" @submit.prevent="create">
-      <h2 id="product-form-title" class="font-heading text-headline-md">Tambah produk</h2>
-      <p v-if="formError" role="alert" class="rounded bg-error-surface px-3 py-2 text-body-sm text-on-error-surface">{{ formError }}</p>
+  <AppModal ref="dialog" variant="create" title="Tambah produk" subtitle="Tersimpan sebagai draf, lalu lengkapi varian dan foto">
+    <form id="product-form" class="space-y-space-md" @submit.prevent="create">
+      <p v-if="formError" role="alert" class="rounded-2xl bg-error-surface px-4 py-3 text-body-sm text-on-error-surface">{{ formError }}</p>
       <label class="block text-label-md">
         Nama produk
-        <input v-model="form.name" required maxlength="150" class="mt-1 w-full rounded border border-secondary px-3 py-2 text-body-md focus:outline-2 focus:outline-primary">
-        <span v-if="fieldErrors.name" class="mt-1 block text-body-sm text-error">{{ fieldErrors.name[0] }}</span>
+        <input v-model="form.name" required maxlength="150" :class="field">
+        <span class="mt-1 block text-right text-label-sm font-normal tabular-nums text-secondary">{{ form.name.length }}/150</span>
+        <span v-if="fieldErrors.name" class="block text-body-sm text-error">{{ fieldErrors.name[0] }}</span>
       </label>
       <label class="block text-label-md">
-        Deskripsi
-        <textarea v-model="form.description" rows="4" maxlength="5000" class="mt-1 w-full rounded border border-secondary px-3 py-2 text-body-md focus:outline-2 focus:outline-primary"></textarea>
+        Deskripsi <span class="font-normal text-secondary">(opsional)</span>
+        <textarea v-model="form.description" rows="5" maxlength="5000" :class="`${field} resize-none`"></textarea>
+        <span v-if="fieldErrors.description" class="mt-1 block text-body-sm text-error">{{ fieldErrors.description[0] }}</span>
       </label>
-      <div class="flex justify-end gap-space-sm">
-        <button type="button" class="rounded border border-secondary px-4 py-2 text-label-md hover:bg-accent-tint-15 focus-visible:outline-2 focus-visible:outline-primary" @click="dialog.close()">Batal</button>
-        <button :disabled="saving" class="rounded bg-accent px-4 py-2 text-label-md hover:bg-accent-hover focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary disabled:opacity-60">{{ saving ? 'Menyimpan...' : 'Simpan' }}</button>
-      </div>
+      <p class="flex items-start gap-2 rounded-2xl bg-background/70 p-3 text-body-sm text-secondary">
+        <AdminIcon name="info" :size="16" class="mt-0.5 shrink-0" />Setelah disimpan, halaman ubah produk terbuka untuk menambah varian, harga, dan foto.
+      </p>
     </form>
-  </dialog>
+    <template #footer>
+      <button type="button" :class="`inline-flex min-h-10 items-center rounded-full border border-secondary px-4 text-label-md hover:bg-accent-tint-15 ${press}`" @click="dialog.close()">Batal</button>
+      <button form="product-form" :disabled="saving" :class="`inline-flex min-h-10 items-center gap-1.5 rounded-full bg-accent px-4 text-label-md hover:bg-accent-hover ${press}`"><AdminIcon name="check" :size="16" />{{ saving ? 'Menyimpan...' : 'Simpan dan lanjut' }}</button>
+    </template>
+  </AppModal>
 </template>

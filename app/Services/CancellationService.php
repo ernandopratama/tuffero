@@ -6,6 +6,7 @@ use App\Models\Order;
 use App\Models\OrderCancellationRequest as CancellationRequest;
 use App\Models\Setting;
 use App\Models\User;
+use App\Notifications\StaffEvent;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
 
@@ -14,7 +15,7 @@ use Illuminate\Validation\ValidationException;
  */
 class CancellationService
 {
-    public function __construct(private InventoryService $inventory) {}
+    public function __construct(private InventoryService $inventory, private VoucherService $vouchers, private StaffNotifier $notifier) {}
 
     /** @param array{reason: string, channel: string} $data */
     public function submit(Order $order, array $data): CancellationRequest
@@ -32,24 +33,30 @@ class CancellationService
 
             $days = (int) Setting::where('key', 'cancellation.process_days_max')->value('value') ?: 7;
 
-            return $locked->cancellationRequests()->create([
+            $request = $locked->cancellationRequests()->create([
                 'request_number' => $this->requestNumber(),
                 'reason' => $data['reason'],
                 'channel' => $data['channel'],
                 'status' => CancellationRequest::SUBMITTED,
                 'due_at' => now()->addDays($days),
             ]);
+
+            $this->notify(['customer-service'], 'cancellation_submitted', $request, $locked, "Pengajuan pembatalan {$request->request_number} menunggu validasi", $data['reason']);
+
+            return $request;
         });
     }
 
     public function validateRequest(CancellationRequest $request, User $actor): CancellationRequest
     {
-        return $this->step($request, CancellationRequest::SUBMITTED, function (CancellationRequest $locked) use ($actor) {
+        return $this->step($request, CancellationRequest::SUBMITTED, function (CancellationRequest $locked, Order $order) use ($actor) {
             $locked->forceFill([
                 'status' => CancellationRequest::VALIDATED,
                 'validated_by_user_id' => $actor->id,
                 'validated_at' => now(),
             ])->save();
+
+            $this->notify(['store-admin'], 'cancellation_validated', $locked, $order, "Pengajuan {$locked->request_number} menunggu ACC Admin Toko", "Pesanan {$order->order_number}", $actor);
         });
     }
 
@@ -61,6 +68,7 @@ class CancellationService
             // Pesanan belum dibayar selesai di ACC Admin Toko; Pemilik hanya memantau (D-044).
             if ($order->payment_status === 'paid') {
                 $locked->forceFill(['status' => CancellationRequest::STORE_APPROVED])->save();
+                $this->notify(['owner'], 'cancellation_store_approved', $locked, $order, "Pengajuan {$locked->request_number} menunggu ACC Pemilik", "Pesanan {$order->order_number}", $actor);
 
                 return;
             }
@@ -154,6 +162,7 @@ class CancellationService
         } else {
             $this->inventory->releaseOrder($order, $note);
         }
+        $this->vouchers->release($order);
 
         $toPayment = $wasPaid ? 'refund_pending' : 'cancelled';
 
@@ -162,6 +171,36 @@ class CancellationService
         $order->histories()->create(['status_type' => 'payment', 'from_status' => $fromPayment, 'to_status' => $toPayment, 'source' => 'admin', 'actor_user_id' => $actor->id]);
 
         $request->forceFill(['status' => CancellationRequest::APPROVED])->save();
+
+        if ($wasPaid) {
+            $this->notify(['store-admin'], 'refund_pending', $request, $order, "Dana pesanan {$order->order_number} menunggu dikembalikan", "Pengajuan {$request->request_number}", $actor);
+        }
+    }
+
+    /**
+     * Pengingat untuk pengajuan yang lewat batas proses (sistem hanya mengingatkan, tidak menyetujui apa pun). Sekali per pengajuan.
+     */
+    public function remindOverdue(): int
+    {
+        $count = 0;
+
+        CancellationRequest::with('order')
+            ->whereIn('status', CancellationRequest::OPEN)
+            ->whereNull('overdue_notified_at')
+            ->where('due_at', '<', now())
+            ->each(function (CancellationRequest $request) use (&$count) {
+                $request->forceFill(['overdue_notified_at' => now()])->save();
+                $this->notify(['customer-service', 'store-admin'], 'cancellation_overdue', $request, $request->order, "Pengajuan {$request->request_number} lewat batas proses", "Pesanan {$request->order->order_number}");
+                $count++;
+            });
+
+        return $count;
+    }
+
+    /** @param list<string> $roles */
+    private function notify(array $roles, string $event, CancellationRequest $request, Order $order, string $title, string $excerpt, ?User $actor = null): void
+    {
+        $this->notifier->toRoles($roles, new StaffEvent($event, 'cancellation', $request->request_number, $title, $excerpt), $actor);
     }
 
     private function requestNumber(): string

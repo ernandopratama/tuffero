@@ -9,10 +9,16 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 /**
  * Catatan internal staf (D-045): tidak terlihat pelanggan dan tidak bisa diedit atau dihapus.
  */
-#[Fillable(['user_id', 'body'])]
+#[Fillable(['user_id', 'body', 'mentions'])]
 class AdminComment extends Model
 {
     public const UPDATED_AT = null;
+
+    /** @return array<string, string> */
+    protected function casts(): array
+    {
+        return ['mentions' => 'array'];
+    }
 
     /** @return BelongsTo<User, $this> */
     public function user(): BelongsTo

@@ -31,6 +31,12 @@ class ProductVariant extends Model
         return $this->belongsTo(Product::class);
     }
 
+    /** @return HasMany<VariantDiscount, $this> */
+    public function discounts(): HasMany
+    {
+        return $this->hasMany(VariantDiscount::class);
+    }
+
     /** @return HasMany<InventoryStock, $this> */
     public function stocks(): HasMany
     {

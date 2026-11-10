@@ -1,0 +1,150 @@
+/* Popup berita beranda (D-085). Dimuat oleh resources/js/store/newsPopup.js hanya saat popup akan tampil,
+   jadi tidak menambah CSS yang memblokir render halaman. Memakai variabel :root dari tuffero-landing.css. */
+
+dialog.tf-news{
+	--news-ink: var(--tf-ink, #2B1B14);
+	--news-brown: var(--tf-brown, #6D4C3D);
+	--news-gold: var(--tf-gold, #C6A15B);
+	--news-line: var(--tf-line, #E3D5C0);
+	--news-ivory: var(--tf-ivory, #F6F0E5);
+	--news-ease: var(--tf-ease-out, cubic-bezier(0.23, 1, 0.32, 1));
+
+	width: min(520px, calc(100vw - 32px));
+	max-width: none;
+	max-height: calc(100dvh - 32px);
+	margin: auto;
+	padding: 0;
+	border: 0;
+	background: transparent;
+	color: var(--news-brown);
+	font-family: var(--tf-sans, "Be Vietnam Pro", sans-serif);
+	overflow: visible;
+}
+dialog.tf-news::backdrop{ background: rgb(43 27 20 / 0.5); }
+body:has(dialog.tf-news[open]){ overflow: hidden; }
+
+/* Masuk: naik sedikit dan membesar dari 0,96 (tidak pernah dari 0). Keluar lebih cepat dari masuk. */
+dialog.tf-news[open]{ animation: tf-news-in 240ms var(--news-ease); }
+dialog.tf-news[open]::backdrop{ animation: tf-news-fade 200ms ease-out; }
+dialog.tf-news.is-closing{ animation: tf-news-out 160ms ease-out forwards; }
+dialog.tf-news.is-closing::backdrop{ animation: tf-news-fade 160ms ease-out reverse forwards; }
+@keyframes tf-news-in{ from{ opacity: 0; transform: translateY(14px) scale(0.96); } }
+@keyframes tf-news-out{ to{ opacity: 0; transform: translateY(8px) scale(0.98); } }
+@keyframes tf-news-fade{ from{ opacity: 0; } }
+
+.tf-news-card{
+	display: flex;
+	flex-direction: column;
+	max-height: calc(100dvh - 32px);
+	overflow: hidden;
+	border: 1px solid var(--news-line);
+	border-radius: 24px;
+	background: #fff;
+	box-shadow: 0 24px 60px -20px rgb(43 27 20 / 0.45), 0 4px 12px rgb(43 27 20 / 0.12);
+}
+
+.tf-news-head{ display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 14px 12px 0 24px; }
+.tf-news-eyebrow{ display: flex; align-items: center; gap: 10px; margin: 0; color: var(--news-brown); font-size: 12px; font-weight: 600; letter-spacing: 0.12em; text-transform: uppercase; }
+.tf-news-eyebrow::before{ content: ""; width: 22px; height: 1px; background: var(--news-gold); }
+
+.tf-news-close,
+.tf-news-nav{
+	display: inline-grid;
+	place-items: center;
+	width: 44px;
+	height: 44px;
+	padding: 0;
+	border: 0;
+	border-radius: 50%;
+	background: transparent;
+	color: var(--news-ink);
+	font: inherit;
+	font-size: 28px;
+	line-height: 1;
+	cursor: pointer;
+	transition: transform 160ms ease-out, background-color 160ms ease;
+}
+.tf-news-nav{ border: 1px solid var(--news-line); font-size: 24px; }
+.tf-news-close:active,
+.tf-news-nav:active,
+.tf-news-cta:active{ transform: scale(0.97); }
+.tf-news-nav:disabled{ opacity: 0.35; cursor: default; }
+.tf-news-nav:disabled:active{ transform: none; }
+@media (hover: hover) and (pointer: fine){
+	.tf-news-close:hover,
+	.tf-news-nav:not(:disabled):hover{ background: var(--news-ivory); }
+}
+.tf-news-close:focus-visible,
+.tf-news-nav:focus-visible,
+.tf-news-cta:focus-visible,
+.tf-news-viewport:focus-visible{ outline: 2px solid var(--news-gold); outline-offset: 2px; }
+
+/* Carousel: geser asli browser (scroll-snap), tanpa pustaka. */
+.tf-news-viewport{
+	overflow-x: auto;
+	overflow-y: auto;
+	scroll-snap-type: x mandatory;
+	overscroll-behavior-x: contain;
+	scrollbar-width: none;
+	min-height: 0;
+}
+.tf-news-viewport::-webkit-scrollbar{ display: none; }
+.tf-news-track{ display: flex; margin: 0; padding: 0; list-style: none; }
+.tf-news-slide{ flex: 0 0 100%; box-sizing: border-box; padding: 14px 24px 8px; scroll-snap-align: start; scroll-snap-stop: always; }
+
+/* Ukuran gambar dipesan lewat aspect-ratio, jadi tidak ada loncatan tata letak saat gambar tiba. */
+.tf-news-media{ width: 100%; aspect-ratio: 16 / 9; max-height: 36dvh; overflow: hidden; border-radius: 16px; background: linear-gradient(135deg, #F0E2C2, #F8EFD9); }
+.tf-news-media img{ display: block; width: 100%; height: 100%; object-fit: cover; }
+.tf-news-media.is-blank{ background: radial-gradient(circle at 30% 30%, #F4E6C4, #E8D3A0 70%); }
+
+.tf-news-body{ padding-top: 16px; }
+.tf-news-badge{ display: inline-flex; align-items: center; padding: 4px 11px; border-radius: 999px; background: #F3EADB; color: var(--news-brown); font-size: 12px; font-weight: 600; }
+.tf-news-badge.is-flash,
+.tf-news-badge.is-promo{ background: #FCF1EE; color: #A63A2B; }
+.tf-news-badge.is-campaign{ background: #FBF1D9; color: #7A5A1E; }
+.tf-news-badge.is-update{ background: #F4F8EE; color: #3F6B2C; }
+.tf-news-title{ margin: 10px 0 6px; color: var(--news-ink); font-family: var(--tf-serif, "EB Garamond", serif); font-size: 26px; font-weight: 500; line-height: 1.15; overflow-wrap: anywhere; }
+.tf-news-text{ margin: 0; color: var(--news-brown); font-size: 15px; line-height: 1.55; overflow-wrap: anywhere; }
+.tf-news-note{ margin: 8px 0 0; color: var(--news-brown); font-size: 13px; opacity: 0.8; }
+.tf-news-cta{
+	display: inline-flex;
+	align-items: center;
+	min-height: 44px;
+	margin-top: 14px;
+	padding: 0 24px;
+	border-radius: 999px;
+	background: var(--news-gold);
+	color: var(--news-ink);
+	font-size: 15px;
+	font-weight: 600;
+	text-decoration: none;
+	transition: transform 160ms ease-out, background-color 160ms ease;
+}
+@media (hover: hover) and (pointer: fine){ .tf-news-cta:hover{ background: #D8B978; color: var(--news-ink); } }
+
+.tf-news-foot{ display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 6px 16px 16px; }
+.tf-news-dots{ display: flex; align-items: center; gap: 10px; }
+.tf-news-dot{ width: 8px; height: 8px; border-radius: 50%; background: #DCCBAE; transition: transform 200ms var(--news-ease), background-color 200ms ease; }
+.tf-news-dot.is-on{ background: var(--news-gold); transform: scale(1.4); }
+
+/* HP: lembar dari bawah, bukan kotak di tengah layar yang menutupi isi halaman. */
+@media (max-width: 640px){
+	dialog.tf-news{ width: 100%; margin: auto 0 0; }
+	.tf-news-card{ border-bottom-left-radius: 0; border-bottom-right-radius: 0; padding-bottom: env(safe-area-inset-bottom); }
+	dialog.tf-news[open]{ animation-name: tf-news-sheet-in; }
+	dialog.tf-news.is-closing{ animation-name: tf-news-sheet-out; }
+	.tf-news-slide{ padding: 12px 20px 6px; }
+	.tf-news-title{ font-size: 24px; }
+}
+/* Layar pendek (HP mendatar, jendela kecil): gambar dipendekkan supaya judul dan tombol tetap terlihat tanpa menggulir. */
+@media (max-height: 640px){ .tf-news-media{ max-height: 24dvh; } .tf-news-title{ font-size: 22px; } }
+@keyframes tf-news-sheet-in{ from{ opacity: 0; transform: translateY(32px); } }
+@keyframes tf-news-sheet-out{ to{ opacity: 0; transform: translateY(24px); } }
+
+/* Gerak dikurangi: hanya pudar, tanpa pergeseran. Geser carousel langsung tanpa animasi. */
+@media (prefers-reduced-motion: reduce){
+	dialog.tf-news[open]{ animation-name: tf-news-fade; }
+	dialog.tf-news.is-closing{ animation-name: tf-news-fade-out; }
+	@keyframes tf-news-fade-out{ to{ opacity: 0; } }
+	.tf-news-dot{ transition: none; }
+}

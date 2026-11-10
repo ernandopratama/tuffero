@@ -1,6 +1,7 @@
 <script setup>
 import { onBeforeUnmount, onMounted, ref, watch } from 'vue';
 import { t } from '../../composables/useLocale';
+import { enableLauncherDrag } from '../../utils/chatDrag';
 
 const props = defineProps({ status: { type: String, required: true } });
 defineEmits(['activate', 'prefetch']);
@@ -35,10 +36,15 @@ watch(() => props.status, (status) => {
     if (status !== 'idle') attention.value = false;
 });
 
+let stopDrag;
 onMounted(() => {
     if (!window.matchMedia('(prefers-reduced-motion: reduce)').matches) schedule(FIRST_ATTENTION);
+    stopDrag = enableLauncherDrag(button.value);
 });
-onBeforeUnmount(() => clearTimeout(timer));
+onBeforeUnmount(() => {
+    clearTimeout(timer);
+    stopDrag?.();
+});
 
 defineExpose({ button, mascot });
 </script>

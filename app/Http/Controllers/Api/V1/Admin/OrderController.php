@@ -6,8 +6,11 @@ use App\Http\Controllers\Controller;
 use App\Models\Order;
 use App\Models\OrderItem;
 use App\Models\OrderStatusHistory;
+use App\Models\Warehouse;
 use App\Services\OrderStatusService;
 use App\Traits\ApiResponse;
+use BaconQrCode\Common\ErrorCorrectionLevel;
+use BaconQrCode\Encoder\Encoder;
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -16,23 +19,31 @@ class OrderController extends Controller
 {
     use ApiResponse;
 
+    private const WEBSITE = 'https://tuffero.com';
+
     public function index(Request $request): JsonResponse
     {
         $search = $request->string('search')->trim()->toString();
         $status = $request->string('status')->trim()->toString();
+        $payment = $request->string('payment_status')->trim()->toString();
 
-        $page = Order::query()
+        $page = Order::with('shipment:id,order_id,provider,status,waybill_id')
             ->when($status !== '', fn ($query) => $query->where('status', $status))
+            ->when($payment !== '', fn ($query) => $query->where('payment_status', $payment))
             ->when($search !== '', fn ($query) => $query->where(fn ($inner) => $inner
                 ->where('order_number', 'like', "%{$search}%")
                 ->orWhere('customer_name', 'like', "%{$search}%")
                 ->orWhere('customer_email', 'like', "%{$search}%")
                 ->orWhere('customer_phone', 'like', "%{$search}%")))
             ->orderByDesc('id')
-            ->paginate(25);
+            ->paginate($this->perPage($request));
 
         return $this->paged('Orders retrieved.', $page, fn (Order $order) => [
             ...$order->only(['id', 'order_number', 'customer_name', 'status', 'payment_status', 'shipping_status', 'total', 'created_at']),
+            // Status paket dari Biteship (webhook); null bila belum ada pengiriman atau resi manual.
+            'carrier_status' => $order->shipment?->provider === 'biteship' ? $order->shipment->status : null,
+            // Tombol Cetak Resi di daftar: hanya tampil bila resi sudah ada.
+            'waybill_id' => $order->shipment?->waybill_id,
         ]);
     }
 
@@ -48,6 +59,7 @@ class OrderController extends Controller
             ]),
             'items' => $order->items->map($this->presentItem(...)),
             'waybill_id' => $order->shipment?->waybill_id,
+            'shipment' => $order->shipment?->only(['provider', 'status', 'courier_code', 'service_code', 'waybill_id', 'note', 'shipped_at', 'delivered_at', 'updated_at']),
             'histories' => $order->histories->sortBy('id')->values()->map(fn (OrderStatusHistory $history) => [
                 'status_type' => $history->status_type,
                 'from_status' => $history->from_status,
@@ -64,16 +76,22 @@ class OrderController extends Controller
     /**
      * Data pengemasan: tanpa harga, pembayaran, dan email (D-041).
      */
-    public function fulfillment(): JsonResponse
+    public function fulfillment(Request $request): JsonResponse
     {
+        $search = $request->string('search')->trim()->toString();
+        $status = $request->string('status')->trim()->toString();
+
         $page = Order::with(['items', 'shipment'])
             ->whereIn('status', [Order::PAID, Order::PROCESSING])
+            ->when(in_array($status, [Order::PAID, Order::PROCESSING], true), fn ($query) => $query->where('status', $status))
+            ->when($search !== '', fn ($query) => $query->where('order_number', 'like', "%{$search}%"))
             ->orderBy('paid_at')
-            ->paginate(25);
+            ->paginate($this->perPage($request));
 
         return $this->paged('Fulfillment retrieved.', $page, fn (Order $order) => [
             ...$order->only(['id', 'order_number', 'status', 'shipping_status', 'shipping_address', 'shipping_courier', 'shipping_service', 'paid_at']),
             'waybill_id' => $order->shipment?->waybill_id,
+            'shipment' => $order->shipment?->only(['provider', 'status', 'waybill_id', 'note']),
             'items' => $order->items->map(fn (OrderItem $item) => [
                 'sku' => $item->sku_snapshot,
                 'product_name' => $item->product_name_snapshot,
@@ -83,18 +101,27 @@ class OrderController extends Controller
         ]);
     }
 
-    public function shipments(): JsonResponse
+    public function shipments(Request $request): JsonResponse
     {
+        $search = $request->string('search')->trim()->toString();
+        $shipping = $request->string('shipping_status')->trim()->toString();
+
         $page = Order::with('shipment')
             ->whereIn('status', [Order::PROCESSING, Order::SHIPPED, Order::COMPLETED])
+            ->when($shipping !== '', fn ($query) => $query->where('shipping_status', $shipping))
+            ->when($search !== '', fn ($query) => $query->where(fn ($inner) => $inner
+                ->where('order_number', 'like', "%{$search}%")
+                ->orWhere('customer_name', 'like', "%{$search}%")))
             ->orderByDesc('id')
-            ->paginate(25);
+            ->paginate($this->perPage($request));
 
         return $this->paged('Shipments retrieved.', $page, fn (Order $order) => [
             ...$order->only(['id', 'order_number', 'status', 'shipping_status', 'shipping_courier', 'shipping_service']),
             'recipient' => $order->shipping_address['recipient'] ?? null,
             'city' => $order->shipping_address['city'] ?? null,
             'waybill_id' => $order->shipment?->waybill_id,
+            // OrderActions butuh `shipment` untuk tahu resi sudah dibuat; tanpanya tombol Proses Pesanan muncul lagi.
+            'shipment' => $order->shipment?->only(['provider', 'status', 'waybill_id', 'note']),
             'shipped_at' => $order->shipment?->shipped_at,
             'delivered_at' => $order->shipment?->delivered_at,
         ]);
@@ -103,9 +130,16 @@ class OrderController extends Controller
     /**
      * Status pembayaran hanya untuk dilihat (D-041). Tidak ada jalur ubah manual.
      */
-    public function payments(): JsonResponse
+    public function payments(Request $request): JsonResponse
     {
-        $page = Order::query()->orderByDesc('id')->paginate(25);
+        $search = $request->string('search')->trim()->toString();
+        $payment = $request->string('payment_status')->trim()->toString();
+
+        $page = Order::query()
+            ->when($payment !== '', fn ($query) => $query->where('payment_status', $payment))
+            ->when($search !== '', fn ($query) => $query->where('order_number', 'like', "%{$search}%"))
+            ->orderByDesc('id')
+            ->paginate($this->perPage($request));
 
         return $this->paged('Payments retrieved.', $page, fn (Order $order) => $order->only([
             'id', 'order_number', 'payment_status', 'total', 'paid_at', 'expires_at', 'created_at',
@@ -122,13 +156,81 @@ class OrderController extends Controller
     public function ship(Request $request, Order $order, OrderStatusService $status): JsonResponse
     {
         $validated = $request->validate(
-            ['waybill_id' => ['required', 'string', 'max:64', 'regex:/^[A-Za-z0-9-]+$/']],
-            ['waybill_id.required' => 'Nomor resi wajib diisi.', 'waybill_id.regex' => 'Nomor resi hanya boleh huruf, angka, dan tanda hubung.', 'waybill_id.max' => 'Nomor resi terlalu panjang.'],
+            ['waybill_id' => ['nullable', 'string', 'max:64', 'regex:/^[A-Za-z0-9-]+$/']],
+            ['waybill_id.regex' => 'Nomor resi hanya boleh huruf, angka, dan tanda hubung.', 'waybill_id.max' => 'Nomor resi terlalu panjang.'],
         );
 
-        $status->ship($order, $validated['waybill_id'], $request->user());
+        // Resi kosong = buat pengiriman di Biteship (resi otomatis, D-082). Resi diisi = cadangan manual atau koreksi.
+        filled($validated['waybill_id'] ?? null)
+            ? $status->ship($order, $validated['waybill_id'], $request->user())
+            : $status->shipViaBiteship($order, $request->user());
 
         return $this->success('Order updated.');
+    }
+
+    /** "Proses Pesanan": resi Biteship (default) atau resi manual dengan catatan. */
+    public function arrange(Request $request, Order $order, OrderStatusService $status): JsonResponse
+    {
+        $validated = $request->validate([
+            'method' => ['required', 'in:biteship,manual'],
+            'waybill_id' => ['required_if:method,manual', 'nullable', 'string', 'max:64', 'regex:/^[A-Za-z0-9-]+$/'],
+            'note' => ['nullable', 'string', 'max:300'],
+        ], ['waybill_id.required_if' => 'Nomor resi wajib diisi untuk resi manual.', 'waybill_id.regex' => 'Nomor resi hanya boleh huruf, angka, dan tanda hubung.', 'waybill_id.max' => 'Nomor resi terlalu panjang.', 'note.max' => 'Catatan maksimal 300 karakter.']);
+
+        $status->arrange($order, $request->user(), $validated['method'], $validated['waybill_id'] ?? null, isset($validated['note']) ? trim(strip_tags($validated['note'])) ?: null : null);
+
+        return $this->success('Order processed.');
+    }
+
+    public function markShipped(Request $request, Order $order, OrderStatusService $status): JsonResponse
+    {
+        $status->markShipped($order, $request->user());
+
+        return $this->success('Order updated.');
+    }
+
+    /**
+     * Data label pengiriman. Tanpa harga, pembayaran, dan email (D-041): label dibaca staf gudang dan kurir.
+     */
+    public function label(Order $order): JsonResponse
+    {
+        $order->load(['items', 'shipment']);
+
+        if (! $order->shipment?->waybill_id) {
+            return $this->error('Belum ada nomor resi untuk dicetak.', ['status' => ['Belum ada nomor resi untuk dicetak.']], 422);
+        }
+
+        $warehouse = Warehouse::find($order->warehouse_id);
+        $address = $order->shipping_address;
+
+        return $this->success('Label retrieved.', [
+            'order_number' => $order->order_number,
+            'provider' => $order->shipment->provider,
+            'waybill_id' => $order->shipment->waybill_id,
+            'note' => $order->shipment->note,
+            'courier' => strtoupper($order->shipping_courier.' '.$order->shipping_service),
+            'sender' => ['name' => 'Tuffero Patisserie', 'address' => $warehouse?->address, 'postal_code' => $warehouse?->postal_code, 'phone' => $warehouse?->phone],
+            'recipient' => [
+                'name' => $address['recipient'] ?? $order->customer_name,
+                'phone' => $address['phone'] ?? $order->customer_phone,
+                'address' => implode(', ', array_filter([$address['street'] ?? null, $address['district'] ?? null, $address['city'] ?? null, $address['province'] ?? null])).' '.($address['postal_code'] ?? ''),
+            ],
+            'weight_gram' => (int) $order->items->sum(fn (OrderItem $item) => $item->weight_gram_snapshot * $item->quantity),
+            'website' => self::WEBSITE,
+            'qr' => $this->qrRows(self::WEBSITE),
+            'items' => $order->items->map(fn (OrderItem $item) => ['name' => $item->product_name_snapshot, 'variant' => $item->variant_name_snapshot, 'sku' => $item->sku_snapshot, 'quantity' => $item->quantity]),
+        ]);
+    }
+
+    /** QR asli (bukan gambar statis) sebagai baris "1" dan "0"; halaman label menggambarnya sebagai kotak hitam putih. */
+    private function qrRows(string $content): array
+    {
+        $matrix = Encoder::encode($content, ErrorCorrectionLevel::M(), 'UTF-8')->getMatrix();
+
+        return array_map(
+            fn (int $y) => implode('', array_map(fn (int $x) => $matrix->get($x, $y) ? '1' : '0', range(0, $matrix->getWidth() - 1))),
+            range(0, $matrix->getHeight() - 1),
+        );
     }
 
     public function complete(Request $request, Order $order, OrderStatusService $status): JsonResponse

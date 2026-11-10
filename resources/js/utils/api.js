@@ -1,5 +1,6 @@
 import axios from 'axios';
 import router from '../router';
+import { toast } from '../composables/useToast';
 
 const api = axios.create({
     baseURL: '/api/v1',
@@ -10,9 +11,24 @@ const api = axios.create({
     withCredentials: true, // Required for Sanctum cookie-based auth
 });
 
+// Aksi yang tidak menampilkan toast: bukan "simpan" bagi pengguna (tandai baca, usulan terjemahan, catatan, login).
+const SILENT = [/^\/auth\//, /^\/admin\/notifications/, /\/translate$/, /\/comments$/];
+const WRITES = ['post', 'put', 'patch', 'delete'];
+
+// Toast sukses untuk setiap penulisan admin yang berhasil. Per permintaan: { toast: false } mematikan, { toast: 'teks' } mengganti pesan.
+function notifySuccess(response) {
+    const { method, url, toast: custom } = response.config;
+    if (custom === false || !WRITES.includes(method) || !url.startsWith('/admin/')) return;
+    if (!custom && SILENT.some((pattern) => pattern.test(url))) return;
+    toast.success(custom || (method === 'delete' ? 'Data dihapus.' : 'Perubahan tersimpan.'));
+}
+
 // Response Interceptor
 api.interceptors.response.use(
-    (response) => response,
+    (response) => {
+        notifySuccess(response);
+        return response;
+    },
     (error) => {
         // Handle 401 Unauthorized globally
         // /auth/user dipanggil penjaga rute untuk memeriksa sesi; penjaga itu yang memutuskan arah. Mengalihkan di sini membuat perulangan tanpa henti.

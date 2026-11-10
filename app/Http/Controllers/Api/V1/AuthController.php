@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Api\V1;
 
 use App\Http\Controllers\Controller;
 use App\Models\User;
+use App\Services\DeviceService;
 use App\Traits\ApiResponse;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -12,6 +13,8 @@ use Illuminate\Support\Facades\Auth;
 class AuthController extends Controller
 {
     use ApiResponse;
+
+    public function __construct(private DeviceService $devices) {}
 
     public function login(Request $request): JsonResponse
     {
@@ -40,6 +43,7 @@ class AuthController extends Controller
         }
 
         Auth::guard('web')->login($user);
+        $this->devices->recordLogin($user, $request);
 
         return $this->success('Login successful.', [
             'user' => $user->accessProfile(),

@@ -26,7 +26,7 @@
 			<nav class="tf-nav" aria-label="{{ $t['aria']['main'] }}">
 				<ul id="menu">
 					@foreach ($navItems as $item)
-						<li class="nav-item"><a @class(['nav-link', 'is-active' => $item['href'] === $current]) href="{{ $item['href'] }}">{{ $item['label'] }}</a></li>
+						<li class="nav-item"><a @class(['nav-link', 'is-active' => $item['href'] === $current]) @if ($item['href'] === $current) aria-current="page" aria-disabled="true" @else href="{{ $item['href'] }}" @endif>{{ $item['label'] }}</a></li>
 					@endforeach
 				</ul>
 			</nav>
@@ -36,18 +36,30 @@
 					<div x-ref="accountBox" class="tf-account">
 						<button x-ref="accountToggle" type="button" class="tf-action" :class="accountOpen ? 'is-on' : ''" aria-label="{{ $t['aria']['account'] }}" aria-controls="tf-account-menu" aria-expanded="false" :aria-expanded="accountOpen" @click="toggleAccount">{{ $site->icon('person', 20) }}</button>
 						<div x-show="accountOpen" id="tf-account-menu" class="tf-account-menu" style="display: none">
-							<p class="tf-account-id"><strong>{{ $storeUser->name }}</strong><span>{{ $storeUser->email }}</span></p>
-							@if ($storeRole)
-								<a href="/admin">{{ $t['account']['admin'] }}</a>
-							@else
-								<a href="{{ $site->route('profile') }}">{{ $t['account']['mine'] }}</a>
-								<a href="{{ $site->route('orders') }}">{{ $t['account']['orders'] }}</a>
-								<a href="{{ $site->route('addresses') }}">{{ $t['account']['addresses'] }}</a>
-							@endif
-							<a href="{{ $site->route('track') }}">{{ $t['top']['track'] }}</a>
-							<a href="{{ $site->route('contact') }}">{{ $t['top']['help'] }}</a>
-							<button type="button" @click="signOut">{{ $t['account']['signOut'] }}</button>
-							<p x-show="signOutFailed" class="tf-account-error" role="alert" style="display: none">{{ $t['account']['signOutFailed'] }}</p>
+							@php($initials = collect(preg_split('/\s+/', trim($storeUser->name)))->filter()->take(2)->map(fn ($w) => mb_strtoupper(mb_substr($w, 0, 1)))->implode(''))
+							<div class="tf-account-head">
+								<p>{{ $t['account']['signedInAs'] }}</p>
+								<div class="tf-account-who">
+									<span class="tf-account-avatar" aria-hidden="true">{{ $initials }}</span>
+									<span class="tf-account-id"><strong>{{ $storeUser->name }}</strong><span>{{ $storeUser->email }}</span></span>
+								</div>
+							</div>
+							@php($menuLinks = $storeRole
+								? [['/admin', 'admin', $t['account']['admin']]]
+								: [[$site->route('profile'), 'profile', $t['account']['mine']], [$site->route('orders'), 'order', $t['account']['orders']], [$site->route('addresses'), 'address', $t['account']['addresses']], [$site->route('myVouchers'), 'voucher', $t['account']['vouchers']]])
+							<div class="tf-account-group">
+								@foreach ($menuLinks as [$href, $icon, $label])
+									<a href="{{ $href }}" class="tf-account-item"><span class="tf-account-ico">@include('store.partials.account-icon', ['name' => $icon])</span><span>{{ $label }}</span>@include('store.partials.account-icon', ['name' => 'chevron'])</a>
+								@endforeach
+							</div>
+							<div class="tf-account-group">
+								<a href="{{ $site->route('track') }}" class="tf-account-item"><span class="tf-account-ico">@include('store.partials.account-icon', ['name' => 'track'])</span><span>{{ $t['top']['track'] }}</span>@include('store.partials.account-icon', ['name' => 'chevron'])</a>
+								<a href="{{ $site->route('contact') }}" class="tf-account-item"><span class="tf-account-ico">@include('store.partials.account-icon', ['name' => 'help'])</span><span>{{ $t['top']['help'] }}</span>@include('store.partials.account-icon', ['name' => 'chevron'])</a>
+							</div>
+							<div class="tf-account-group">
+								<button type="button" class="tf-account-item is-danger" @click="signOut"><span class="tf-account-ico">@include('store.partials.account-icon', ['name' => 'logout'])</span><span>{{ $t['account']['signOut'] }}</span>@include('store.partials.account-icon', ['name' => 'chevron'])</button>
+								<p x-show="signOutFailed" class="tf-account-error" role="alert" style="display: none">{{ $t['account']['signOutFailed'] }}</p>
+							</div>
 						</div>
 					</div>
 				@else
@@ -80,7 +92,7 @@
 			<nav aria-label="{{ $t['aria']['main'] }}">
 				<ul>
 					@foreach ($navItems as $item)
-						<li><a @class(['is-active' => $item['href'] === $current]) @if ($item['href'] === $current) aria-current="page" @endif href="{{ $item['href'] }}" @click="closeMenuLink">{{ $item['label'] }}{{ $site->icon('north_east', 14) }}</a></li>
+						<li><a @class(['is-active' => $item['href'] === $current]) @if ($item['href'] === $current) aria-current="page" aria-disabled="true" @else href="{{ $item['href'] }}" @click="closeMenuLink" @endif>{{ $item['label'] }}{{ $site->icon('north_east', 14) }}</a></li>
 					@endforeach
 				</ul>
 			</nav>

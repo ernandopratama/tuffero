@@ -27,9 +27,34 @@
 					</ul>
 				</div>
 				<div class="tf-about-images">
-					<figure class="image-anime wow fadeInUp"><img src="{{ $site->productPhoto('Nastar Sultan 2') }}" alt="{{ $p['story']['photo1'] }}" loading="lazy"></figure>
-					<figure class="image-anime wow fadeInUp" data-wow-delay="0.08s"><img src="{{ $site->productPhoto('Macaron isi 50 1') }}" alt="{{ $p['story']['photo2'] }}" loading="lazy"></figure>
+					<figure class="image-anime wow fadeInUp"><img src="/images/landing/tentang-1.webp" alt="{{ $p['story']['photo1'] }}" loading="lazy"></figure>
+					<figure class="image-anime wow fadeInUp" data-wow-delay="0.08s"><img src="/images/landing/tentang-2.webp" alt="{{ $p['story']['photo2'] }}" loading="lazy"></figure>
 					<div class="tf-years"><strong><span class="counter">{{ $site->years() }}</span></strong><span>{{ $site->rich($t['about']['years']) }}</span></div>
+				</div>
+			</div>
+		</section>
+
+		<!-- Tim: carousel otomatis (Swiper, init di public/js/function.js). Foto asli 6000 px sudah dikecilkan ke images/landing/web/ -->
+		<section class="tf-page-section tf-wrap">
+			<div class="tf-head">
+				<p class="tf-eyebrow wow fadeInUp">{{ $p['team']['eyebrow'] }}</p>
+				<h2 class="tf-h2 tf-h2-tight text-anime-style-2" data-cursor="-opaque">{{ $site->rich($p['team']['title']) }}</h2>
+			</div>
+			<div class="tf-team wow fadeInUp" role="region" aria-roledescription="carousel" aria-label="{{ $p['team']['eyebrow'] }}" data-pause="{{ $p['team']['pause'] }}" data-play="{{ $p['team']['play'] }}">
+				<div class="swiper">
+					<div class="swiper-wrapper">
+						@for ($n = 0; $n < 6; $n++)
+							<div class="swiper-slide"@if ($n > 2) aria-hidden="true"@endif>
+								<figure><img src="/images/landing/web/tentang-{{ $n % 3 + 3 }}.webp" alt="{{ $n < 3 ? $p['team']['alts'][$n] : '' }}" width="1600" height="1067" loading="lazy" decoding="async" draggable="false"></figure>
+							</div>
+						@endfor
+					</div>
+				</div>
+				<div class="tf-team-bar">
+					<span class="tf-team-count" aria-hidden="true"><b>01</b> / 03</span>
+					<button type="button" class="tf-team-btn is-prev" aria-label="{{ $t['aria']['prev'] }}">←</button>
+					<button type="button" class="tf-team-btn tf-team-toggle" aria-label="{{ $p['team']['pause'] }}"><svg class="is-pause" viewBox="0 0 24 24" width="14" height="14" fill="currentColor" aria-hidden="true"><path d="M6 5h4v14H6zM14 5h4v14h-4z"></path></svg><svg class="is-play" viewBox="0 0 24 24" width="14" height="14" fill="currentColor" aria-hidden="true"><path d="M8 5v14l11-7z"></path></svg></button>
+					<button type="button" class="tf-team-btn is-next" aria-label="{{ $t['aria']['next'] }}">→</button>
 				</div>
 			</div>
 		</section>

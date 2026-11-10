@@ -1,3 +1,4 @@
+import { addressPicker, mix } from './addressPicker';
 import api from './api';
 import { pageData } from './site';
 import { rupiah } from './shop';
@@ -35,6 +36,8 @@ export const accountPage = () => ({
     rupiah,
     orderDate,
     get heading() { return this.profile ? this.words.hello.replace('{name}', this.profile.name) : this.words.title; },
+    // Dua huruf awal nama untuk avatar; kosong sebelum profil termuat (CSS menampilkan ikon).
+    get initials() { return (this.profile?.name || '').trim().split(/\s+/).slice(0, 2).map((w) => Array.from(w)[0] || '').join('').toUpperCase(); },
     get loadingProfile() { return !this.profile && !this.loadFailed; },
     get ready() { return !!this.profile && !this.loadFailed; },
     get lastLabel() { return this.lastOrder ? orderLabel(this.words, this.lastOrder) : ''; },
@@ -73,7 +76,7 @@ export const accountPage = () => ({
             this.profile = data.data;
             this.name = data.data.name;
             this.$root.dispatchEvent(new CustomEvent('tf-name-changed', { bubbles: true, detail: data.data.name }));
-            this.nameStatus = this.words.saved;
+            this.$store.toast.show(this.words.saved);
         } catch (e) {
             if (e.response?.status === 422) this.nameError = this.message(e.response.data.errors?.name?.[0]);
             else this.nameFailed = this.failure(e);
@@ -92,7 +95,7 @@ export const accountPage = () => ({
         try {
             await api.put('/account/profile/password', this.pw);
             Object.assign(this.pw, { current_password: '', password: '', password_confirmation: '' });
-            this.pwStatus = this.words.passwordSaved;
+            this.$store.toast.show(this.words.passwordSaved);
         } catch (e) {
             if (e.response?.status === 422) {
                 this.pwErrors = Object.fromEntries(Object.entries(e.response.data.errors || {}).map(([field, [code]]) => [field, this.message(code)]));
@@ -145,7 +148,7 @@ export const accountOrdersPage = () => ({
 
 const blank = () => ({ label: '', recipient_name: '', phone: '', street: '', district: '', city: '', province: '', postal_code: '', is_default: false });
 
-export const addressesPage = () => ({
+export const addressesPage = () => mix(addressPicker('ad'), {
     words: {},
     max: 10,
     items: [],
@@ -160,6 +163,7 @@ export const addressesPage = () => ({
 
     init() {
         this.words = pageData('tf-addresses-data');
+        this.initAddressPicker();
         this.load();
     },
     get initialLoading() { return this.loading && !this.items.length; },
@@ -198,22 +202,30 @@ export const addressesPage = () => ({
         this.failed = '';
         this.status = '';
         this.editing = address ? address.id : 0;
+        // Peta form sebelumnya dilepas; titik tersimpan dipakai apa adanya (D-077).
+        this.unmountMap();
+        Object.assign(this, { auto: {}, combo: '', mapFailed: false, pinState: '' });
+        this.usePin(address?.latitude, address?.longitude);
         // Form baru dipasang x-if setelah tick ini.
         setTimeout(() => document.querySelector('#ad-label')?.focus());
     },
     openNew() { this.openForm(); },
-    closeForm() { this.editing = null; },
+    closeForm() {
+        this.editing = null;
+        this.unmountMap();
+    },
     async save() {
         if (this.busy) return;
         this.busy = true;
         this.errors = {};
         this.failed = '';
         try {
-            const { id, ...body } = this.form;
+            const { id, ...fields } = this.form;
+            const body = { ...fields, ...this.pinPayload() };
             if (this.editing) await api.patch(`/account/addresses/${this.editing}`, body);
             else await api.post('/account/addresses', body);
-            this.editing = null;
-            this.status = this.words.saved;
+            this.closeForm();
+            this.$store.toast.show(this.words.saved);
             await this.load();
         } catch (e) {
             if (e.response?.status === 422) {
@@ -236,7 +248,7 @@ export const addressesPage = () => ({
         this.status = '';
         try {
             await request();
-            this.status = done;
+            this.$store.toast.show(done);
             await this.load();
         } catch (e) {
             this.failed = this.failure(e);

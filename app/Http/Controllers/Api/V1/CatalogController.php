@@ -9,6 +9,7 @@ use App\Models\ProductImage;
 use App\Models\ProductVariant;
 use App\Models\Setting;
 use App\Models\StoreReview;
+use App\Services\DiscountService;
 use App\Services\StoreCatalogService;
 use App\Traits\ApiResponse;
 use Illuminate\Http\JsonResponse;
@@ -32,9 +33,10 @@ class CatalogController extends Controller
         ]);
     }
 
-    public function index(StoreCatalogService $catalog): JsonResponse
+    public function index(StoreCatalogService $catalog, DiscountService $discounts): JsonResponse
     {
         $products = $catalog->publishedProducts();
+        $prices = $discounts->prices($products->flatMap->variants, $discounts->memberId());
         $available = InventoryStock::availableByVariant($products->flatMap->variants->pluck('id'));
 
         return $this->success('Catalog retrieved.', [
@@ -44,7 +46,10 @@ class CatalogController extends Controller
                 'badges' => $product->badges ?? [],
                 'images' => $product->images->map(fn (ProductImage $image) => ['url' => '/storage/'.$image->path, 'alt' => $image->alt]),
                 'variants' => $product->variants->map(fn (ProductVariant $variant) => [
-                    ...$variant->only(['sku', 'name', 'price', 'compare_at_price', 'weight_gram', 'net_weight_gram', 'shelf_life_days']),
+                    ...$variant->only(['sku', 'name', 'compare_at_price', 'weight_gram', 'net_weight_gram', 'shelf_life_days']),
+                    // Harga bayar setelah diskon produk. API ini tanpa session, jadi hanya diskon untuk semua dan Non Member.
+                    'price' => $prices[$variant->id],
+                    'list_price' => $variant->price,
                     'max_per_order' => $variant->max_order_quantity,
                     // Hanya ada atau tidak; jumlah stok tidak dikirim.
                     'in_stock' => ($available[$variant->id] ?? 0) > 0,

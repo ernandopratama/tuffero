@@ -1,73 +1,73 @@
 <script setup>
-import { onMounted, ref, watch } from 'vue';
-import api from '../../utils/api';
-import { apiError } from '../../utils/apiError';
+import DataTable from '../../components/ui/DataTable.vue';
+import FilterSelect from '../../components/ui/FilterSelect.vue';
+import PageHeader from '../../components/ui/PageHeader.vue';
+import TableToolbar from '../../components/ui/TableToolbar.vue';
+import { useDataTable } from '../../composables/useDataTable';
 import { formatDate } from '../../utils/datetime';
-import { PAYMENT_STATUS, rupiah } from '../../utils/orderLabels';
+import { PAYMENT_STATUS, TONE_CLASS, rupiah } from '../../utils/orderLabels';
 
-const items = ref([]);
-const meta = ref({ current_page: 1, last_page: 1, total: 0 });
-const page = ref(1);
-const loading = ref(true);
-const error = ref('');
+const COLUMNS = [
+    { key: 'order_number', label: 'Nomor pesanan' },
+    { key: 'total', label: 'Total' },
+    { key: 'payment_status', label: 'Status' },
+    { key: 'paid_at', label: 'Dibayar' },
+    { key: 'expires_at', label: 'Batas bayar' },
+];
+const PAYMENT_TONE = { paid: 'ok', pending: 'warn', refund_pending: 'warn', refunded: 'info', cancelled: 'bad', expired: 'neutral' };
+const DOT = { ok: 'bg-success', warn: 'bg-warning', info: 'bg-info', bad: 'bg-error', neutral: 'bg-secondary' };
 
-async function load() {
-    loading.value = true;
-    error.value = '';
-    try {
-        const { data } = await api.get('/admin/payments', { params: { page: page.value } });
-        items.value = data.data.items;
-        meta.value = data.data.meta;
-    } catch (e) {
-        error.value = apiError(e).message;
-    } finally {
-        loading.value = false;
-    }
+const { rows, meta, page, perPage, search, filter, loading, error, load } = useDataTable('/admin/payments', { filters: { payment_status: '' } });
+
+const toneOf = (row) => PAYMENT_TONE[row.payment_status] || 'neutral';
+
+// Sisa waktu bayar hanya berarti selama status masih menunggu. Dihitung saat tabel dimuat, tidak berdetak.
+function remaining(row) {
+    if (row.payment_status !== 'pending' || !row.expires_at) return null;
+    const minutes = Math.round((new Date(row.expires_at) - Date.now()) / 60000);
+    if (minutes <= 0) return { text: 'Lewat batas', late: true };
+    if (minutes < 60) return { text: `Sisa ${minutes} menit`, late: false };
+    return { text: `Sisa ${Math.floor(minutes / 60)} jam`, late: false };
 }
-
-watch(page, load);
-onMounted(load);
 </script>
 
 <template>
-  <h1 class="font-heading text-headline-lg-mobile lg:text-headline-lg">Pembayaran</h1>
-  <p class="mt-space-sm text-secondary">Hanya untuk dilihat. Status berubah dari notifikasi Midtrans yang terverifikasi, bukan dari dashboard.</p>
-
-  <p v-if="loading" role="status" class="mt-space-lg text-secondary">Memuat pembayaran...</p>
-  <div v-else-if="error" role="alert" class="mt-space-lg rounded bg-error-surface p-space-md text-on-error-surface">
-    {{ error }}
-    <button type="button" class="ml-2 underline" @click="load">Coba lagi</button>
+  <div class="flex flex-wrap items-end justify-between gap-space-md">
+    <PageHeader title="Pembayaran" description="Hanya untuk dilihat. Status berubah dari notifikasi Midtrans yang terverifikasi, bukan dari dashboard." />
+    <TableToolbar v-model="search" placeholder="Cari nomor pesanan">
+      <FilterSelect v-model="filter.payment_status" label="Status" :options="PAYMENT_STATUS" />
+    </TableToolbar>
   </div>
-  <p v-else-if="!items.length" class="mt-space-lg rounded-lg border border-border bg-surface p-space-lg text-secondary">Belum ada pembayaran.</p>
-  <template v-else>
-    <div class="mt-space-lg overflow-x-auto rounded-lg border border-border bg-surface">
-      <table class="w-full min-w-[640px] text-left text-body-sm">
-        <thead class="border-b border-border text-label-md">
-          <tr>
-            <th scope="col" class="px-4 py-3">Nomor pesanan</th>
-            <th scope="col" class="px-4 py-3">Total</th>
-            <th scope="col" class="px-4 py-3">Status</th>
-            <th scope="col" class="px-4 py-3">Dibayar</th>
-            <th scope="col" class="px-4 py-3">Batas bayar</th>
-          </tr>
-        </thead>
-        <tbody>
-          <tr v-for="item in items" :key="item.id" class="border-b border-border last:border-b-0">
-            <td class="whitespace-nowrap px-4 py-3 font-mono">{{ item.order_number }}</td>
-            <td class="whitespace-nowrap px-4 py-3">{{ rupiah(item.total) }}</td>
-            <td class="px-4 py-3">{{ PAYMENT_STATUS[item.payment_status] || item.payment_status }}</td>
-            <td class="whitespace-nowrap px-4 py-3">{{ formatDate(item.paid_at) }}</td>
-            <td class="whitespace-nowrap px-4 py-3">{{ formatDate(item.expires_at) }}</td>
-          </tr>
-        </tbody>
-      </table>
-    </div>
-    <nav class="mt-space-md flex items-center justify-between gap-space-md" aria-label="Halaman pembayaran">
-      <p class="text-body-sm text-secondary">Halaman {{ meta.current_page }} dari {{ meta.last_page }} ({{ meta.total }} pesanan)</p>
-      <div class="flex gap-space-sm">
-        <button type="button" :disabled="page <= 1" class="rounded border border-secondary px-3 py-1.5 text-label-md hover:bg-accent-tint-15 disabled:opacity-50" @click="page -= 1">Sebelumnya</button>
-        <button type="button" :disabled="page >= meta.last_page" class="rounded border border-secondary px-3 py-1.5 text-label-md hover:bg-accent-tint-15 disabled:opacity-50" @click="page += 1">Berikutnya</button>
-      </div>
-    </nav>
-  </template>
+
+  <DataTable
+    v-model:page="page"
+    v-model:per-page="perPage"
+    class="mt-space-lg"
+    caption="Daftar pembayaran"
+    empty-text="Belum ada pembayaran."
+    :columns="COLUMNS"
+    :rows="rows"
+    :meta="meta"
+    :loading="loading"
+    :error="error"
+    @retry="load"
+  >
+    <template #cell-order_number="{ row }">
+      <span class="block whitespace-nowrap font-mono">{{ row.order_number }}</span>
+      <span class="block whitespace-nowrap text-body-sm text-secondary">Dibuat {{ formatDate(row.created_at) }}</span>
+    </template>
+    <template #cell-total="{ row }"><span class="whitespace-nowrap text-label-md tabular-nums">{{ rupiah(row.total) }}</span></template>
+    <template #cell-payment_status="{ row }">
+      <span class="inline-flex items-center gap-1.5 whitespace-nowrap rounded-full px-2.5 py-1 text-label-sm" :class="TONE_CLASS[toneOf(row)]">
+        <i class="size-1.5 rounded-full" :class="DOT[toneOf(row)]" aria-hidden="true"></i>{{ PAYMENT_STATUS[row.payment_status] || row.payment_status }}
+      </span>
+    </template>
+    <template #cell-paid_at="{ row }">
+      <span class="whitespace-nowrap" :class="row.paid_at ? '' : 'text-secondary'">{{ row.paid_at ? formatDate(row.paid_at) : 'Belum dibayar' }}</span>
+    </template>
+    <template #cell-expires_at="{ row }">
+      <span class="block whitespace-nowrap" :class="remaining(row) ? '' : 'text-secondary'">{{ row.expires_at ? formatDate(row.expires_at) : '-' }}</span>
+      <span v-if="remaining(row)" class="block text-label-sm" :class="remaining(row).late ? 'text-error' : 'text-warning'">{{ remaining(row).text }}</span>
+    </template>
+  </DataTable>
 </template>

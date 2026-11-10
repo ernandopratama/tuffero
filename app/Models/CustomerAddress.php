@@ -6,7 +6,7 @@ use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
-#[Fillable(['label', 'recipient_name', 'phone', 'street', 'district', 'city', 'province', 'postal_code'])]
+#[Fillable(['label', 'recipient_name', 'phone', 'street', 'district', 'city', 'province', 'postal_code', 'latitude', 'longitude'])]
 class CustomerAddress extends Model
 {
     /**
@@ -14,7 +14,7 @@ class CustomerAddress extends Model
      */
     protected function casts(): array
     {
-        return ['is_default' => 'boolean'];
+        return ['is_default' => 'boolean', 'latitude' => 'float', 'longitude' => 'float'];
     }
 
     /** @return BelongsTo<User, $this> */

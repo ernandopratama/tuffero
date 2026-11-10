@@ -9,6 +9,19 @@ const routes = [
         meta: { guestOnly: true },
     },
     {
+        path: '/lupa-kata-sandi',
+        name: 'ForgotPassword',
+        component: () => import('./pages/ForgotPassword.vue'),
+        meta: { guestOnly: true },
+    },
+    {
+        // Label resi untuk dicetak: halaman penuh tanpa kerangka admin.
+        path: '/admin/label/:id(\\d+)',
+        name: 'AdminOrderLabel',
+        component: () => import('./pages/admin/OrderLabel.vue'),
+        meta: { requiresAuth: true, permission: 'shipments.manage' },
+    },
+    {
         path: '/admin',
         component: () => import('./layouts/AdminLayout.vue'),
         meta: { requiresAuth: true },
@@ -29,6 +42,24 @@ const routes = [
                 name: 'AdminProductEdit',
                 component: () => import('./pages/admin/ProductEdit.vue'),
                 meta: { permission: 'products.view', menu: 'AdminProducts' },
+            },
+            {
+                path: 'kampanye',
+                name: 'AdminCampaigns',
+                component: () => import('./pages/admin/Campaigns.vue'),
+                meta: { permission: 'products.view' },
+            },
+            {
+                path: 'kategori',
+                name: 'AdminCategories',
+                component: () => import('./pages/admin/Categories.vue'),
+                meta: { permission: 'products.view' },
+            },
+            {
+                path: 'faq-chat',
+                name: 'AdminFaqs',
+                component: () => import('./pages/admin/Faqs.vue'),
+                meta: { permission: 'faqs.manage' },
             },
             {
                 path: 'stok',
@@ -79,10 +110,34 @@ const routes = [
                 meta: { permission: 'content.view' },
             },
             {
+                path: 'galeri',
+                name: 'AdminGallery',
+                component: () => import('./pages/admin/Gallery.vue'),
+                meta: { permission: 'content.view' },
+            },
+            {
+                path: 'berita',
+                name: 'AdminNews',
+                component: () => import('./pages/admin/News.vue'),
+                meta: { permission: 'news.view' },
+            },
+            {
                 path: 'ulasan',
                 name: 'AdminReviews',
                 component: () => import('./pages/admin/Reviews.vue'),
                 meta: { permission: 'reviews.manage' },
+            },
+            {
+                path: 'pelanggan',
+                name: 'AdminCustomers',
+                component: () => import('./pages/admin/Customers.vue'),
+                meta: { permission: 'customers.view' },
+            },
+            {
+                path: 'pelanggan/:id(\\d+)',
+                name: 'AdminCustomerDetail',
+                component: () => import('./pages/admin/CustomerDetail.vue'),
+                meta: { permission: 'customers.view', menu: 'AdminCustomers' },
             },
             {
                 path: 'pengguna',

@@ -1,5 +1,16 @@
 import api from './api';
 
+// Keluar lalu ke beranda; false bila gagal. 401 berarti session sudah berakhir, jadi pengguna memang sudah keluar.
+export const requestSignOut = async () => {
+    try {
+        await api.post('/auth/logout');
+    } catch (e) {
+        if (e.response?.status !== 401) return false;
+    }
+    window.location.assign('/');
+    return true;
+};
+
 // Bar utama: menu akun, panel pencarian, menu mobile. Tamu menuju /masuk lewat tautan biasa.
 export default () => ({
     accountOpen: false,
@@ -30,15 +41,9 @@ export default () => ({
 
     toggleAccount() { this.accountOpen = !this.accountOpen; },
 
-    // 401 berarti session sudah berakhir, jadi pengguna memang sudah keluar.
     async signOut() {
         this.signOutFailed = false;
-        try {
-            await api.post('/auth/logout');
-        } catch (e) {
-            if (e.response?.status !== 401) { this.signOutFailed = true; return; }
-        }
-        window.location.assign('/');
+        this.signOutFailed = !(await requestSignOut());
     },
 
     toggleSearch() {

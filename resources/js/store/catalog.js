@@ -36,10 +36,30 @@ export const catalog = () => ({
             badge.style.animation = '';
         });
         this.render();
+        this.hideIntroOnceScrolledPast();
+    },
+
+    // Label, judul, dan pengantar (.tf-cat-hero) hanya tampil saat halaman dibuka. Setelah seluruhnya tergulir lewat ke atas, bagian itu
+    // dilepas. Isi yang sedang dilihat dijaga di tempatnya: Chrome dan Firefox melakukannya lewat scroll anchoring,
+    // browser tanpa anchoring dikoreksi sebesar pergeseran yang benar-benar terjadi. Patokannya baris urutan (.tf-cat-bar),
+    // bukan pencarian yang menempel, karena posisi elemen sticky tidak ikut bergeser.
+    hideIntroOnceScrolledPast() {
+        const hero = this.$refs.intro;
+        const anchor = this.$refs.bar;
+        if (!hero || !anchor || !('IntersectionObserver' in window)) return;
+        const observer = new IntersectionObserver(([entry]) => {
+            if (entry.isIntersecting || entry.boundingClientRect.bottom > 0) return;
+            observer.disconnect();
+            const before = anchor.getBoundingClientRect().top;
+            hero.hidden = true;
+            const shift = anchor.getBoundingClientRect().top - before;
+            if (shift) window.scrollBy({ top: shift, behavior: 'instant' });
+        });
+        observer.observe(hero);
     },
 
     matches(x, q) {
-        return `${x.name.id} ${x.name.en} ${this.words.cats[x.cat] || ''} ${x.type === 'paket' ? 'hampers' : ''}`.toLowerCase().includes(q);
+        return `${x.name.id} ${x.name.en} ${this.words.cats[x.cat] || ''} ${this.words.types[x.type] || ''}`.toLowerCase().includes(q);
     },
     get matchesQuery() {
         const q = this.query.toLowerCase();
@@ -107,8 +127,6 @@ export const product = () => ({
     max: 50,
     active: 0,
     qtyText: '1',
-    toast: '',
-    toastTimer: null,
     stickyOn: false,
 
     init() {
@@ -135,15 +153,10 @@ export const product = () => ({
     dec() { this.qtyText = String(Math.max(1, this.qty - 1)); },
     inc() { this.qtyText = String(Math.min(this.max, this.qty + 1)); },
 
-    showToast(text) {
-        this.toast = text;
-        clearTimeout(this.toastTimer);
-        this.toastTimer = setTimeout(() => { this.toast = ''; }, 4000);
-    },
     addCurrent() { return this.$store.cart.add(this.sku, this.qty); },
     async buyNow() { if (await this.addCurrent()) window.location.href = '/checkout'; },
     async copyLink() {
         const url = `${window.location.origin}${this.path}`;
-        try { await navigator.clipboard.writeText(url); this.showToast(this.words.copied); } catch { this.showToast(url); }
+        try { await navigator.clipboard.writeText(url); this.$store.toast.show(this.words.copied); } catch { this.$store.toast.show(url, 'info'); }
     },
 });

@@ -107,4 +107,16 @@ class StoreReviewTest extends TestCase
         $this->patchJson('/api/v1/admin/settings/checkout.reservation_minutes', ['value' => 30])->assertForbidden();
         $this->assertSame(4.7, $this->getJson('/api/v1/reviews')->json('data.rating'));
     }
+
+    public function test_review_list_filters_by_search_rating_and_status(): void
+    {
+        $this->actingAs($this->staff('store-admin'));
+        $this->postJson('/api/v1/admin/reviews', $this->body(['author_name' => 'Zulkifli', 'rating' => 2, 'is_published' => false]))->assertCreated();
+
+        $authors = fn (string $query) => collect($this->getJson("/api/v1/admin/reviews?{$query}")->assertOk()->json('data.items'))->pluck('author_name')->all();
+
+        $this->assertSame(['Zulkifli'], $authors('search=Zulk'));
+        $this->assertSame(['Zulkifli'], $authors('rating=2'));
+        $this->assertSame(['Zulkifli'], $authors('is_published=0'));
+    }
 }

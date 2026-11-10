@@ -38,8 +38,15 @@ class CheckoutRequest extends FormRequest
             'address.city' => ['required', 'string', 'max:100'],
             'address.province' => ['required', 'string', 'max:100'],
             'address.postal_code' => ['required', 'string', 'regex:/^\d{5}$/'],
+            // Titik rumah dari peta checkout, opsional. Batas kasar wilayah Indonesia supaya titik asal-asalan ditolak.
+            'address.latitude' => ['nullable', 'required_with:address.longitude', 'numeric', 'between:-11.5,6.5'],
+            'address.longitude' => ['nullable', 'required_with:address.latitude', 'numeric', 'between:94,141.5'],
             'courier' => ['required', 'string', 'max:30'],
             'service' => ['required', 'string', 'max:50'],
+            'voucher_code' => ['nullable', 'string', 'max:40'],
+            // Maksimal 2 voucher per pesanan (D-078); server yang memutuskan boleh tidaknya digabung.
+            'voucher_codes' => ['nullable', 'array', 'max:2'],
+            'voucher_codes.*' => ['string', 'max:40'],
         ];
     }
 
@@ -62,6 +69,8 @@ class CheckoutRequest extends FormRequest
         'address.province.required' => 'province_required',
         'address.postal_code.required' => 'postal_invalid',
         'address.postal_code.regex' => 'postal_invalid',
+        'address.latitude.*' => 'pin_invalid',
+        'address.longitude.*' => 'pin_invalid',
         'courier.required' => 'courier_required',
         'service.required' => 'courier_required',
     ];

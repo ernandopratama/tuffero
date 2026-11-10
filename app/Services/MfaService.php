@@ -29,11 +29,26 @@ class MfaService
      */
     public function startEnrollment(User $user): array
     {
-        $secret = $this->base32Encode(random_bytes(20));
+        $secret = $this->newSecret();
 
         $user->forceFill(['mfa_totp_secret' => $secret, 'mfa_totp_last_timestep' => null])->save();
 
-        $uri = 'otpauth://totp/'.rawurlencode('Tuffero:'.$user->email).'?'.http_build_query([
+        return $this->provisioning($secret, $user->email);
+    }
+
+    public function newSecret(): string
+    {
+        return $this->base32Encode(random_bytes(20));
+    }
+
+    /**
+     * Data untuk dipindai atau diketik ke aplikasi autentikator.
+     *
+     * @return array{secret: string, otpauth_uri: string, qr_code: string}
+     */
+    public function provisioning(string $secret, string $email): array
+    {
+        $uri = 'otpauth://totp/'.rawurlencode('Tuffero:'.$email).'?'.http_build_query([
             'secret' => $secret,
             'issuer' => 'Tuffero',
             'algorithm' => 'SHA1',
@@ -62,10 +77,7 @@ class MfaService
             return null;
         }
 
-        $codes = [];
-        for ($i = 0; $i < self::RECOVERY_CODE_COUNT; $i++) {
-            $codes[] = implode('-', str_split(bin2hex(random_bytes(5)), 5));
-        }
+        $codes = $this->newRecoveryCodes();
 
         $user->forceFill([
             'mfa_totp_confirmed_at' => now(),
@@ -73,6 +85,55 @@ class MfaService
         ])->save();
 
         AuditLog::record('mfa.enrolled', $user, actorId: $user->id);
+
+        return $codes;
+    }
+
+    /**
+     * Mengganti authenticator milik sendiri: kode dari secret BARU harus benar dulu, baru secret lama diganti dan kode pemulihan
+     * dibuat ulang (yang lama tidak berlaku lagi). Dikembalikan null bila kode salah; authenticator lama tetap utuh.
+     *
+     * @return list<string>|null
+     */
+    public function replaceSecret(User $user, string $newSecret, string $code): ?array
+    {
+        return DB::transaction(function () use ($user, $newSecret, $code) {
+            $locked = User::whereKey($user->id)->lockForUpdate()->firstOrFail();
+            $current = (int) floor(now()->getTimestamp() / self::STEP_SECONDS);
+            $matched = null;
+
+            for ($step = $current - self::WINDOW_STEPS; $step <= $current + self::WINDOW_STEPS; $step++) {
+                if (hash_equals($this->totp($newSecret, $step), $code)) {
+                    $matched = $step;
+                    break;
+                }
+            }
+
+            if ($matched === null) {
+                return null;
+            }
+
+            $codes = $this->newRecoveryCodes();
+            $locked->forceFill([
+                'mfa_totp_secret' => $newSecret,
+                'mfa_totp_last_timestep' => $matched,
+                'mfa_totp_confirmed_at' => now(),
+                'mfa_recovery_codes' => array_map($this->hashRecoveryCode(...), $codes),
+            ])->save();
+
+            AuditLog::record('mfa.replaced_self', $locked, actorId: $locked->id);
+
+            return $codes;
+        });
+    }
+
+    /** @return list<string> */
+    private function newRecoveryCodes(): array
+    {
+        $codes = [];
+        for ($i = 0; $i < self::RECOVERY_CODE_COUNT; $i++) {
+            $codes[] = implode('-', str_split(bin2hex(random_bytes(5)), 5));
+        }
 
         return $codes;
     }

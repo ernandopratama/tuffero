@@ -24,7 +24,9 @@ class SettingSeeder extends Seeder
         ['key' => 'refund.payout_days_max', 'value' => '7', 'type' => 'int', 'group' => 'refund', 'is_public' => false],
         ['key' => 'refund.terms_version', 'value' => null, 'type' => 'string', 'group' => 'refund', 'is_public' => false],
         ['key' => 'cancellation.process_days_max', 'value' => '7', 'type' => 'int', 'group' => 'cancellation', 'is_public' => false],
+        ['key' => 'discount.max_percent', 'value' => '50', 'type' => 'int', 'group' => 'discount', 'is_public' => false],
         ['key' => 'checkout.reservation_minutes', 'value' => '60', 'type' => 'int', 'group' => 'checkout', 'is_public' => false],
+        ['key' => 'inventory.low_stock_threshold', 'value' => '10', 'type' => 'int', 'group' => 'inventory', 'is_public' => false],
     ];
 
     public function run(): void

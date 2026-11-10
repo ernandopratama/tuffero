@@ -31,8 +31,9 @@ class StockController extends Controller
             ->when($search !== '', fn ($query) => $query->where(fn ($inner) => $inner
                 ->where('sku', 'like', "%{$search}%")
                 ->orWhereHas('product', fn ($product) => $product->where('name', 'like', "%{$search}%"))))
+            ->when(in_array($request->query('active'), ['1', '0'], true), fn ($query) => $query->where('is_active', $request->query('active') === '1'))
             ->orderBy('sku')
-            ->paginate(25);
+            ->paginate($this->perPage($request));
 
         return $this->success('Stock retrieved.', [
             'warehouses' => $warehouses,

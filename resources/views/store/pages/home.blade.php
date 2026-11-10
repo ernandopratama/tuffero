@@ -1,14 +1,14 @@
 @extends('store.layouts.app')
 
 @php
-	$img = fn ($name) => "/images/landing/{$name}.jpg";
+	$img = fn ($name) => "/images/landing/{$name}";
 	// Versi kecil 640 px (thumb/) bukan berkas asli; tampil paling besar 300 px.
 	$thumb = fn ($name) => "/images/Produk/thumb/{$name} 1.webp";
 	$aboutIcons = ['nastar', 'pineapple', 'redeem'];
 	$whyIcons = ['pineapple', 'celebration', 'mknindo'];
 	$featureIcons = ['nastar', 'macaron', 'pia', 'redeem'];
-	$stepPhotos = ['step-pick', 'step-confirm', 'step-enjoy'];
-	$galleryPhotos = ['gallery-baker', 'gallery-shelves', 'gallery-croissant', 'gallery-chefs'];
+	$stepPhotos = ['step-pick.jpg', 'step-confirm.jpg', 'step-enjoy.jpg'];
+	$galleryPhotos = ['galeri-1.webp', 'galeri-2.webp', 'galeri-3.webp', 'galeri-4.webp', 'galeri-5.webp', 'galeri-6.webp'];
 	$statIcons = [['timer', 40, $site->years()], ['star', 36, $site::RATING], ['semua', 36, $productTotal]];
 	$delay = fn ($i) => ($i * 0.06).'s';
 @endphp
@@ -29,9 +29,25 @@
 				<img class="tf-hero-photo" src="/images/Tuffero Bakery Treats Showcase.webp" alt="" fetchpriority="high">
 				<div class="tf-hero-video" aria-hidden="true"><video class="is-on" src="/videos/HeroVideo%20(1).mp4" muted playsinline tabindex="-1" preload="auto"></video><video src="/videos/HeroVideo%20(2).mp4" muted playsinline tabindex="-1" preload="metadata"></video></div>
 				<div class="tf-hero-shade"></div>
-				<div class="tf-hero-content">
-					<h1 class="tf-h1 text-anime-style-2" data-cursor="-opaque">{{ $site->rich($t['hero']['title']) }}</h1>
-					<p class="tf-hero-text wow fadeInUp" data-wow-delay="0.1s">{{ $t['hero']['text'] }}</p>
+				@php($w = $t['hero']['welcome'])
+				<div @class(['tf-hero-content', 'is-welcome' => $welcome])>
+					@if ($welcome)
+						{{-- Pelanggan yang sudah masuk: sapaan personal, pesanan aktif, dan pintasan akun. --}}
+						<p class="tf-hero-hello wow fadeInUp"><span class="tf-hero-avatar" aria-hidden="true">{{ $welcome['initials'] }}</span>{{ $welcome['greeting'] }}</p>
+						<h1 class="tf-h1 text-anime-style-2" data-cursor="-opaque">{{ $w['title'] }} <br class="tf-br"><em>{{ $welcome['name'] }}</em></h1>
+						<p class="tf-hero-text wow fadeInUp" data-wow-delay="0.1s">{{ $w['text'] }}</p>
+						@if ($welcome['order'])
+							<a href="/pesanan/{{ $welcome['order']->public_ref }}" class="tf-hero-order wow fadeInUp" data-wow-delay="0.12s">
+								<span class="tf-hero-order-ico">@include('store.partials.account-icon', ['name' => 'order'])</span>
+								<span class="tf-hero-order-main"><small>{{ $w['order'] }}</small><strong>{{ $welcome['order']->order_number }}</strong></span>
+								<span class="tf-hero-order-pill">{{ $pg['order']['status'][$welcome['order']->status][0] ?? $welcome['order']->status }}</span>
+								<span class="tf-hero-order-go"><span>{{ $w['orderLink'] }}</span>@include('store.partials.account-icon', ['name' => 'arrow'])</span>
+							</a>
+						@endif
+					@else
+						<h1 class="tf-h1 text-anime-style-2" data-cursor="-opaque">{{ $site->rich($t['hero']['title']) }}</h1>
+						<p class="tf-hero-text wow fadeInUp" data-wow-delay="0.1s">{{ $t['hero']['text'] }}</p>
+					@endif
 					<div class="tf-hero-actions wow fadeInUp" data-wow-delay="0.15s">
 						<a href="{{ $site->route('products') }}" class="tf-btn tf-btn-light tf-btn-hero tf-fly-btn">
 							<span class="tf-fly"><span class="tf-fly-in"><span class="tf-icon tf-icon-cart" aria-hidden="true"></span></span></span>
@@ -43,11 +59,19 @@
 							<span>{{ $t['hero']['tiktok'] }}</span>
 						</a>
 					</div>
-					<ul class="tf-hero-list wow fadeInUp" data-wow-delay="0.2s">
-						@foreach ($t['hero']['list'] as $item)
-							<li>{{ $item }}</li>
-						@endforeach
-					</ul>
+					@if ($welcome)
+						<ul class="tf-hero-list is-links wow fadeInUp" data-wow-delay="0.2s">
+							@foreach (['orders' => 'order', 'myVouchers' => 'voucher', 'addresses' => 'address'] as $route => $icon)
+								<li><a href="{{ $site->route($route) }}">@include('store.partials.account-icon', ['name' => $icon]){{ $w['links'][$route] }}</a></li>
+							@endforeach
+						</ul>
+					@else
+						<ul class="tf-hero-list wow fadeInUp" data-wow-delay="0.2s">
+							@foreach ($t['hero']['list'] as $item)
+								<li>{{ $item }}</li>
+							@endforeach
+						</ul>
+					@endif
 				</div>
 			</div>
 
@@ -61,11 +85,30 @@
 						<h2>{{ $t['hero']['videoTitle'] }}</h2>
 					</div>
 				</article>
-				<article class="tf-card-quote wow fadeInUp" data-wow-delay="0.06s">
-					<p class="tf-card-quote-text">{{ $t['hero']['quote'] }}</p>
-					<div class="tf-card-quote-foot">
-						<span>{{ $t['hero']['quoteBy'] }}</span>
-						<span>{{ $t['hero']['since'] }}</span>
+				<article class="tf-card-rate wow fadeInUp" data-wow-delay="0.06s">
+					<img class="tf-card-rate-bg" src="{{ $img('galeri-2.webp') }}" alt="" loading="lazy" decoding="async">
+					<div class="tf-card-video-shade"></div>
+					<div class="tf-card-rate-quotes">
+						@foreach ($t['hero']['reviews'] as $i => [$author, $review])
+							<figure class="tf-card-rate-quote" style="--i: {{ $i }}"><blockquote>{{ $review }}</blockquote><figcaption>{{ $author }}</figcaption></figure>
+						@endforeach
+					</div>
+					<div class="tf-rate-box">
+						<div class="tf-rate-head">
+							<img src="/images/icon-google.svg" alt="" width="32" height="32">
+							<div>
+								<p>{{ $t['hero']['ratingLabel'] }}</p>
+								<p class="tf-rate-stars"><span class="tf-stars" aria-hidden="true">@for ($s = 0; $s < 5; $s++){{ $site->icon('star', 13) }}@endfor</span><strong>{{ $google['rating'] }}</strong></p>
+							</div>
+						</div>
+						<div class="tf-rate-foot">
+							<div class="tf-faces" aria-hidden="true">
+								@foreach (array_column($t['hero']['reviews'], 0) as $name)
+									<span>{{ \Illuminate\Support\Str::of($name)->explode(' ')->filter()->take(2)->map(fn ($w) => mb_strtoupper(mb_substr($w, 0, 1)))->implode('') }}</span>
+								@endforeach
+							</div>
+							<span class="tf-rate-count">{{ __('store.landing.hero.reviewCount', ['count' => $google['count']]) }}</span>
+						</div>
 					</div>
 				</article>
 				<article class="tf-card-hours wow fadeInUp" data-wow-delay="0.12s">
@@ -101,8 +144,8 @@
 						<a href="{{ $site->route('about') }}" class="tf-btn tf-btn-medium wow fadeInUp" data-wow-delay="0.14s">{{ $t['about']['more'] }} {{ $site->icon('north_east', 12) }}</a>
 					</div>
 					<div class="tf-about-images">
-						<figure class="image-anime wow fadeInUp"><img loading="lazy" decoding="async" src="{{ $img('about-baker') }}" alt="{{ $t['about']['photo1'] }}"></figure>
-						<figure class="image-anime wow fadeInUp" data-wow-delay="0.08s"><img loading="lazy" decoding="async" src="{{ $img('about-sourdough') }}" alt="{{ $t['about']['photo2'] }}"></figure>
+						<figure class="image-anime wow fadeInUp"><img loading="lazy" decoding="async" src="{{ $img('tentang-1.webp') }}" alt="{{ $t['about']['photo1'] }}"></figure>
+						<figure class="image-anime wow fadeInUp" data-wow-delay="0.08s"><img loading="lazy" decoding="async" src="{{ $img('tentang-2.webp') }}" alt="{{ $t['about']['photo2'] }}"></figure>
 						<div class="tf-years"><strong><span class="counter">{{ $site->years() }}</span></strong><span>{{ $site->rich($t['about']['years']) }}</span></div>
 					</div>
 				</div>
@@ -161,7 +204,7 @@
 				</div>
 				<div class="tf-why-images">
 					<div class="tf-why-col-a">
-						<figure class="image-anime wow fadeInUp"><img loading="lazy" decoding="async" src="{{ $img('why-baker-tray') }}" alt="{{ $t['why']['photo1'] }}"></figure>
+						<figure class="image-anime wow fadeInUp"><img loading="lazy" decoding="async" src="{{ $img('kenapa-1.webp') }}" alt="{{ $t['why']['photo1'] }}"></figure>
 						<a href="{{ $site->route('contact') }}" class="tf-help wow fadeInUp" data-wow-delay="0.06s"><em>{{ $t['why']['helpA'] }}</em><strong>{{ $t['why']['helpB'] }}</strong></a>
 					</div>
 					<div class="tf-why-col-b">
@@ -169,7 +212,7 @@
 							<p>{{ $t['why']['trusted'] }}</p>
 							<div class="tf-dots"><span></span><span></span><span class="is-dark"></span><span class="is-dark"></span></div>
 						</div>
-						<figure class="image-anime wow fadeInUp" data-wow-delay="0.12s"><img loading="lazy" decoding="async" src="{{ $img('why-pastry-display') }}" alt="{{ $t['why']['photo2'] }}"></figure>
+						<figure class="image-anime wow fadeInUp" data-wow-delay="0.12s"><img loading="lazy" decoding="async" src="{{ $img('kenapa-2.webp') }}" alt="{{ $t['why']['photo2'] }}"></figure>
 					</div>
 				</div>
 			</div>
@@ -213,7 +256,7 @@
 								<span class="tf-product-num">0{{ $i + 1 }}.</span>
 								<h3>{{ $row['item']['name'][$locale] }}</h3>
 								<p class="tf-rate">{{ collect([$site->weightText($row['item']), $site->shelfText($row['item'])])->filter()->implode(' · ') }}</p>
-								<p class="tf-price">{{ $site->rupiah($row['item']['price']) }}</p>
+								<p class="tf-price">{{ $site->rupiah($row['item']['price']) }}@if ($row['item']['normal'] > $row['item']['price']) <s>{{ $site->rupiah($row['item']['normal']) }}</s> <em class="tf-off">-{{ $site->offPercent($row['item']) }}%</em>@endif</p>
 								<button type="button" class="tf-cart" data-add-cart="{{ $row['item']['sku'] }}"><span>+</span> {{ $t['products']['cart'] }}</button>
 							</article>
 						@endforeach
@@ -296,8 +339,8 @@
 						<div class="swiper-wrapper">
 							@for ($n = 0; $n < 8; $n++)
 								<div class="swiper-slide">
-									<a href="{{ $img($galleryPhotos[$n % 4]) }}" class="photo-gallery" data-cursor-text="{{ $t['gallery']['view'] }}">
-										<figure class="image-anime"><img loading="lazy" decoding="async" src="{{ $img($galleryPhotos[$n % 4]) }}" alt="{{ $t['gallery']['alts'][$n % 4] }}"></figure>
+									<a href="{{ $img($galleryPhotos[$n % 6]) }}" class="photo-gallery" data-cursor-text="{{ $t['gallery']['view'] }}">
+										<figure class="image-anime"><img loading="lazy" decoding="async" src="{{ $img($galleryPhotos[$n % 6]) }}" alt="{{ $t['gallery']['alts'][$n % 6] }}"></figure>
 									</a>
 								</div>
 							@endfor
@@ -330,7 +373,7 @@
 					</ul>
 				</div>
 				<div class="tf-host image-anime wow fadeInUp">
-					<img loading="lazy" decoding="async" src="{{ $img('testimonial-host') }}" alt="{{ $t['testimonials']['hostAlt'] }}">
+					<img loading="lazy" decoding="async" src="{{ $img('testimoni.webp') }}" alt="{{ $t['testimonials']['hostAlt'] }}">
 					<div class="tf-host-card"><p>{{ $t['testimonials']['hostText'] }}</p><a href="{{ $site->phoneHref() }}">{{ $site->phoneDisplay() }}</a></div>
 				</div>
 			</div>
@@ -351,4 +394,5 @@
 		@include('store.partials.trust')
 		<!-- Trust Section End -->
 	</main>
+	@include('store.partials.news-popup', ['news' => $newsPopup])
 @endsection

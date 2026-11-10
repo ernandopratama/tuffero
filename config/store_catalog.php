@@ -1,152 +1,93 @@
 <?php
 
-// Data tampilan per SKU yang belum ada di database: kategori, jenis, nama Inggris (OQ-16). Ulasan Google Maps diambil 2026-11-03.
+// Nama Inggris, kategori, dan jenis kini di database (D-064, D-065); 'en' di bawah tidak lagi dibaca. 'meta' hanya dipakai menghitung jumlah produk saat katalog kosong. Ulasan Google Maps diambil 2026-11-03.
 return [
-    'categories' => ['nastar', 'macaron', 'pia', 'snack', 'collab'],
     'meta' => [
         'NAS-TOP-01' => [
-            'cat' => 'nastar',
-            'type' => 'sultan',
             'en' => 'Sultan Premium Pineapple Nastar',
         ],
         'NAS-CLAS-01' => [
-            'cat' => 'nastar',
-            'type' => 'classic',
             'en' => 'Classic Homemade Pineapple Nastar',
         ],
         'NAS-APEL-01' => [
-            'cat' => 'nastar',
-            'type' => 'apel',
             'en' => 'Premium Apple Nastar',
         ],
         'NAS-COO-01' => [
-            'cat' => 'nastar',
-            'type' => 'cookies',
             'en' => 'Nastar Cookies (Egg-Free)',
         ],
         'MAC-MIN-31' => [
-            'cat' => 'macaron',
-            'type' => 'mini',
             'en' => 'Mini Macarons, 30 pcs (6 Flavors)',
         ],
         'MAC-MIN-30' => [
-            'cat' => 'macaron',
-            'type' => 'mini',
             'en' => 'Mini Almond Macarons, 30 pcs',
         ],
         'MAC-MIN-50' => [
-            'cat' => 'macaron',
-            'type' => 'mini',
             'en' => 'Premium Mini Macarons, 50 pcs',
         ],
         'MAC-REG-06' => [
-            'cat' => 'macaron',
-            'type' => 'regular',
             'en' => 'Large Regular Macarons, 6 pcs',
         ],
         'PIA-OLH-02' => [
-            'cat' => 'pia',
-            'type' => 'pia',
             'en' => 'Premium Chocolate Pia',
         ],
         'CHO-DUB-01' => [
-            'cat' => 'snack',
-            'type' => 'dubai',
             'en' => 'Dubai Chocolate Kunafa Pistachio Brownies',
         ],
         'BRW-BOX-03' => [
-            'cat' => 'snack',
-            'type' => 'brownies',
             'en' => 'Marble Brownies Box',
         ],
         'MER-TOP-01' => [
-            'cat' => 'snack',
-            'type' => 'cookies',
             'en' => 'Meringue Cookies',
         ],
         'BUNDLING-NAS-02' => [
-            'cat' => 'nastar',
-            'type' => 'paket',
             'en' => 'Wisman + Classic Nastar Set',
         ],
         'SELAI-NANAS-01' => [
-            'cat' => 'nastar',
-            'type' => 'selai',
             'en' => 'Sultan Nastar Pineapple Jam',
         ],
         'MAC-PAK-01' => [
-            'cat' => 'macaron',
-            'type' => 'paket',
             'en' => '2 Mini + 1 Regular Macaron Boxes',
         ],
         'MAC-REM-01' => [
-            'cat' => 'macaron',
-            'type' => 'crumbs',
             'en' => 'Macaron Crumbs',
         ],
         'MAC-RICE-01' => [
-            'cat' => 'macaron',
-            'type' => 'rice',
             'en' => 'Chocolate Macaron Rice Crispy',
         ],
         'MAC-RICE-02' => [
-            'cat' => 'macaron',
-            'type' => 'rice',
             'en' => 'Strawberry Macaron Rice Crispy',
         ],
         'CHO-DUB-02' => [
-            'cat' => 'snack',
-            'type' => 'dubai',
             'en' => 'Dubai Chocolate 2-Pack',
         ],
         'COO-BIT-02' => [
-            'cat' => 'snack',
-            'type' => 'cookies',
             'en' => 'Choco Chips Cookies',
         ],
         'COO-LUM-01' => [
-            'cat' => 'snack',
-            'type' => 'cookies',
             'en' => 'Melting Chocopia',
         ],
         'TERASI-KING-01' => [
-            'cat' => 'collab',
-            'type' => 'terasi',
             'en' => 'Terasi Oven King, 1 Jar',
         ],
         'TERASI-KING-02' => [
-            'cat' => 'collab',
-            'type' => 'terasi',
             'en' => 'Terasi Oven King, 2 Jars',
         ],
         'TERASI-KING-03' => [
-            'cat' => 'collab',
-            'type' => 'terasi',
             'en' => 'Terasi Oven King, 3 Jars',
         ],
         'TERASI-SACHET-12' => [
-            'cat' => 'collab',
-            'type' => 'terasi',
             'en' => 'Terasi Oven King, 12 Sachets',
         ],
         'BUMBU-HTM-01' => [
-            'cat' => 'collab',
-            'type' => 'sambal',
             'en' => 'Black Spice Duck Sambal, 1 Pouch',
         ],
         'BUMBU-HTM-03' => [
-            'cat' => 'collab',
-            'type' => 'sambal',
             'en' => 'Black Spice Duck Sambal, 3 Pouches',
         ],
         'BUMBU-HTM-05' => [
-            'cat' => 'collab',
-            'type' => 'sambal',
             'en' => 'Black Spice Duck Sambal, 5 Pouches',
         ],
         'BUMBU-HTM-02' => [
-            'cat' => 'collab',
-            'type' => 'paket',
             'en' => '2 Sambal + 1 Terasi Bundle',
         ],
     ],
@@ -215,10 +156,6 @@ return [
             'key' => 'whatsapp',
             'external' => true,
         ]],
-        'shipping' => [[
-            'key' => 'track',
-            'href' => '/cek-pesanan',
-        ]],
         'human' => [[
             'key' => 'whatsapp',
             'external' => true,
@@ -226,6 +163,16 @@ return [
         'unsent' => [[
             'key' => 'whatsapp',
             'external' => true,
+        ]],
+        // Hasil form chat yang tidak bisa dijawab otomatis: arahkan ke WhatsApp.
+        'help' => [[
+            'key' => 'whatsapp',
+            'external' => true,
+        ]],
+        // Hasil cek pesanan: halaman lengkapnya ada di Cek Pesanan.
+        'found' => [[
+            'key' => 'track',
+            'href' => '/cek-pesanan',
         ]],
     ],
     'quick_replies' => [[
@@ -238,7 +185,10 @@ return [
         'key' => 'hampers',
         'icon' => 'gift',
     ], [
-        'key' => 'shipping',
+        'key' => 'track',
+        'icon' => 'pin',
+    ], [
+        'key' => 'rates',
         'icon' => 'truck',
     ], [
         'key' => 'human',

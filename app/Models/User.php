@@ -40,6 +40,7 @@ class User extends Authenticatable
             'mfa_totp_confirmed_at' => 'datetime',
             'mfa_email_enabled' => 'boolean',
             'mfa_recovery_codes' => 'array',
+            'notification_muted' => 'array',
         ];
     }
 
@@ -56,6 +57,11 @@ class User extends Authenticatable
     }
 
     /** @return array<string, mixed> */
+    public function avatarUrl(): ?string
+    {
+        return $this->avatar_path ? '/storage/'.$this->avatar_path : null;
+    }
+
     public function accessProfile(): array
     {
         $this->unsetRelation('roles');
@@ -66,6 +72,7 @@ class User extends Authenticatable
             'id' => $this->id,
             'name' => $this->name,
             'email' => $this->email,
+            'avatar_url' => $this->avatarUrl(),
             'role' => $roles->first(),
             'roles' => $roles,
             'permissions' => $this->getAllPermissions()->pluck('name')->sort()->values(),

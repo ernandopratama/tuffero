@@ -6,6 +6,7 @@ use Illuminate\Support\Facades\Route;
 
 // Area admin: Vue 3 SPA dengan Blade sendiri (D-053). CSS Bootstrap template toko menimpa token design system.
 Route::view('/login', 'admin');
+Route::view('/lupa-kata-sandi', 'admin');
 Route::view('/admin/{any?}', 'admin')->where('any', '.*');
 
 Route::get('/sitemap.xml', [StorefrontController::class, 'sitemap']);
@@ -19,6 +20,9 @@ Route::middleware(SetStoreContext::class)->controller(StorefrontController::clas
     Route::get('/kontak', 'contact');
     Route::get('/produk', 'catalog');
     Route::get('/produk/{sku}', 'product');
+    Route::get('/voucher', 'vouchers');
+    Route::get('/promo', 'promos');
+    Route::get('/promo/{slug}', 'promo');
     Route::get('/keranjang', 'cart');
     Route::get('/checkout', 'checkout');
     Route::get('/pesanan/{ref}', 'order');
@@ -35,6 +39,7 @@ Route::middleware(SetStoreContext::class)->controller(StorefrontController::clas
         Route::get('/akun', 'account');
         Route::get('/akun/pesanan', 'accountOrders');
         Route::get('/akun/alamat', 'accountAddresses');
+        Route::get('/akun/voucher', 'accountVouchers');
     });
 
     Route::fallback('missing');

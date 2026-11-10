@@ -15,11 +15,20 @@ class CancellationController extends Controller
 
     public function __construct(private CancellationService $cancellations) {}
 
-    public function index(): JsonResponse
+    public function index(Request $request): JsonResponse
     {
+        $search = $request->string('search')->trim()->toString();
+        $status = $request->string('status')->trim()->toString();
+
         $page = OrderCancellationRequest::with('order:id,order_number,customer_name,status,payment_status,total')
+            ->when($status !== '', fn ($query) => $query->where('status', $status))
+            ->when($search !== '', fn ($query) => $query->where(fn ($inner) => $inner
+                ->where('request_number', 'like', "%{$search}%")
+                ->orWhereHas('order', fn ($order) => $order
+                    ->where('order_number', 'like', "%{$search}%")
+                    ->orWhere('customer_name', 'like', "%{$search}%"))))
             ->orderByDesc('id')
-            ->paginate(25);
+            ->paginate($this->perPage($request));
 
         return $this->success('Requests retrieved.', [
             'items' => collect($page->items())->map(fn (OrderCancellationRequest $request) => [

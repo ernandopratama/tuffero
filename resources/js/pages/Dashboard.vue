@@ -56,7 +56,7 @@ onMounted(load);
     <h1 class="sr-only">Ringkasan {{ roleLabel }}</h1>
 
     <!-- memuat: kerangka dengan ukuran sama supaya halaman tidak melompat -->
-    <div v-if="loading" class="grid gap-4 sm:grid-cols-3 lg:grid-cols-[minmax(0,2fr)_repeat(3,minmax(0,1fr))]" role="status" aria-label="Memuat ringkasan">
+    <div v-if="loading" class="grid grid-cols-1 gap-4 sm:grid-cols-3 lg:grid-cols-[minmax(0,2fr)_repeat(3,minmax(0,1fr))]" role="status" aria-label="Memuat ringkasan">
       <div class="h-56 animate-pulse-soft rounded-card bg-secondary-tint-12 sm:col-span-3 lg:col-span-1 lg:h-[14.5rem]"></div>
       <div v-for="n in 3" :key="n" class="h-32 animate-pulse-soft rounded-card bg-secondary-tint-12 sm:h-44 lg:h-[14.5rem]"></div>
       <div class="h-96 animate-pulse-soft rounded-card bg-secondary-tint-12 sm:col-span-3 lg:col-span-3"></div>
@@ -75,8 +75,8 @@ onMounted(load);
       </button>
     </div>
 
-    <div v-else class="grid gap-4">
-      <div class="grid gap-4 sm:grid-cols-3 lg:grid-cols-[minmax(0,2fr)_repeat(3,minmax(0,1fr))]">
+    <div v-else class="grid grid-cols-1 gap-4">
+      <div class="grid grid-cols-1 gap-4 sm:grid-cols-3 lg:grid-cols-[minmax(0,2fr)_repeat(3,minmax(0,1fr))]">
         <section class="flex animate-rise flex-col justify-between sm:col-span-3 lg:col-span-1 gap-5 rounded-card border border-border bg-surface p-6 shadow-card lg:min-h-[14.5rem]" aria-labelledby="hero-title">
           <div>
             <p class="inline-flex items-center gap-2 rounded-full border border-border bg-background px-3 py-1 text-label-md text-secondary">
@@ -101,7 +101,7 @@ onMounted(load);
         <KpiCard v-for="(kpi, i) in data.kpis" :key="kpi.key" :kpi="kpi" :index="i" />
       </div>
 
-      <div class="grid gap-4 lg:grid-cols-[minmax(0,2fr)_minmax(0,1fr)]">
+      <div class="grid grid-cols-1 gap-4 lg:grid-cols-[minmax(0,2fr)_minmax(0,1fr)]">
         <section v-if="data.chart" class="animate-rise rounded-card border border-border bg-surface p-6 shadow-card" style="animation-delay: 240ms" aria-labelledby="chart-title">
           <header class="mb-4 flex flex-wrap items-center justify-between gap-2">
             <h2 id="chart-title" class="font-heading text-headline-sm">{{ data.chart.title }}</h2>
@@ -116,7 +116,7 @@ onMounted(load);
         </section>
       </div>
 
-      <div class="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+      <div class="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">
         <ListCard v-for="(list, i) in data.lists" :key="list.key" :list="list" :index="i" />
       </div>
     </div>

@@ -9,7 +9,7 @@ use Illuminate\Database\Eloquent\Model;
 class Setting extends Model
 {
     /** Grup yang boleh diubah Admin Toko lewat settings.manage_contact (D-054); sisanya hanya Super Admin. */
-    public const STORE_ADMIN_GROUPS = ['contact', 'reviews'];
+    public const STORE_ADMIN_GROUPS = ['contact', 'reviews', 'discount'];
 
     /**
      * Kunci yang boleh diubah dari dashboard beserta validasinya (docs/database/DATABASE.md).
@@ -28,7 +28,9 @@ class Setting extends Model
         'reviews.count' => ['required', 'integer', 'min:0', 'max:1000000'],
         'antifraud.max_unpaid_orders' => ['required', 'integer', 'min:1', 'max:50'],
         'antifraud.max_orders_per_day' => ['required', 'integer', 'min:1', 'max:100'],
+        'discount.max_percent' => ['required', 'integer', 'min:1', 'max:90'],
         'checkout.reservation_minutes' => ['required', 'integer', 'min:5', 'max:1440'],
+        'inventory.low_stock_threshold' => ['required', 'integer', 'min:0', 'max:1000'],
     ];
 
     /**

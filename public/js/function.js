@@ -93,6 +93,32 @@
 		});
 	}
 
+	/* Carousel tim (halaman Tentang Kami): geser otomatis, berhenti saat disentuh/di-hover, tombol jeda (WCAG 2.2.2), mati bila gerak dikurangi */
+	if ($('.tf-team').length) {
+		const $team = $('.tf-team');
+		const reduce = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+		const $count = $team.find('.tf-team-count b');
+		const team_slider = new Swiper('.tf-team .swiper', {
+			slidesPerView: 1.12,
+			spaceBetween: 16,
+			speed: 500,
+			loop: true,
+			grabCursor: true,
+			autoplay: reduce ? false : { delay: 4200, disableOnInteraction: false, pauseOnMouseEnter: true },
+			navigation: { nextEl: '.tf-team .is-next', prevEl: '.tf-team .is-prev' },
+			breakpoints: { 768: { slidesPerView: 2 } },
+			on: { slideChange: function (s) { $count.text('0' + (s.realIndex % 3 + 1)); } }
+		});
+		const $toggle = $team.find('.tf-team-toggle');
+		if (reduce) { $team.addClass('is-paused'); }
+		$toggle.on('click', function () {
+			const paused = $team.toggleClass('is-paused').hasClass('is-paused');
+			if (paused) { team_slider.autoplay.stop(); } else { team_slider.autoplay.start(); }
+			$toggle.attr('aria-label', $team.data(paused ? 'play' : 'pause'));
+		});
+		$toggle.attr('aria-label', $team.data(reduce ? 'play' : 'pause'));
+	}
+
 	/* Skill Bar */
 	if ($('.skills-progress-bar').length) {
 		$('.skills-progress-bar').waypoint(function() {
@@ -113,7 +139,9 @@
 
 	/* Init Counter */
 	if ($('.counter').length) {
-		$('.counter').counterUp({ delay: 6, time: 3000 });
+		// Angka "tahun berkarya" kecil (5), jadi 3 detik terasa lambat: dipercepat jadi 0,8 detik.
+		$('.counter').not('.tf-years .counter').counterUp({ delay: 6, time: 3000 });
+		$('.tf-years .counter').counterUp({ delay: 6, time: 800 });
 	}
 
 	/* Image Reveal Animation */

@@ -5,8 +5,8 @@
 @endphp
 
 @section('content')
-	<main x-data="contactPage" data-phone="{{ str_replace('-', '', $site->phoneDisplay()) }}">
-		@include('store.partials.page-hero', ['hero' => $p['hero'], 'current' => $t['nav'][6], 'photo' => $site->productPhoto('Nastar Classic 5')])
+	<main x-data="contactPage" data-phone="{{ str_replace('-', '', $site->phoneDisplay()) }}" data-copied="{{ $p['phone']['copied'] }}">
+		@include('store.partials.page-hero', ['hero' => $p['hero'], 'current' => $t['nav'][7], 'photo' => $site->productPhoto('Nastar Classic 5')])
 
 		<section class="tf-wrap tf-page-section tf-contact-grid">
 			<div class="tf-contact-cards">

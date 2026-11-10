@@ -25,6 +25,7 @@ class PromoContentRequest extends FormRequest
             'title' => ['required', 'string', 'max:150'],
             'body' => [$type === 'text' ? 'required' : 'nullable', 'string', 'max:5000'],
             'video_url' => $type === 'video' ? ['required', 'string', 'max:255', new AllowedVideoUrl] : ['prohibited'],
+            'sort_order' => ['sometimes', 'integer', 'between:0,9999'],
             'starts_at' => ['nullable', 'date'],
             'ends_at' => ['nullable', 'date', 'after:starts_at'],
             'is_published' => ['sometimes', 'boolean'],
@@ -42,6 +43,7 @@ class PromoContentRequest extends FormRequest
             'body.max' => 'Teks maksimal 5000 karakter.',
             'video_url.required' => 'Tautan video wajib diisi.',
             'video_url.max' => 'Tautan terlalu panjang.',
+            'sort_order.between' => 'Urutan antara 0 dan 9999.',
             'ends_at.after' => 'Waktu selesai harus setelah waktu mulai.',
             '*.date' => 'Tanggal tidak valid.',
         ];

@@ -19,6 +19,7 @@ class DatabaseSeeder extends Seeder
             SettingSeeder::class,
             WarehouseSeeder::class,
             StoreReviewSeeder::class,
+            ChatFaqSeeder::class,
         ]);
     }
 }

@@ -49,6 +49,18 @@ class CartController extends Controller
         return $this->respond($cart);
     }
 
+    public function select(Request $request, CartService $cart): JsonResponse
+    {
+        $validated = $request->validate([
+            'skus' => ['present', 'array', 'max:200'],
+            'skus.*' => ['string', 'max:64'],
+        ]);
+
+        $cart->select($validated['skus']);
+
+        return $this->respond($cart);
+    }
+
     public function destroy(string $sku, CartService $cart): JsonResponse
     {
         $cart->remove($sku);

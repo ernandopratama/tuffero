@@ -5,8 +5,11 @@ namespace App\Services;
 use App\Models\AuditLog;
 use App\Models\InventoryStock;
 use App\Models\Order;
+use App\Models\ProductVariant;
+use App\Models\Setting;
 use App\Models\StockReservation;
 use App\Models\User;
+use App\Notifications\StaffEvent;
 use Carbon\CarbonInterface;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
@@ -16,6 +19,8 @@ use Illuminate\Validation\ValidationException;
  */
 class InventoryService
 {
+    public function __construct(private StaffNotifier $notifier) {}
+
     public function adjust(int $warehouseId, int $variantId, string $type, int $change, string $note, User $actor): InventoryStock
     {
         if ($type === 'restock' && $change <= 0) {
@@ -30,6 +35,7 @@ class InventoryService
                 ->firstOrFail();
 
             $after = $stock->quantity + $change;
+            $availableBefore = $stock->quantity - $stock->reserved;
 
             if ($after < $stock->reserved) {
                 throw ValidationException::withMessages([
@@ -56,6 +62,8 @@ class InventoryService
                 'note' => $note,
             ], $actor->id);
 
+            $this->warnIfLow($stock, $availableBefore, $actor);
+
             return $stock;
         }, 3);
     }
@@ -73,7 +81,9 @@ class InventoryService
             throw ValidationException::withMessages(['cart' => 'stock_gone']);
         }
 
+        $availableBefore = $stock->quantity - $stock->reserved;
         $stock->update(['reserved' => $stock->reserved + $quantity]);
+        $this->warnIfLow($stock, $availableBefore);
 
         $stock->movements()->create([
             'type' => 'reserve',
@@ -92,6 +102,26 @@ class InventoryService
             'status' => 'active',
             'expires_at' => $expiresAt,
         ]);
+    }
+
+    /**
+     * Memberi tahu Admin Toko dan Gudang sekali saat stok tersedia (stok dikurangi yang ditahan) turun ke bawah batas,
+     * bukan setiap kali berkurang.
+     */
+    private function warnIfLow(InventoryStock $stock, int $availableBefore, ?User $except = null): void
+    {
+        // Bawaan sama dengan label "menipis" di dashboard (D-055): tersedia di bawah 10.
+        $limit = (int) (Setting::where('key', 'inventory.low_stock_threshold')->value('value') ?? DashboardService::LOW_STOCK);
+        $available = $stock->quantity - $stock->reserved;
+
+        if ($availableBefore < $limit || $available >= $limit) {
+            return;
+        }
+
+        $variant = ProductVariant::with('product:id,name')->find($stock->product_variant_id);
+        $name = $variant ? "{$variant->sku} ({$variant->product?->name})" : "varian #{$stock->product_variant_id}";
+
+        $this->notifier->toRoles(['store-admin', 'warehouse'], new StaffEvent('low_stock', 'stock', $variant->sku ?? (string) $stock->product_variant_id, "Stok {$name} menipis: tersisa {$available}", "Peringatan saat stok tersedia di bawah {$limit}"), $except);
     }
 
     /**

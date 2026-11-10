@@ -16,7 +16,10 @@ class CartService
 
     private const KEY = 'cart.items';
 
-    public function __construct(private Session $session) {}
+    // Item yang pembeli batalkan centangnya (kunci md5 SKU). Item baru otomatis terpilih; hanya item terpilih yang dihitung dan dibeli.
+    private const UNSELECTED = 'cart.unselected';
+
+    public function __construct(private Session $session, private DiscountService $discounts) {}
 
     public function set(string $sku, int $quantity): void
     {
@@ -25,17 +28,32 @@ class CartService
 
     public function add(string $sku, int $quantity): void
     {
+        // Menambah produk berarti ingin membelinya, jadi centangnya kembali.
+        $this->selectBack($sku);
         $this->set($sku, $this->quantity($sku) + $quantity);
     }
 
     public function remove(string $sku): void
     {
         $this->session->forget(self::KEY.'.'.$this->key($sku));
+        $this->selectBack($sku);
+    }
+
+    /**
+     * Tentukan item mana yang terpilih untuk checkout; sisanya tetap di keranjang.
+     *
+     * @param  list<string>  $skus
+     */
+    public function select(array $skus): void
+    {
+        $selected = array_map($this->key(...), $skus);
+
+        $this->session->put(self::UNSELECTED, array_values(array_diff(array_keys($this->session->get(self::KEY, [])), $selected)));
     }
 
     public function clear(): void
     {
-        $this->session->forget(self::KEY);
+        $this->session->forget([self::KEY, self::UNSELECTED]);
     }
 
     /**
@@ -49,7 +67,9 @@ class CartService
     /**
      * Isi keranjang dengan data terkini. SKU yang sudah tidak ada dibuang; yang ditarik dari toko diberi tanda.
      *
-     * @return array{items: list<array<string, mixed>>, subtotal: int, weight_gram: int, can_checkout: bool}
+     * Subtotal, hemat, berat, dan can_checkout hanya menghitung item terpilih (item tidak tersedia tidak bisa dipilih).
+     *
+     * @return array{items: list<array<string, mixed>>, subtotal: int, saving: int, weight_gram: int, can_checkout: bool, selected_count: int}
      */
     public function summary(): array
     {
@@ -61,8 +81,12 @@ class CartService
             ->keyBy('sku');
 
         $available = InventoryStock::availableByVariant($variants->pluck('id'));
+        // Harga efektif (setelah diskon produk) dibaca ulang dari database setiap kali, jadi diskon yang berakhir ikut berakhir.
+        $prices = $this->discounts->prices($variants, $this->discounts->memberId());
 
-        $items = $entries->values()->map(function (array $entry) use ($variants, $available) {
+        $unselected = $this->session->get(self::UNSELECTED, []);
+
+        $items = $entries->values()->map(function (array $entry) use ($variants, $available, $prices, $unselected) {
             /** @var ProductVariant|null $variant */
             $variant = $variants->get($entry['sku']);
 
@@ -74,28 +98,41 @@ class CartService
             $stock = $available[$variant->id] ?? 0;
 
             return [
+                'selected' => $sellable && ! in_array($this->key($variant->sku), $unselected, true),
                 'sku' => $variant->sku,
                 'variant_id' => $variant->id,
                 'product_name' => $variant->product->name,
                 'variant_name' => $variant->name,
                 'photo' => $variant->product->images->first()?->path,
-                'price' => $variant->price,
+                'price' => $prices[$variant->id],
+                // Harga coret: harga normal yang diisi admin, atau harga jual varian sebelum diskon produk.
+                'normal' => $variant->compare_at_price ?: $variant->price,
                 'compare_at_price' => $variant->compare_at_price,
                 'weight_gram' => $variant->weight_gram,
                 'quantity' => min($entry['quantity'], $variant->max_order_quantity),
                 'max_quantity' => $variant->max_order_quantity,
-                'line_total' => $variant->price * min($entry['quantity'], $variant->max_order_quantity),
+                'line_total' => $prices[$variant->id] * min($entry['quantity'], $variant->max_order_quantity),
                 'issue' => ! $sellable ? 'unavailable' : ($stock < min($entry['quantity'], $variant->max_order_quantity) ? 'insufficient_stock' : null),
                 'available' => $sellable ? $stock : 0,
             ];
         })->filter()->values();
 
+        $picked = $items->where('selected')->values();
+
         return [
             'items' => $items->all(),
-            'subtotal' => (int) $items->sum('line_total'),
-            'weight_gram' => (int) $items->sum(fn (array $item) => $item['weight_gram'] * $item['quantity']),
-            'can_checkout' => $items->isNotEmpty() && $items->every(fn (array $item) => $item['issue'] === null),
+            'selected_count' => $picked->count(),
+            'subtotal' => (int) $picked->sum('line_total'),
+            // Total hemat dari diskon produk dan harga coret, hanya untuk ditampilkan; yang dibayar tetap subtotal.
+            'saving' => (int) $picked->sum(fn (array $item) => max(0, $item['normal'] - $item['price']) * $item['quantity']),
+            'weight_gram' => (int) $picked->sum(fn (array $item) => $item['weight_gram'] * $item['quantity']),
+            'can_checkout' => $picked->isNotEmpty() && $picked->every(fn (array $item) => $item['issue'] === null),
         ];
+    }
+
+    private function selectBack(string $sku): void
+    {
+        $this->session->put(self::UNSELECTED, array_values(array_diff($this->session->get(self::UNSELECTED, []), [$this->key($sku)])));
     }
 
     private function limitFor(string $sku): int

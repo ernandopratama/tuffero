@@ -1,24 +1,13 @@
 @extends('store.layouts.app')
 
 @php
-	// Hanya foto produk asli Tuffero: [berkas di public/images/Produk, kategori, kunci label, besar?]. Foto dengan teks promosi besar sengaja tidak dipakai.
-	$photos = [
-		['Nastar Sultan 3', 'nastar', 'sultan', true], ['Macaron isi 50 3', 'macaron', 'mini'], ['Pia premium 3', 'pia', 'pia'], ['Dubai 3', 'snack', 'dubai'],
-		['Nastar Apel 4', 'nastar', 'apel'], ['Meringue 3', 'snack', 'meringue'], ['Macaron isi 30 3', 'macaron', 'mini', true], ['Nastar Classic 5', 'nastar', 'classic'],
-		['brownies susu 3', 'snack', 'brownies'], ['Nastar Sultan 2', 'nastar', 'sultan'], ['macaron regular 2', 'macaron', 'regular'], ['Pia premium 2', 'pia', 'pia', true],
-		['Nastar Cookies 3', 'nastar', 'nastarCookies'], ['Cookies 3', 'snack', 'cookies'], ['selai 4', 'nastar', 'selai'], ['Macaron isi 50 1', 'macaron', 'mini'],
-		['Nastar Sultan 7', 'nastar', 'sultan'], ['Meringue 1', 'snack', 'meringue'], ['Nastar Apel 1', 'nastar', 'apel', true], ['Pia premium 1', 'pia', 'pia'],
-		['Dubai 2', 'snack', 'dubai'], ['Macaron New Packing 1', 'macaron', 'mini'], ['brownies susu 4', 'snack', 'brownies'], ['Nastar Classic 3', 'nastar', 'classic'],
-		['rice strawberry 2', 'macaron', 'rice'], ['Nastar Cookies 2', 'nastar', 'nastarCookies'], ['Macaron Crumb 3', 'macaron', 'crumbs'], ['selai 2', 'nastar', 'selai'],
-	];
-	$videos = ['/videos/HeroVideo%20(1).mp4', '/videos/HeroVideo%20(2).mp4'];
 	// Ikon kategori (public/images/Logo/icon, versi kecil di thumb/ untuk tab).
 	$tabs = ['nastar' => 'nastar', 'macaron' => 'macaron', 'pia' => 'pia', 'snack' => 'camilan'];
 @endphp
 
 @section('content')
 	<main>
-		@include('store.partials.page-hero', ['hero' => $p['hero'], 'current' => $t['nav'][5], 'photo' => $site->productPhoto('Macaron isi 50 3')])
+		@include('store.partials.page-hero', ['hero' => $p['hero'], 'current' => $t['nav'][6], 'photo' => $site->productPhoto('Macaron isi 50 3')])
 
 		<section class="tf-wrap tf-gal-section" x-data="gallery">
 			<div x-ref="tabs" class="tf-cat-tabs wow fadeInUp" role="group" aria-label="{{ $p['filter'] }}">
@@ -30,32 +19,48 @@
 			<!-- .gallery-items: lightbox Magnific dari function.js, sama seperti galeri landing -->
 			<div x-ref="grid" class="tf-gal-grid gallery-items">
 				@foreach ($photos as $photo)
-					@php [$file, $cat, $label] = $photo; $big = $photo[3] ?? false; @endphp
-					<a href="{{ $site->productPhoto($file) }}" data-cat="{{ $cat }}" @class(['tf-gal-item', 'is-big' => $big]) data-cursor-text="{{ $t['gallery']['view'] }}" aria-label="{{ $t['gallery']['view'] }}: {{ $p['labels'][$label] }}">
-						<img src="/images/Produk/gallery/{{ $file }}.webp" alt="{{ $p['labels'][$label] }}" width="800" height="800" loading="lazy" decoding="async">
-						<span>{{ $p['labels'][$label] }}</span>
-					</a>
-				@endforeach
+						@php $title = $photo->titleFor(app()->getLocale()); @endphp
+						<a href="{{ $photo->fullUrl() }}" data-cat="{{ $photo->category }}" @class(['tf-gal-item', 'is-big' => $photo->is_featured]) data-cursor-text="{{ $t['gallery']['view'] }}" aria-label="{{ $t['gallery']['view'] }}: {{ $title }}">
+							<img src="{{ $photo->imageUrl() }}" alt="{{ $title }}" width="800" height="800" loading="lazy" decoding="async">
+							<span>{{ $title }}</span>
+						</a>
+					@endforeach
 			</div>
 		</section>
 
+		@if ($liveVideos->isNotEmpty())
 		<section class="tf-page-band">
 			<div class="tf-wrap">
 				<div class="tf-head">
 					<p class="tf-eyebrow tf-eyebrow-gold wow fadeInUp">{{ $p['video']['eyebrow'] }}</p>
 					<h2 class="tf-h2 tf-h2-tight text-anime-style-2" data-cursor="-opaque">{{ $site->rich($p['video']['title']) }}</h2>
 				</div>
-				<div class="tf-gal-videos">
-					@foreach ($videos as $i => $src)
-						<a href="{{ $src }}" class="tf-gal-video popup-video wow fadeInUp" data-wow-delay="{{ ($i * 0.06).'s' }}" data-cursor-text="Play">
-							<img src="/videos/poster-{{ $i + 1 }}.webp" alt="{{ $p['video']['items'][$i] }}" width="800" height="450" loading="lazy" decoding="async">
-							<i aria-hidden="true">{{ $site->lineIcon('play', 26) }}</i>
-							<span>{{ $p['video']['items'][$i] }}</span>
-						</a>
-					@endforeach
-				</div>
+					<div x-data="reels" class="tf-reels-host" data-open-on="{{ $p['video']['openOn'] }}">
+					<div class="tf-gal-reels">
+						@foreach ($liveVideos as $i => $v)
+							@php
+								$platform = $p['video']['providers'][$v->provider] ?? 'web';
+								$embed = $v->embedUrl();
+							@endphp
+							<a href="{{ $v->video_url }}" class="tf-reel wow fadeInUp" target="_blank" rel="noopener noreferrer" @click="open" data-embed="{{ $embed }}" data-title="{{ $v->title }}" data-platform="{{ $platform }}" data-wow-delay="{{ ($i * 0.06).'s' }}" aria-label="{{ str_replace([':title', ':platform'], [$v->title, $platform], $embed ? $p['video']['play'] : $p['video']['open']) }}">
+								<img src="/storage/{{ $v->image_path }}" alt="" width="360" height="640" loading="lazy" decoding="async">
+								<b>{{ $platform }}</b>
+								<i aria-hidden="true">{{ $site->lineIcon('play', 22) }}</i>
+								<span>{{ $v->title }}</span>
+							</a>
+						@endforeach
+					</div>
+					<dialog x-ref="dialog" class="tf-reel-dialog" aria-label="{{ $p['video']['dialog'] }}" @close="stop" @click="backdrop">
+						<div class="tf-reel-box">
+							<button type="button" class="tf-reel-close" aria-label="{{ $p['video']['close'] }}" @click="close">{{ $site->lineIcon('close', 20) }}</button>
+							<div x-ref="frame" class="tf-reel-frame"></div>
+							<a x-ref="link" href="#" class="tf-reel-open" target="_blank" rel="noopener noreferrer"><span x-text="openLabel"></span></a>
+						</div>
+					</dialog>
+					</div>
 			</div>
 		</section>
+		@endif
 
 		@include('store.partials.page-cta')
 	</main>

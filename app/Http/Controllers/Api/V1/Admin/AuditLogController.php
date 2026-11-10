@@ -15,11 +15,13 @@ class AuditLogController extends Controller
     public function index(Request $request): JsonResponse
     {
         $action = $request->string('action')->trim()->toString();
+        $search = $request->string('search')->trim()->toString();
 
         $page = AuditLog::with('actor:id,name')
             ->when($action !== '', fn ($query) => $query->where('action', $action))
+            ->when($search !== '', fn ($query) => $query->whereHas('actor', fn ($actor) => $actor->where('name', 'like', "%{$search}%")))
             ->orderByDesc('id')
-            ->paginate(50);
+            ->paginate($this->perPage($request, 50));
 
         return $this->success('Audit logs retrieved.', [
             'items' => $page->getCollection()->map(fn (AuditLog $log) => [

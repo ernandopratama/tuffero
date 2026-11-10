@@ -33,10 +33,10 @@ class StoreSite
 
     public const ROUTES = [
         'about' => '/tentang-kami', 'services' => '/layanan', 'products' => '/produk', 'offers' => '/#offers', 'gallery' => '/galeri', 'contact' => '/kontak',
-        'account' => '/masuk', 'profile' => '/akun', 'orders' => '/akun/pesanan', 'addresses' => '/akun/alamat', 'cart' => '/keranjang', 'checkout' => '/checkout', 'track' => '/cek-pesanan',
+        'account' => '/masuk', 'profile' => '/akun', 'orders' => '/akun/pesanan', 'addresses' => '/akun/alamat', 'vouchers' => '/voucher', 'promos' => '/promo', 'myVouchers' => '/akun/voucher', 'cart' => '/keranjang', 'checkout' => '/checkout', 'track' => '/cek-pesanan',
     ];
 
-    public const NAV_LINKS = ['/', '/tentang-kami', '/layanan', '/produk', '/#offers', '/galeri', '/kontak'];
+    public const NAV_LINKS = ['/', '/tentang-kami', '/layanan', '/produk', '/promo', '/#offers', '/galeri', '/kontak'];
 
     public const FOOTER_LINKS = ['/', '/tentang-kami', '/layanan', '/produk', '/#offers'];
 
@@ -106,6 +106,46 @@ class StoreSite
         return ['day' => $day, 'open' => $hours !== null && $now->hour >= $hours[0] && $now->hour < $hours[1]];
     }
 
+    /**
+     * JSON-LD Bakery untuk beranda (local SEO). Hanya fakta yang sudah ada di StoreSite dan teks footer.
+     * Tanpa aggregateRating: Google tidak menampilkan ulasan yang dipasang sendiri oleh bisnis lokal.
+     *
+     * @return array<string, mixed>
+     */
+    public function businessJsonLd(): array
+    {
+        $days = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
+
+        return [
+            '@context' => 'https://schema.org',
+            '@type' => 'Bakery',
+            'name' => 'Tuffero Bakery',
+            'url' => url('/'),
+            'image' => url(str_replace(' ', '%20', $this->productPhoto('Nastar Classic 2'))),
+            'telephone' => $this->whatsappNumber(),
+            'foundingDate' => '2021-06-08',
+            'address' => [
+                '@type' => 'PostalAddress',
+                'streetAddress' => trans('store.landing.footer.address', [], 'id'),
+                'addressLocality' => 'Malang',
+                'addressRegion' => 'Jawa Timur',
+                'postalCode' => '65151',
+                'addressCountry' => 'ID',
+            ],
+            'geo' => ['@type' => 'GeoCoordinates', 'latitude' => self::MAP_LAT, 'longitude' => self::MAP_LNG],
+            'hasMap' => self::MAPS_URL,
+            'openingHoursSpecification' => collect(self::OPEN_HOURS)
+                ->map(fn (?array $hours, int $i) => $hours ? [
+                    '@type' => 'OpeningHoursSpecification',
+                    'dayOfWeek' => $days[$i],
+                    'opens' => sprintf('%02d:00', $hours[0]),
+                    'closes' => sprintf('%02d:00', $hours[1]),
+                ] : null)
+                ->filter()->values()->all(),
+            'sameAs' => [self::INSTAGRAM_URL, self::TIKTOK_URL],
+        ];
+    }
+
     public function productPhoto(string $name): string
     {
         return "/images/Produk/{$name}_result.webp";
@@ -114,6 +154,16 @@ class StoreSite
     public function rupiah(int $amount): string
     {
         return 'Rp'.number_format($amount, 0, ',', '.');
+    }
+
+    /**
+     * Persen hemat untuk label "-30%": dari harga coret ke harga bayar. 0 bila tidak ada potongan.
+     *
+     * @param  array<string, mixed>  $item
+     */
+    public function offPercent(array $item): int
+    {
+        return $item['normal'] > $item['price'] ? (int) round((1 - $item['price'] / $item['normal']) * 100) : 0;
     }
 
     /**

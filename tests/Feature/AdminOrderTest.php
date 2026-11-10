@@ -128,6 +128,18 @@ class AdminOrderTest extends TestCase
         $this->actingAs($this->staff('warehouse'))->getJson('/api/v1/admin/fulfillment')->assertJsonPath('data.meta.total', 0);
     }
 
+    public function test_payment_list_filters_by_status_and_searches_order_number(): void
+    {
+        $paid = $this->paidOrder();
+        $this->order();
+        $staff = $this->staff('store-admin');
+
+        $this->actingAs($staff)->getJson('/api/v1/admin/payments?payment_status=paid')
+            ->assertJsonPath('data.meta.total', 1)
+            ->assertJsonPath('data.items.0.order_number', $paid->order_number);
+        $this->actingAs($staff)->getJson("/api/v1/admin/payments?search={$paid->order_number}")->assertJsonPath('data.meta.total', 1);
+    }
+
     public function test_payment_list_has_no_customer_data_and_no_write_route(): void
     {
         $order = $this->paidOrder();
@@ -160,6 +172,25 @@ class AdminOrderTest extends TestCase
         $order->forceFill(['status' => Order::EXPIRED])->save();
 
         $this->assertSame(Order::EXPIRED, app(OrderStatusService::class)->markPaid($order)->status);
+    }
+
+    public function test_order_list_and_detail_show_biteship_shipment_status(): void
+    {
+        $order = $this->paidOrder();
+        $order->shipment()->create(['provider' => 'biteship', 'provider_order_id' => 'bt-1', 'courier_code' => 'sicepat', 'service_code' => 'reg', 'waybill_id' => 'WYB-1', 'status' => 'picked', 'shipping_fee' => 12000]);
+        $manual = $this->paidOrder();
+        $manual->shipment()->create(['provider' => 'manual', 'courier_code' => 'jnt', 'service_code' => 'ez', 'waybill_id' => 'JT1', 'status' => 'shipped', 'shipping_fee' => 12000]);
+        $this->actingAs($this->staff('store-admin'));
+
+        $rows = collect($this->getJson('/api/v1/admin/orders')->assertOk()->json('data.items'));
+        $this->assertSame('picked', $rows->firstWhere('id', $order->id)['carrier_status']);
+        $this->assertNull($rows->firstWhere('id', $manual->id)['carrier_status']);
+
+        $this->getJson("/api/v1/admin/orders/{$order->id}")
+            ->assertOk()
+            ->assertJsonPath('data.shipment.provider', 'biteship')
+            ->assertJsonPath('data.shipment.status', 'picked')
+            ->assertJsonPath('data.waybill_id', 'WYB-1');
     }
 
     public function test_full_status_flow_with_history(): void

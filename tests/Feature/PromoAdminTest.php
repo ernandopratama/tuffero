@@ -10,6 +10,7 @@ use App\Models\Voucher;
 use Database\Seeders\DatabaseSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\UploadedFile;
+use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Storage;
 use PHPUnit\Framework\Attributes\DataProvider;
 use Tests\TestCase;
@@ -21,6 +22,9 @@ class PromoAdminTest extends TestCase
     protected function setUp(): void
     {
         parent::setUp();
+
+        // Tahap 2 (D-058): simpan video mencoba thumbnail otomatis; uji tidak boleh memanggil jaringan.
+        Http::preventStrayRequests();
 
         $this->seed(DatabaseSeeder::class);
     }
@@ -237,6 +241,50 @@ class PromoAdminTest extends TestCase
         $this->assertSame(['GET', 'HEAD', 'POST'], $this->commentRouteMethods());
     }
 
+    public function test_comment_can_tag_only_active_staff_who_can_see_the_voucher(): void
+    {
+        $owner = $this->staff('owner');
+        $marketing = $this->staff('marketing');
+        $warehouse = $this->staff('warehouse'); // tidak punya vouchers.view
+        $inactive = $this->staff('store-admin');
+        $inactive->forceFill(['is_active' => false])->save();
+        $url = '/api/v1/admin/vouchers/'.$this->voucher()->id.'/comments';
+
+        $this->actingAs($owner);
+
+        $mentionable = collect($this->getJson($url)->assertOk()->json('data.mentionable'))->pluck('id');
+        $this->assertTrue($mentionable->contains($marketing->id));
+        $this->assertFalse($mentionable->contains($owner->id), 'Pembuat tidak bisa menandai dirinya sendiri.');
+        $this->assertFalse($mentionable->contains($warehouse->id));
+        $this->assertFalse($mentionable->contains($inactive->id));
+
+        $this->postJson($url, ['body' => "@{$marketing->name} tolong cek", 'mentions' => [$marketing->id, $marketing->id]])
+            ->assertCreated()
+            ->assertJsonPath('data.mentions', [['id' => $marketing->id, 'name' => $marketing->name]]);
+
+        $this->postJson($url, ['body' => 'x', 'mentions' => [$warehouse->id]])->assertUnprocessable()->assertJsonValidationErrors('mentions.0');
+        $this->postJson($url, ['body' => 'x', 'mentions' => [$owner->id]])->assertUnprocessable();
+        $this->postJson($url, ['body' => 'x', 'mentions' => ['1; DROP TABLE users']])->assertUnprocessable();
+
+        $this->getJson($url)->assertJsonPath('data.comments.0.mentions.0.name', $marketing->name);
+    }
+
+    public function test_comments_are_paged_by_five_newest_first(): void
+    {
+        $owner = $this->staff('owner');
+        $url = '/api/v1/admin/vouchers/'.$this->voucher()->id.'/comments';
+        $this->actingAs($owner);
+
+        foreach (range(1, 7) as $n) {
+            $this->postJson($url, ['body' => "catatan {$n}"])->assertCreated();
+        }
+
+        $first = $this->getJson($url)->assertOk()->assertJsonCount(5, 'data.comments');
+        $first->assertJsonPath('data.comments.0.body', 'catatan 7')->assertJsonPath('data.meta.total', 7)->assertJsonPath('data.meta.last_page', 2);
+
+        $this->getJson("{$url}?page=2")->assertJsonCount(2, 'data.comments')->assertJsonPath('data.comments.1.body', 'catatan 1');
+    }
+
     /** @return list<string> */
     private function commentRouteMethods(): array
     {
@@ -264,5 +312,20 @@ class PromoAdminTest extends TestCase
         $this->actingAs($this->staff('owner'))
             ->postJson("/api/v1/admin/contents/{$content->id}/comments", ['body' => ''])
             ->assertUnprocessable();
+    }
+
+    public function test_voucher_and_content_lists_filter_by_type_and_status(): void
+    {
+        $this->actingAs($this->staff('marketing'));
+        $this->voucher(['code' => 'PCT', 'type' => 'percent', 'is_active' => true]);
+        $this->voucher(['code' => 'FIX', 'type' => 'fixed', 'max_discount' => null, 'is_active' => false]);
+        $this->content(['title' => 'Banner A', 'type' => 'banner', 'is_published' => false]);
+        $this->content(['title' => 'Teks B', 'type' => 'text', 'is_published' => true]);
+
+        $this->assertSame(['FIX'], collect($this->getJson('/api/v1/admin/vouchers?type=fixed')->json('data.items'))->pluck('code')->all());
+        $this->assertSame(['PCT'], collect($this->getJson('/api/v1/admin/vouchers?is_active=1')->json('data.items'))->pluck('code')->all());
+        $this->assertSame(['Banner A'], collect($this->getJson('/api/v1/admin/contents?type=banner')->json('data.items'))->pluck('title')->all());
+        $this->assertSame(['Banner A'], collect($this->getJson('/api/v1/admin/contents?search=anner')->json('data.items'))->pluck('title')->all());
+        $this->assertSame(['Teks B'], collect($this->getJson('/api/v1/admin/contents?is_published=1')->json('data.items'))->pluck('title')->all());
     }
 }

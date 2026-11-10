@@ -29,7 +29,8 @@ const step = computed(() => {
     return (whole ? [1, 2, 5, 10] : [1, 2, 2.5, 5, 10]).map((m) => m * pow).find((s) => s >= raw);
 });
 const top = computed(() => step.value * 5);
-const ticks = computed(() => [5, 4, 3, 2, 1, 0].map((i) => i * step.value));
+// Dibulatkan agar 3 * 0,2 tidak tampil 0.6000000000000001.
+const ticks = computed(() => [5, 4, 3, 2, 1, 0].map((i) => Number((i * step.value).toPrecision(12))));
 
 const groups = computed(() => props.chart.labels.map((label, i) => ({ label, i, values: props.chart.series.map((s) => s.values[i]) })));
 const total = computed(() => props.chart.series.map((s) => s.values.reduce((a, b) => a + b, 0)));

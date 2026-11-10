@@ -17,9 +17,18 @@ class ReviewController extends Controller
 
     private const FIELDS = ['id', 'author_name', 'rating', 'body', 'source', 'reviewed_on', 'is_published'];
 
-    public function index(): JsonResponse
+    public function index(Request $request): JsonResponse
     {
-        $page = StoreReview::orderByDesc('id')->paginate(25);
+        $search = $request->string('search')->trim()->toString();
+
+        $page = StoreReview::query()
+            ->when($search !== '', fn ($query) => $query->where(fn ($inner) => $inner
+                ->where('author_name', 'like', "%{$search}%")
+                ->orWhere('body', 'like', "%{$search}%")))
+            ->when(in_array($request->query('rating'), ['1', '2', '3', '4', '5'], true), fn ($query) => $query->where('rating', (int) $request->query('rating')))
+            ->when($request->query('is_published') !== null && $request->query('is_published') !== '', fn ($query) => $query->where('is_published', $request->boolean('is_published')))
+            ->orderByDesc('id')
+            ->paginate($this->perPage($request));
 
         return $this->success('Reviews retrieved.', [
             'items' => $page->getCollection()->map(fn (StoreReview $review) => $review->only(self::FIELDS))->values(),

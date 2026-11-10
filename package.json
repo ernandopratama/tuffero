@@ -21,6 +21,7 @@
         "@alpinejs/csp": "^3.17.5",
         "@fortawesome/fontawesome-free": "^7.3.1",
         "axios": "^1.21.0",
+        "leaflet": "^1.9.4",
         "pinia": "^4.1.0",
         "quill": "^2.0.3",
         "vue": "^3.5.44",

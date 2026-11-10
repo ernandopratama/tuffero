@@ -31,6 +31,9 @@ class SaveAddressRequest extends FormRequest
             'city' => ['required', 'string', 'max:100'],
             'province' => ['required', 'string', 'max:100'],
             'postal_code' => ['required', 'string', 'regex:/^\d{5}$/'],
+            // Titik rumah dari peta, aturan sama dengan checkout (D-077).
+            'latitude' => ['nullable', 'required_with:longitude', 'numeric', 'between:-11.5,6.5'],
+            'longitude' => ['nullable', 'required_with:latitude', 'numeric', 'between:94,141.5'],
             'is_default' => ['sometimes', 'boolean'],
         ];
     }
@@ -49,6 +52,8 @@ class SaveAddressRequest extends FormRequest
             'province.required' => 'province_required',
             'postal_code.required' => 'postal_invalid',
             'postal_code.regex' => 'postal_invalid',
+            'latitude.*' => 'pin_invalid',
+            'longitude.*' => 'pin_invalid',
         ];
     }
 }

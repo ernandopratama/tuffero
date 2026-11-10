@@ -1,4 +1,7 @@
+<script setup>
+import PageHeader from '../components/ui/PageHeader.vue';
+</script>
+
 <template>
-  <h1 class="font-heading text-headline-lg-mobile lg:text-headline-lg">Akses ditolak</h1>
-  <p class="mt-space-sm text-secondary">Akun Anda tidak memiliki izin untuk membuka halaman ini. Hubungi Super Admin bila Anda membutuhkannya.</p>
+  <PageHeader title="Akses ditolak" description="Akun Anda tidak memiliki izin untuk membuka halaman ini. Hubungi Super Admin bila Anda membutuhkannya." icon="shield" />
 </template>

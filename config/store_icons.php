@@ -67,6 +67,14 @@ return [
             'line' => true,
             'inner' => '<rect x="3" y="8" width="18" height="4" rx="1"></rect><path d="M12 8v13M19 12v7a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2v-7M7.5 8a2.5 2.5 0 0 1 0-5C9 3 12 8 12 8s3-5 4.5-5a2.5 2.5 0 0 1 0 5"></path>',
         ],
+        'chevronDown' => [
+            'line' => true,
+            'inner' => '<path d="m6 9 6 6 6-6"></path>',
+        ],
+        'check' => [
+            'line' => true,
+            'inner' => '<path d="M20 6 9 17l-5-5"></path>',
+        ],
         'truck' => [
             'line' => true,
             'inner' => '<path d="M14 18V6a2 2 0 0 0-2-2H4a2 2 0 0 0-2 2v11a1 1 0 0 0 1 1h2M15 18H9M19 18h2a1 1 0 0 0 1-1v-3.65a1 1 0 0 0-.22-.62l-3.48-4.35A1 1 0 0 0 17.52 8H14"></path><circle cx="17" cy="18" r="2"></circle><circle cx="7" cy="18" r="2"></circle>',
@@ -83,6 +91,26 @@ return [
             'line' => true,
             'inner' => '<path d="M5 12h14"></path>',
         ],
+        'trash' => [
+            'line' => true,
+            'inner' => '<path d="M3 6h18M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6M10 11v6M14 11v6"></path>',
+        ],
+        'plus' => [
+            'line' => true,
+            'inner' => '<path d="M5 12h14M12 5v14"></path>',
+        ],
+        'ticket' => [
+            'line' => true,
+            'inner' => '<path d="M2 9a3 3 0 0 1 0 6v2a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-2a3 3 0 0 1 0-6V7a2 2 0 0 0-2-2H4a2 2 0 0 0-2 2Z"></path><path d="M13 5v2M13 11v2M13 17v2"></path>',
+        ],
+        'chevronRight' => [
+            'line' => true,
+            'inner' => '<path d="m9 18 6-6-6-6"></path>',
+        ],
+        'copy' => [
+            'line' => true,
+            'inner' => '<rect width="14" height="14" x="8" y="8" rx="2"></rect><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"></path>',
+        ],
         'close' => [
             'line' => true,
             'inner' => '<path d="M18 6 6 18M6 6l12 12"></path>',
@@ -90,6 +118,68 @@ return [
         'eyeOff' => [
             'line' => true,
             'inner' => '<path d="M9.88 9.88a3 3 0 1 0 4.24 4.24"></path><path d="M10.73 5.08A10.4 10.4 0 0 1 12 5c6.5 0 10 7 10 7a13 13 0 0 1-1.67 2.68"></path><path d="M6.61 6.61A13.5 13.5 0 0 0 2 12s3.5 7 10 7a9.7 9.7 0 0 0 5.39-1.61"></path><path d="M2 2l20 20"></path>',
+        ],
+        // Ikon alur checkout dan pembayaran (FigCraft 04-06, 11).
+        'arrowRight' => [
+            'line' => true,
+            'inner' => '<path d="M5 12h14M13 6l6 6-6 6"></path>',
+        ],
+        'arrowLeft' => [
+            'line' => true,
+            'inner' => '<path d="M19 12H5M11 18l-6-6 6-6"></path>',
+        ],
+        'card' => [
+            'line' => true,
+            'inner' => '<rect x="2" y="5" width="20" height="14" rx="2"></rect><path d="M2 10h20M6 15h4"></path>',
+        ],
+        'shieldCheck' => [
+            'line' => true,
+            'inner' => '<path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10Z"></path><path d="m9 12 2 2 4-4"></path>',
+        ],
+        'alert' => [
+            'line' => true,
+            'inner' => '<circle cx="12" cy="12" r="10"></circle><path d="M12 8v4M12 16h.01"></path>',
+        ],
+        'receipt' => [
+            'line' => true,
+            'inner' => '<path d="M4 2v20l3-2 3 2 2-2 2 2 3-2 3 2V2l-3 2-3-2-2 2-2-2-3 2Z"></path><path d="M8 9h8M8 13h6"></path>',
+        ],
+        'basket' => [
+            'line' => true,
+            'inner' => '<path d="m5 11 4-7M19 11l-4-7M2 11h20M3.5 11l1.6 7.4A2 2 0 0 0 7.1 20h9.8a2 2 0 0 0 2-1.6l1.6-7.4M9 15v2M15 15v2"></path>',
+        ],
+        'box' => [
+            'line' => true,
+            'inner' => '<path d="M21 8 12 3 3 8v8l9 5 9-5Z"></path><path d="m3 8 9 5 9-5M12 13v8"></path>',
+        ],
+        'chef' => [
+            'line' => true,
+            'inner' => '<path d="M6 13.9A4 4 0 0 1 7.5 6a5 5 0 0 1 9 0A4 4 0 0 1 18 13.9V20H6Z"></path><path d="M6 17h12"></path>',
+        ],
+        // Ikon navbar bawah smartphone.
+        'home' => [
+            'line' => true,
+            'inner' => '<path d="M3 10.5 12 3l9 7.5V20a1 1 0 0 1-1 1h-5v-6h-6v6H4a1 1 0 0 1-1-1Z"></path>',
+        ],
+        'user' => [
+            'line' => true,
+            'inner' => '<circle cx="12" cy="8" r="4"></circle><path d="M4 21a8 8 0 0 1 16 0"></path>',
+        ],
+        'image' => [
+            'line' => true,
+            'inner' => '<rect x="3" y="3" width="18" height="18" rx="3"></rect><circle cx="9" cy="9" r="2"></circle><path d="m21 15-4.5-4.5L5 21"></path>',
+        ],
+        'chat' => [
+            'line' => true,
+            'inner' => '<path d="M21 12a8 8 0 0 1-11.6 7.1L4 20.5l1.4-4.9A8 8 0 1 1 21 12Z"></path><path d="M8.5 12h.01M12 12h.01M15.5 12h.01"></path>',
+        ],
+        'search' => [
+            'line' => true,
+            'inner' => '<circle cx="11" cy="11" r="7"></circle><path d="m20 20-3.5-3.5"></path>',
+        ],
+        'logout' => [
+            'line' => true,
+            'inner' => '<path d="M15 4h3a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2h-3M10 17l5-5-5-5M15 12H4"></path>',
         ],
     ],
 ];

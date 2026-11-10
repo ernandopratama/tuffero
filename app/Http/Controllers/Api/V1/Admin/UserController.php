@@ -29,8 +29,10 @@ class UserController extends Controller
             ->when($search !== '', fn ($query) => $query->where(fn ($inner) => $inner
                 ->where('name', 'like', "%{$search}%")
                 ->orWhere('email', 'like', "%{$search}%")))
+            ->when($request->query('role'), fn ($query, $role) => $query->whereHas('roles', fn ($r) => $r->where('name', $role)))
+            ->when($request->query('is_active') !== null && $request->query('is_active') !== '', fn ($query) => $query->where('is_active', $request->boolean('is_active')))
             ->orderBy('name')
-            ->paginate(25);
+            ->paginate($this->perPage($request));
 
         return $this->success('Users retrieved.', [
             'items' => $page->getCollection()->map($this->present(...))->values(),

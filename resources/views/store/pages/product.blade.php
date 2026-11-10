@@ -11,7 +11,7 @@
 	$decimal = str_replace('.', $locale === 'id' ? ',' : '.', (string) $rating);
 	$pct = (($rating / 5) * 100).'%';
 	$specs = [[$p['specs']['pack'], "{$x['pack']} g", null]];
-	if ($x['cat']) { array_unshift($specs, [$p['specs']['cat'], $c['cats'][$x['cat']], "{$site->route('products')}?kategori={$x['cat']}"]); }
+	if ($x['cat']) { array_unshift($specs, [$p['specs']['cat'], $x['cat_name'][$locale], "{$site->route('products')}?kategori={$x['cat']}"]); }
 	if ($x['shelf']) { $specs[] = [$p['specs']['shelf'], $site->shelfPlain($x), null]; }
 	if ($x['net']) { $specs[] = [$p['specs']['net'], "{$x['net']} g", null]; }
 	$specs[] = [$p['specShip'], $p['specShipValue'], null];
@@ -65,7 +65,7 @@
 
 				<div class="tf-pd-info wow fadeInUp" data-wow-delay="0.1s">
 					@if ($x['cat'])
-						<span class="tf-pd-badge">{{ $c['cats'][$x['cat']] }}</span>
+						<span class="tf-pd-badge">{{ $x['cat_name'][$locale] }}</span>
 					@endif
 					@foreach ($x['badges'] as $badge)
 						<span class="tf-pd-badge">{{ $badge }}</span>
@@ -178,7 +178,7 @@
 						<a href="{{ $y['path'] }}" class="tf-pc">
 							<figure>@if ($y['photos'])<img src="{{ $y['photos'][0]['src'] }}" alt="" width="240" height="240" loading="lazy" decoding="async">@endif</figure>
 							<h3>{{ $y['name'][$locale] }}</h3>
-							<p class="tf-pc-price"><strong>{{ $site->rupiah($y['price']) }}</strong>@if ($y['normal'] > $y['price'])<s>{{ $site->rupiah($y['normal']) }}</s>@endif</p>
+							<p class="tf-pc-price"><strong>{{ $site->rupiah($y['price']) }}</strong>@if ($y['normal'] > $y['price'])<s>{{ $site->rupiah($y['normal']) }}</s><em class="tf-off">-{{ $site->offPercent($y) }}%</em>@endif</p>
 							<p class="tf-pc-meta"><span>{{ $site->weightText($y) }}</span>@if ($y['shelf'])<span>{{ $site->shelfText($y) }}</span>@endif</p>
 						</a>
 					</li>
@@ -193,5 +193,4 @@
 		<div><span>{{ $p['stickyPrice'] }}</span><strong>{{ $site->rupiah($x['price']) }}</strong></div>
 		<button type="button" class="tf-btn" @click="addCurrent">{{ $p['addShort'] }}</button>
 	</div>
-	<div class="tf-cat-toast" :class="toast ? 'is-on' : ''" role="status" x-text="toast"></div>
 @endsection

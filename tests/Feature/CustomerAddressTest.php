@@ -48,6 +48,26 @@ class CustomerAddressTest extends TestCase
         $this->actingAs($staff)->postJson('/api/v1/account/addresses', $this->body())->assertForbidden();
     }
 
+    public function test_map_pin_is_saved_cleared_and_validated(): void
+    {
+        $user = User::factory()->create();
+
+        $address = $this->address($user, ['latitude' => -7.9266161, 'longitude' => 112.5846427]);
+        $this->assertEqualsWithDelta(-7.9266161, $address->latitude, 0.0000001);
+        $this->actingAs($user)->getJson('/api/v1/account/addresses')->assertJsonPath('data.items.0.longitude', 112.5846427);
+
+        // Alamat lama tanpa titik tetap sah.
+        $this->assertNull($this->address($user)->latitude);
+
+        $this->actingAs($user)->patchJson("/api/v1/account/addresses/{$address->id}", $this->body(['latitude' => null, 'longitude' => null]))->assertOk();
+        $this->assertNull($address->fresh()->latitude);
+
+        $this->actingAs($user)->postJson('/api/v1/account/addresses', $this->body(['latitude' => 51.5, 'longitude' => -0.12]))
+            ->assertUnprocessable()->assertJsonPath('errors.latitude.0', 'pin_invalid');
+        $this->actingAs($user)->postJson('/api/v1/account/addresses', $this->body(['latitude' => -7.9]))
+            ->assertUnprocessable()->assertJsonValidationErrors('longitude');
+    }
+
     public function test_store_normalizes_phone_and_first_address_is_default(): void
     {
         $user = User::factory()->create();

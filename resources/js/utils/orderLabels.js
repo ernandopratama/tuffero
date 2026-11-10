@@ -26,6 +26,31 @@ export const SHIPPING_STATUS = {
     delivered: 'Diterima',
 };
 
+// Status paket dari Biteship (webhook, snake_case). tone: ok, info, warn, bad dipakai lencana status.
+export const CARRIER_STATUS = {
+    confirmed: { label: 'Menunggu kurir', tone: 'info' },
+    allocated: { label: 'Kurir ditugaskan', tone: 'info' },
+    picking_up: { label: 'Kurir menjemput', tone: 'info' },
+    picked: { label: 'Paket diambil', tone: 'info' },
+    dropping_off: { label: 'Sedang diantar', tone: 'info' },
+    delivered: { label: 'Terkirim', tone: 'ok' },
+    on_hold: { label: 'Tertahan', tone: 'warn' },
+    courier_not_found: { label: 'Kurir belum ditemukan', tone: 'warn' },
+    return_in_transit: { label: 'Dalam pengembalian', tone: 'bad' },
+    returned: { label: 'Dikembalikan', tone: 'bad' },
+    rejected: { label: 'Ditolak kurir', tone: 'bad' },
+    cancelled: { label: 'Dibatalkan kurir', tone: 'bad' },
+    disposed: { label: 'Dimusnahkan', tone: 'bad' },
+};
+
+export const TONE_CLASS = {
+    ok: 'bg-success-surface text-success',
+    info: 'bg-info-surface text-info',
+    warn: 'bg-warning-surface text-warning',
+    bad: 'bg-error-surface text-on-error-surface',
+    neutral: 'bg-secondary-tint-12 text-primary',
+};
+
 export const CANCELLATION_STATUS = {
     submitted: 'Menunggu validasi CS',
     validated: 'Menunggu ACC Admin Toko',

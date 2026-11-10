@@ -3,6 +3,12 @@
 namespace App\Http\Controllers\Store;
 
 use App\Http\Controllers\Controller;
+use App\Models\Campaign;
+use App\Models\GalleryPhoto;
+use App\Models\Order;
+use App\Models\PromoContent;
+use App\Services\MidtransService;
+use App\Services\NewsService;
 use App\Services\StoreCatalogService;
 use App\Support\StoreSite;
 use Illuminate\Contracts\View\View;
@@ -15,9 +21,9 @@ use Illuminate\Http\Response;
  */
 class StorefrontController extends Controller
 {
-    public function __construct(private StoreCatalogService $catalog, private StoreSite $site) {}
+    public function __construct(private StoreCatalogService $catalog, private StoreSite $site, private NewsService $news) {}
 
-    public function home(): View
+    public function home(Request $request): View
     {
         $t = trans('store.landing');
         $items = $this->catalog->items()->keyBy('sku');
@@ -27,13 +33,49 @@ class StorefrontController extends Controller
             ->values();
         $offers = $pick($t['offers']['items'], ['Pia premium', 'Cookies', 'Meringue', 'Selai', 'Dubai', 'macaron regular']);
 
+        $google = $this->catalog->reviews();
+
         return view('store.pages.home', [
-            'seo' => ['title' => $t['meta']['title'], 'description' => $t['hero']['text']],
+            'seo' => ['title' => $t['meta']['title'], 'description' => $t['hero']['text'], 'jsonld' => $this->site->businessJsonLd()],
+            'google' => ['rating' => number_format($google['rating'], 1, ',', ''), 'count' => $google['count']],
+            // Popup berita (D-085): data saja; JS membangun popup setelah halaman siap.
+            'newsPopup' => $this->news->popup(app()->getLocale()),
             'featured' => $pick($t['products']['items'], ['Nastar Sultan', 'Macaron isi 30', 'Dubai', 'Nastar Apel']),
             'offerColumns' => [$offers->slice(0, 3)->values(), $offers->slice(3)->values()],
             // shortcut: bila katalog kosong, jumlah memakai data SKU lokal; ganti bila ada sumber jumlah resmi.
             'productTotal' => $items->count() ?: count(config('store_catalog.meta')),
+            'welcome' => $this->welcome($request, $t['hero']['welcome']['greet']),
         ]);
+    }
+
+    /**
+     * Sapaan hero untuk pelanggan yang sudah masuk: salam sesuai jam WIB (gudang Malang), nama depan, dan pesanan aktif terakhir.
+     * Staf dan tamu mendapat null sehingga hero tampil seperti biasa; mesin pencari selalu melihat versi tamu.
+     *
+     * @param  array<string, string>  $greet
+     * @return array{greeting: string, name: string, initials: string, order: ?Order}|null
+     */
+    private function welcome(Request $request, array $greet): ?array
+    {
+        $user = $request->user();
+        if (! $user || $user->roles()->exists()) {
+            return null;
+        }
+
+        $hour = now('Asia/Jakarta')->hour;
+        $words = preg_split('/\s+/', trim($user->name), -1, PREG_SPLIT_NO_EMPTY) ?: [''];
+
+        return [
+            'greeting' => $greet[match (true) {
+                $hour >= 4 && $hour < 11 => 'morning', $hour >= 11 && $hour < 15 => 'midday', $hour >= 15 && $hour < 18 => 'afternoon', default => 'night'
+            }],
+            'name' => $words[0],
+            'initials' => collect($words)->take(2)->map(fn (string $w) => mb_strtoupper(mb_substr($w, 0, 1)))->implode(''),
+            'order' => $user->orders()
+                ->whereIn('status', [Order::PENDING_PAYMENT, Order::PAID, Order::PROCESSING, Order::SHIPPED])
+                ->latest('id')
+                ->first(['public_ref', 'order_number', 'status']),
+        ];
     }
 
     public function about(): View
@@ -70,7 +112,8 @@ class StorefrontController extends Controller
     {
         $p = trans('store.pages.gallery');
 
-        return view('store.pages.gallery', ['p' => $p, 'seo' => ['title' => $p['meta'], 'description' => $p['hero']['text'], 'image' => $this->site->productPhoto('Macaron isi 50 3')]]);
+        // Foto dan video Galeri dikelola Marketing di dashboard (D-042, D-057, D-083).
+        return view('store.pages.gallery', ['p' => $p, 'photos' => GalleryPhoto::liveList(), 'liveVideos' => PromoContent::liveVideos(), 'seo' => ['title' => $p['meta'], 'description' => $p['hero']['text'], 'image' => $this->site->productPhoto('Macaron isi 50 3')]]);
     }
 
     public function contact(): View
@@ -84,7 +127,7 @@ class StorefrontController extends Controller
     {
         $c = trans('store.pages.catalog');
 
-        return view('store.pages.catalog', ['c' => $c, 'items' => $this->catalog->items(), 'seo' => ['title' => $c['meta'], 'description' => $c['lead']]]);
+        return view('store.pages.catalog', ['c' => $c, 'items' => $this->catalog->items(), 'categories' => $this->catalog->categories(), 'seo' => ['title' => $c['meta'], 'description' => $c['lead'], 'image' => $this->site->productPhoto('Nastar Classic 3')]]);
     }
 
     public function product(string $sku): Response
@@ -123,23 +166,45 @@ class StorefrontController extends Controller
                 'description' => $description,
                 'image' => $photo,
                 'type' => 'product',
-                'jsonld' => array_filter([
+                'jsonld' => [
                     '@context' => 'https://schema.org',
-                    '@type' => 'Product',
-                    'name' => $item['name'][$locale],
-                    'sku' => $item['sku'],
-                    'description' => $description,
-                    'image' => $photo ? url($photo) : null,
-                    'brand' => ['@type' => 'Brand', 'name' => 'Tuffero'],
-                    'offers' => ['@type' => 'Offer', 'priceCurrency' => 'IDR', 'price' => $item['price'], 'url' => url($item['path'])],
-                ]),
+                    '@graph' => [
+                        array_filter([
+                            '@type' => 'Product',
+                            'name' => $item['name'][$locale],
+                            'sku' => $item['sku'],
+                            'description' => $description,
+                            'image' => $photo ? url($photo) : null,
+                            'brand' => ['@type' => 'Brand', 'name' => 'Tuffero'],
+                            'offers' => [
+                                '@type' => 'Offer', 'priceCurrency' => 'IDR', 'price' => $item['price'], 'url' => url($item['path']),
+                                'availability' => $item['in_stock'] ? 'https://schema.org/InStock' : 'https://schema.org/OutOfStock',
+                            ],
+                        ]),
+                        [
+                            '@type' => 'BreadcrumbList',
+                            'itemListElement' => [
+                                ['@type' => 'ListItem', 'position' => 1, 'name' => $p['home'], 'item' => url('/')],
+                                ['@type' => 'ListItem', 'position' => 2, 'name' => $p['products'], 'item' => url('/produk')],
+                                ['@type' => 'ListItem', 'position' => 3, 'name' => $item['name'][$locale]],
+                            ],
+                        ],
+                    ],
+                ],
             ],
         ]);
     }
 
     public function cart(): View
     {
-        $c = trans('store.pages.cart');
+        $checkout = trans('store.pages.checkout');
+        $c = [
+            ...trans('store.pages.voucherCard'),
+            ...trans('store.pages.cart'),
+            'voucher' => $checkout['voucher'],
+            'errors' => $checkout['errors'],
+            'tooMany' => $checkout['tooMany'],
+        ];
 
         return view('store.pages.cart', ['c' => $c, 'seo' => ['title' => $c['meta'], 'noindex' => true]]);
     }
@@ -154,11 +219,13 @@ class StorefrontController extends Controller
     /**
      * Status pesanan tidak dirender server: token tamu ada di fragmen URL (D-050), jadi data diambil browser lewat API yang memeriksa aksesnya.
      */
-    public function order(string $ref): View
+    public function order(string $ref, MidtransService $midtrans): View
     {
         $c = trans('store.pages.order');
+        // Client key Midtrans memang publik (dipakai snap.js); server key tidak pernah ke browser.
+        $pay = $midtrans->enabled() ? ['clientKey' => config('services.midtrans.client_key'), 'snapJs' => $midtrans->snapJsUrl()] : null;
 
-        return view('store.pages.order', ['c' => $c, 'ref' => $ref, 'seo' => ['title' => $c['meta'], 'noindex' => true]]);
+        return view('store.pages.order', ['c' => $c, 'ref' => $ref, 'pay' => $pay, 'seo' => ['title' => $c['meta'], 'noindex' => true]]);
     }
 
     public function lookup(): View
@@ -199,6 +266,51 @@ class StorefrontController extends Controller
         return view('store.pages.account-orders', ['c' => $c, 'seo' => ['title' => $c['meta'], 'noindex' => true]]);
     }
 
+    /** Daftar kampanye yang sedang berjalan atau akan datang (D-073). */
+    public function promos(): View
+    {
+        $c = trans('store.pages.promo');
+        $campaigns = Campaign::visible()->orderBy('starts_at')->get();
+
+        return view('store.pages.promos', [
+            'c' => $c,
+            'campaigns' => $campaigns,
+            'seo' => ['title' => $c['meta'], 'description' => $c['lead']],
+        ]);
+    }
+
+    public function promo(Request $request, string $slug): View|Response
+    {
+        $campaign = Campaign::visible()->where('slug', $slug)->first();
+        if (! $campaign) {
+            return $this->missing($request);
+        }
+
+        $c = [...trans('store.pages.promo'), 'claim' => [...trans('store.pages.voucherCard'), ...trans('store.pages.vouchers')]];
+
+        return view('store.pages.promo', [
+            'c' => $c,
+            'campaign' => $campaign,
+            'live' => $campaign->starts_at->lte(now()),
+            'items' => $this->catalog->campaignItems($campaign),
+            'seo' => ['title' => $campaign->title.$c['metaSuffix'], 'description' => $campaign->description ?: $c['lead']],
+        ]);
+    }
+
+    public function vouchers(): View
+    {
+        $c = [...trans('store.pages.voucherCard'), ...trans('store.pages.vouchers')];
+
+        return view('store.pages.vouchers', ['c' => $c, 'seo' => ['title' => $c['meta'], 'description' => $c['lead']]]);
+    }
+
+    public function accountVouchers(): View
+    {
+        $c = [...trans('store.pages.voucherCard'), ...trans('store.pages.accountVouchers')];
+
+        return view('store.pages.account-vouchers', ['c' => $c, 'seo' => ['title' => $c['meta'], 'noindex' => true]]);
+    }
+
     public function accountAddresses(): View
     {
         $c = trans('store.pages.accountAddresses');
@@ -208,8 +320,14 @@ class StorefrontController extends Controller
 
     public function sitemap(): Response
     {
-        $urls = collect(['/', '/tentang-kami', '/layanan', '/produk', '/galeri', '/kontak'])
-            ->merge($this->catalog->items()->pluck('path'));
+        // lastmod hanya untuk halaman yang punya tanggal ubah di database; halaman statis tanpa lastmod.
+        $urls = collect(['/', '/tentang-kami', '/layanan', '/produk', '/promo', '/voucher', '/galeri', '/kontak'])
+            ->map(fn (string $path) => ['path' => $path, 'lastmod' => null])
+            ->merge(Campaign::visible()->get(['slug', 'updated_at'])->map(fn (Campaign $campaign) => ['path' => '/promo/'.$campaign->slug, 'lastmod' => $campaign->updated_at]))
+            ->merge($this->catalog->publishedProducts()->flatMap(fn ($product) => $product->variants->map(fn ($variant) => [
+                'path' => '/produk/'.strtolower($variant->sku),
+                'lastmod' => max($product->updated_at, $variant->updated_at),
+            ])));
 
         return response()->view('store.sitemap', ['urls' => $urls])->header('Content-Type', 'application/xml');
     }
@@ -225,15 +343,16 @@ class StorefrontController extends Controller
     }
 
     /**
-     * Deskripsi dari dashboard berbahasa Indonesia (OQ-16); halaman Inggris tetap memakai ringkasan dari data.
+     * Deskripsi dari dashboard per bahasa (D-065); bila kosong dipakai ringkasan dari data.
      *
      * @param  array<string, mixed>  $x
      * @param  array<string, mixed>  $p
      */
     private function productDescription(array $x, array $p, string $locale): string
     {
-        if ($x['description'] && $locale === 'id') {
-            return $x['description'];
+        $written = $locale === 'id' ? $x['description'] : $x['description_en'];
+        if ($written) {
+            return $written;
         }
 
         $parts = [$this->site->fill($p['descPack'], ['pack' => $x['pack']])];

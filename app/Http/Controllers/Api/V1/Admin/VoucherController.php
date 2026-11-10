@@ -20,9 +20,11 @@ class VoucherController extends Controller
     {
         $search = $request->string('search')->trim()->toString();
 
-        $page = Voucher::when($search !== '', fn ($query) => $query->where('code', 'like', "%{$search}%"))
+        $page = Voucher::withCount('claims')->when($search !== '', fn ($query) => $query->where('code', 'like', "%{$search}%"))
+            ->when(in_array($request->query('type'), ['percent', 'fixed'], true), fn ($query) => $query->where('type', $request->query('type')))
+            ->when($request->query('is_active') !== null && $request->query('is_active') !== '', fn ($query) => $query->where('is_active', $request->boolean('is_active')))
             ->orderByDesc('id')
-            ->paginate(25);
+            ->paginate($this->perPage($request));
 
         return $this->success('Vouchers retrieved.', [
             'items' => $page->items(),

@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Api\V1;
 
 use App\Http\Controllers\Controller;
 use App\Models\User;
+use App\Services\DeviceService;
 use App\Services\MfaService;
 use App\Traits\ApiResponse;
 use Illuminate\Http\JsonResponse;
@@ -17,7 +18,7 @@ class MfaController extends Controller
 {
     use ApiResponse;
 
-    public function __construct(private MfaService $mfa) {}
+    public function __construct(private MfaService $mfa, private DeviceService $devices) {}
 
     public function setup(Request $request): JsonResponse
     {
@@ -106,6 +107,7 @@ class MfaController extends Controller
         $request->session()->forget('mfa');
         Auth::guard('web')->login($user);
         $request->session()->regenerate();
+        $this->devices->recordLogin($user, $request);
 
         return $user->accessProfile();
     }

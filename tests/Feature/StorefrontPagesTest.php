@@ -2,6 +2,7 @@
 
 namespace Tests\Feature;
 
+use App\Models\Campaign;
 use App\Models\Product;
 use App\Models\User;
 use Database\Seeders\RolePermissionSeeder;
@@ -81,7 +82,9 @@ class StorefrontPagesTest extends TestCase
             ->assertSee('Maksimal 12 per pesanan')
             ->assertSee('Stok sedang habis')
             ->assertSee('application/ld+json', false)
-            ->assertSee('"price":123000', false);
+            ->assertSee('"price":123000', false)
+            ->assertSee('"availability":"https://schema.org/OutOfStock"', false)
+            ->assertSee('"@type":"BreadcrumbList"', false);
 
         $this->get('/produk/NAS-UJI-01')->assertOk()->assertSee('Nastar Uji');
     }
@@ -177,6 +180,26 @@ class StorefrontPagesTest extends TestCase
         $this->actingAs($customer)->get('/')->assertSee('tf-account-menu', false)->assertSee('Uji &lt;Pelanggan&gt;', false);
     }
 
+    public function test_bottom_nav_links_account_by_role_and_stays_off_checkout_and_sign_in(): void
+    {
+        $this->seed(RolePermissionSeeder::class);
+        $customer = User::factory()->create();
+        $staff = User::factory()->create();
+        $staff->assignRole('marketing');
+
+        $this->get('/produk')->assertOk()->assertSee('tf-bnav', false)
+            ->assertSee('<a href="/produk" class="tf-bnav-tab" aria-current="page"', false)
+            ->assertSee('<a href="/masuk" class="tf-bnav-tab"', false)
+            ->assertDontSee('tf-bnav-out', false);
+        $this->actingAs($customer)->get('/')->assertSee('<a href="/akun" class="tf-bnav-tab"', false)->assertSee('tf-bnav-out', false);
+        auth()->logout();
+        $this->actingAs($staff)->get('/')->assertSee('<a href="/admin" class="tf-bnav-tab"', false);
+        auth()->logout();
+
+        $this->get('/checkout')->assertOk()->assertDontSee('tf-bnav', false);
+        $this->get('/masuk')->assertOk()->assertDontSee('tf-bnav', false);
+    }
+
     public function test_unknown_path_is_404_and_unknown_api_stays_json(): void
     {
         $this->get('/halaman-tak-ada')->assertNotFound()->assertSee('noindex', false);
@@ -188,18 +211,42 @@ class StorefrontPagesTest extends TestCase
         $this->product();
         Product::create(['name' => 'Draf', 'slug' => 'draf', 'is_published' => false])->variants()->create(['sku' => 'DRAF-01', 'name' => 'Standar', 'price' => 1, 'weight_gram' => 1]);
 
+        (new Campaign)->forceFill(['title' => 'Promo Lebaran', 'slug' => 'promo-lebaran', 'starts_at' => now()->subDay(), 'ends_at' => now()->addDay(), 'is_active' => true])->save();
+        (new Campaign)->forceFill(['title' => 'Promo Lama', 'slug' => 'promo-lama', 'starts_at' => now()->subWeek(), 'ends_at' => now()->subDay(), 'is_active' => true])->save();
+
         $this->get('/sitemap.xml')
             ->assertOk()
             ->assertHeader('Content-Type', 'application/xml')
             ->assertSee('/produk/nas-uji-01', false)
+            ->assertSee('/promo/promo-lebaran', false)
+            ->assertDontSee('/promo/promo-lama', false)
+            ->assertSee('/voucher', false)
+            ->assertSee('<lastmod>', false)
             ->assertSee('/tentang-kami', false)
             ->assertDontSee('/produk/draf-01', false)
             ->assertDontSee('/keranjang', false);
     }
 
+    public function test_home_has_local_business_json_ld(): void
+    {
+        // Kode pos dan kota di businessJsonLd() ditulis terpisah dari teks alamat footer; uji ini gagal bila salah satunya diubah sendirian.
+        $footer = trans('store.landing.footer.address', [], 'id');
+        $this->assertStringContainsString('65151', $footer);
+        $this->assertStringContainsString('Malang', $footer);
+        $this->assertStringContainsString('Jawa Timur', $footer);
+
+        $this->get('/')
+            ->assertOk()
+            ->assertSee('"@type":"Bakery"', false)
+            ->assertSee('"postalCode":"65151"', false)
+            ->assertSee('"dayOfWeek":"Saturday"', false)
+            ->assertDontSee('"dayOfWeek":"Sunday"', false)
+            ->assertDontSee('aggregateRating', false);
+    }
+
     public function test_admin_pages_stay_on_vue_shell(): void
     {
-        foreach (['/login', '/admin', '/admin/produk'] as $path) {
+        foreach (['/login', '/lupa-kata-sandi', '/admin', '/admin/produk'] as $path) {
             $this->get($path)->assertOk()->assertViewIs('admin')->assertDontSee('tf-page-loader', false);
         }
     }
