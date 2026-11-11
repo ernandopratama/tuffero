@@ -162,7 +162,6 @@ Route::prefix('v1')->group(function () {
         Route::get('/settings', [SettingController::class, 'index'])->middleware('permission:settings.manage|settings.manage_contact');
         Route::patch('/settings/{setting:key}', [SettingController::class, 'update'])->middleware(['permission:settings.manage|settings.manage_contact', 'mfa.enrolled']);
 
-        Route::middleware('permission:reviews.manage')->group(function () {
         Route::get('/product-reviews', [ProductReviewController::class, 'index'])->middleware('permission:product_reviews.view');
         Route::middleware(['permission:product_reviews.manage', 'mfa.enrolled'])->group(function () {
             Route::post('/product-reviews', [ProductReviewController::class, 'store']);
@@ -170,6 +169,7 @@ Route::prefix('v1')->group(function () {
             Route::delete('/product-reviews/{productReview}', [ProductReviewController::class, 'destroy']);
         });
 
+        Route::middleware('permission:reviews.manage')->group(function () {
             Route::get('/reviews', [ReviewController::class, 'index']);
             Route::middleware('mfa.enrolled')->group(function () {
                 Route::post('/reviews', [ReviewController::class, 'store']);
