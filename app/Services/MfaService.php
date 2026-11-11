@@ -4,10 +4,12 @@ namespace App\Services;
 
 use App\Models\AuditLog;
 use App\Models\User;
+use App\Notifications\MfaEmailCode;
 use BaconQrCode\Renderer\Image\SvgImageBackEnd;
 use BaconQrCode\Renderer\ImageRenderer;
 use BaconQrCode\Renderer\RendererStyle\RendererStyle;
 use BaconQrCode\Writer;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 
 class MfaService
@@ -21,6 +23,14 @@ class MfaService
     private const RECOVERY_CODE_COUNT = 8;
 
     private const BASE32_ALPHABET = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ234567';
+
+    private const EMAIL_TTL_MINUTES = 5;
+
+    private const EMAIL_MAX_ATTEMPTS = 5;
+
+    private const EMAIL_LOCK_MINUTES = 15;
+
+    private const EMAIL_RESEND_SECONDS = 60;
 
     /**
      * Membuat secret baru yang belum aktif sampai kode pertama terverifikasi.
@@ -155,6 +165,60 @@ class MfaService
 
                     return true;
                 }
+            }
+
+            return false;
+        });
+    }
+
+    /**
+     * Mengirim kode OTP email (cadangan TOTP, D-030). Parameter mengikuti D-051: 6 digit, 5 menit, sekali pakai, hash,
+     * 5 percobaan lalu kunci 15 menit, kirim ulang 60 detik. Dikembalikan false bila belum boleh kirim ulang.
+     */
+    public function sendEmailCode(User $user): bool
+    {
+        if (! Cache::add('mfa-email-resend:'.$user->id, true, self::EMAIL_RESEND_SECONDS)) {
+            return false;
+        }
+
+        $code = str_pad((string) random_int(0, 10 ** self::DIGITS - 1), self::DIGITS, '0', STR_PAD_LEFT);
+        Cache::put('mfa-email:'.$user->id, ['hash' => hash('sha256', $code), 'attempts' => 0], self::EMAIL_TTL_MINUTES * 60);
+
+        try {
+            $user->notify(new MfaEmailCode($code, self::EMAIL_TTL_MINUTES));
+        } catch (\Throwable $e) {
+            // Gagal kirim tidak boleh menahan pengguna 60 detik untuk kode yang tidak pernah sampai.
+            Cache::forget('mfa-email-resend:'.$user->id);
+            Cache::forget('mfa-email:'.$user->id);
+
+            throw $e;
+        }
+
+        return true;
+    }
+
+    public function verifyEmailCode(User $user, string $code): bool
+    {
+        return Cache::lock('mfa-email-verify:'.$user->id, 5)->block(3, function () use ($user, $code) {
+            $key = 'mfa-email:'.$user->id;
+            $entry = Cache::get($key);
+
+            if (Cache::has('mfa-email-locked:'.$user->id) || ! is_array($entry)) {
+                return false;
+            }
+
+            if (hash_equals($entry['hash'], hash('sha256', $code))) {
+                Cache::forget($key);
+                AuditLog::record('mfa.email_code_used', $user, actorId: $user->id);
+
+                return true;
+            }
+
+            if (++$entry['attempts'] >= self::EMAIL_MAX_ATTEMPTS) {
+                Cache::forget($key);
+                Cache::put('mfa-email-locked:'.$user->id, true, self::EMAIL_LOCK_MINUTES * 60);
+            } else {
+                Cache::put($key, $entry, self::EMAIL_TTL_MINUTES * 60);
             }
 
             return false;

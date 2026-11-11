@@ -96,6 +96,7 @@ Route::prefix('v1')->group(function () {
             Route::post('/setup', [MfaController::class, 'setup']);
             Route::post('/confirm', [MfaController::class, 'confirm']);
             Route::post('/verify', [MfaController::class, 'verify']);
+            Route::post('/email', [MfaController::class, 'sendEmailCode']);
         });
 
         Route::middleware(['auth:sanctum', 'active'])->group(function () {

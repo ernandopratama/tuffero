@@ -55,6 +55,10 @@ export const useAuthStore = defineStore('auth', {
             return data.data.recovery_codes;
         },
 
+        async sendMfaEmail() {
+            await api.post('/auth/mfa/email');
+        },
+
         async verifyMfa(payload) {
             const { data } = await api.post('/auth/mfa/verify', payload);
             this.setUser(data.data.user);

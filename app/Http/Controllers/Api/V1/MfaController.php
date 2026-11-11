@@ -61,10 +61,37 @@ class MfaController extends Controller
         ]);
     }
 
+    public function sendEmailCode(Request $request): JsonResponse
+    {
+        $user = $this->pendingUser($request);
+
+        if (! $user) {
+            return $this->sessionExpired();
+        }
+
+        // Email hanya cadangan untuk akun yang sudah punya autentikator; pendaftaran awal tetap lewat TOTP.
+        if (! $user->mfa_totp_confirmed_at) {
+            return $this->error('MFA is not enrolled.', [], 409);
+        }
+
+        try {
+            if (! $this->mfa->sendEmailCode($user)) {
+                return $this->error('Please wait before requesting another code.', [], 429);
+            }
+        } catch (\Throwable $e) {
+            report($e);
+
+            return $this->error('The email could not be sent.', [], 503);
+        }
+
+        return $this->success('Code sent.');
+    }
+
     public function verify(Request $request): JsonResponse
     {
         $validated = $request->validate([
-            'code' => ['required_without:recovery_code', 'nullable', 'string', 'size:6'],
+            'code' => ['required_without_all:recovery_code,email_code', 'nullable', 'string', 'size:6'],
+            'email_code' => ['nullable', 'string', 'size:6'],
             'recovery_code' => ['nullable', 'string', 'max:32'],
         ]);
         $user = $this->pendingUser($request);
@@ -77,9 +104,11 @@ class MfaController extends Controller
             return $this->error('MFA is not enrolled.', [], 409);
         }
 
-        $verified = isset($validated['code'])
-            ? $this->mfa->verifyCode($user, $validated['code'])
-            : $this->mfa->verifyRecoveryCode($user, (string) ($validated['recovery_code'] ?? ''));
+        $verified = match (true) {
+            isset($validated['code']) => $this->mfa->verifyCode($user, $validated['code']),
+            isset($validated['email_code']) => $this->mfa->verifyEmailCode($user, $validated['email_code']),
+            default => $this->mfa->verifyRecoveryCode($user, (string) ($validated['recovery_code'] ?? '')),
+        };
 
         if (! $verified) {
             return $this->error('The provided code is invalid.', [], 422);

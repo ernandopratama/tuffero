@@ -44,6 +44,7 @@ export const ACTIONS = {
     'mfa.reset': 'MFA direset',
     'mfa.replaced_self': 'Autentikator diganti',
     'mfa.recovery_code_used': 'Kode pemulihan dipakai',
+    'mfa.email_code_used': 'Login dengan kode email',
 };
 
 export const actionLabel = (action) => ACTIONS[action] || action;

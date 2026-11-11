@@ -4,10 +4,12 @@ namespace Tests\Feature;
 
 use App\Models\AuditLog;
 use App\Models\User;
+use App\Notifications\MfaEmailCode;
 use App\Services\MfaService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Facades\Notification;
 use Tests\TestCase;
 
 class MfaTest extends TestCase
@@ -214,5 +216,88 @@ class MfaTest extends TestCase
 
         $this->postJson('/api/v1/auth/login', ['email' => $user->email, 'password' => self::PASSWORD])
             ->assertJsonPath('data.mfa', 'setup');
+    }
+
+    private function sentEmailCode(User $user): string
+    {
+        $code = '';
+        Notification::assertSentTo($user, MfaEmailCode::class, function (MfaEmailCode $notification) use (&$code) {
+            $code = $notification->code;
+
+            return true;
+        });
+
+        return $code;
+    }
+
+    public function test_email_code_completes_login_once(): void
+    {
+        Notification::fake();
+        $user = $this->user();
+        $this->enroll($user);
+        $this->logIn($user);
+
+        $this->postJson('/api/v1/auth/mfa/email')->assertOk();
+        $code = $this->sentEmailCode($user);
+        $this->assertMatchesRegularExpression('/^\d{6}$/', $code);
+
+        $this->postJson('/api/v1/auth/mfa/verify', ['email_code' => $code])->assertOk();
+        $this->assertAuthenticatedAs($user, 'web');
+        $this->assertSame(1, AuditLog::where('action', 'mfa.email_code_used')->count());
+
+        auth('web')->logout();
+        $this->flushSession();
+        $this->logIn($user);
+        $this->postJson('/api/v1/auth/mfa/verify', ['email_code' => $code])->assertStatus(422);
+    }
+
+    public function test_email_code_needs_enrolled_totp_and_waits_before_resend(): void
+    {
+        Notification::fake();
+        $user = $this->user();
+        $this->logIn($user);
+        $this->postJson('/api/v1/auth/mfa/email')->assertStatus(409);
+        Notification::assertNothingSent();
+
+        $this->enroll($user);
+        $this->logIn($user);
+        $this->postJson('/api/v1/auth/mfa/email')->assertOk();
+        $this->postJson('/api/v1/auth/mfa/email')->assertStatus(429);
+        $this->travel(61)->seconds();
+        $this->postJson('/api/v1/auth/mfa/email')->assertOk();
+        Notification::assertSentToTimes($user, MfaEmailCode::class, 2);
+    }
+
+    public function test_email_code_locks_after_five_wrong_attempts_and_expires(): void
+    {
+        Notification::fake();
+        $user = $this->user();
+        $service = app(MfaService::class);
+
+        $service->sendEmailCode($user);
+        $code = $this->sentEmailCode($user);
+        $wrong = $code === '000000' ? '111111' : '000000';
+
+        for ($i = 0; $i < 5; $i++) {
+            $this->assertFalse($service->verifyEmailCode($user, $wrong));
+        }
+        $this->assertFalse($service->verifyEmailCode($user, $code));
+
+        $this->travel(16)->minutes();
+        Notification::fake();
+        $service->sendEmailCode($user);
+        $code = $this->sentEmailCode($user);
+        $this->travel(6)->minutes();
+        $this->assertFalse($service->verifyEmailCode($user, $code));
+    }
+
+    public function test_failed_email_send_returns_503_without_details(): void
+    {
+        $user = $this->user();
+        $this->enroll($user);
+        $this->logIn($user);
+        $this->mock(MfaService::class)->shouldReceive('sendEmailCode')->andThrow(new \RuntimeException('smtp down'));
+
+        $this->postJson('/api/v1/auth/mfa/email')->assertStatus(503)->assertJsonMissing(['smtp down']);
     }
 }
