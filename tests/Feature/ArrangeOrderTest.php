@@ -160,6 +160,19 @@ class ArrangeOrderTest extends TestCase
         $this->assertSame(Order::COMPLETED, $order->fresh()->status);
     }
 
+    public function test_in_transit_webhook_marks_processing_order_shipped(): void
+    {
+        $this->fakeCreate();
+        $order = $this->paidOrder();
+        $this->arrange($order, ['method' => 'biteship']);
+
+        $this->webhook('in_transit');
+
+        $order->refresh();
+        $this->assertSame(Order::SHIPPED, $order->status);
+        $this->assertSame('in_transit', $order->shipment->status);
+    }
+
     public function test_label_needs_waybill_and_hides_prices_and_email(): void
     {
         $order = $this->paidOrder();

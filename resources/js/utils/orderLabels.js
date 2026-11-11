@@ -32,6 +32,7 @@ export const CARRIER_STATUS = {
     allocated: { label: 'Kurir ditugaskan', tone: 'info' },
     picking_up: { label: 'Kurir menjemput', tone: 'info' },
     picked: { label: 'Paket diambil', tone: 'info' },
+    in_transit: { label: 'Dalam pengiriman', tone: 'info' },
     dropping_off: { label: 'Sedang diantar', tone: 'info' },
     delivered: { label: 'Terkirim', tone: 'ok' },
     on_hold: { label: 'Tertahan', tone: 'warn' },

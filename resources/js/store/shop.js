@@ -155,7 +155,7 @@ const contactFrom = (address) => ({ customer_name: address.recipient_name, custo
 
 const COURIER_LOGOS = ['jnt', 'sicepat'];
 // Posisi truk (0 sampai 1) per status paket Biteship. Status bermasalah tidak maju: tertahan di titik terakhir, kembali ke gudang bila dikembalikan.
-const CARRIER_ROUTE = { confirmed: 0.08, allocated: 0.18, picking_up: 0.3, picked: 0.5, dropping_off: 0.85, delivered: 1, on_hold: 0.55, courier_not_found: 0.08, cancelled: 0, return_in_transit: 0.5, returned: 0, rejected: 0, disposed: 0 };
+const CARRIER_ROUTE = { confirmed: 0.08, allocated: 0.18, picking_up: 0.3, picked: 0.5, in_transit: 0.65, dropping_off: 0.85, delivered: 1, on_hold: 0.55, courier_not_found: 0.08, cancelled: 0, return_in_transit: 0.5, returned: 0, rejected: 0, disposed: 0 };
 // Paket tidak akan sampai ke pelanggan: tahap 4 berhenti.
 const FAILED_CARRIER = ['cancelled', 'return_in_transit', 'returned', 'rejected', 'disposed'];
 const PROBLEM_CARRIER = ['on_hold', 'courier_not_found', 'cancelled', 'return_in_transit', 'returned', 'rejected', 'disposed'];
