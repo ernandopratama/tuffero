@@ -708,6 +708,31 @@ export const orderPage = () => ({
         return this.pay();
     },
 
+    // Ulasan produk setelah pesanan selesai: satu per barang, dikirim ke server yang memeriksa status pesanan.
+    drafts: {},
+    reviewBusy: '',
+    reviewError: '',
+    get reviewItems() { return (this.order?.items || []).filter((item) => item.can_review || item.review); },
+    rateOf(sku) { return this.drafts[sku]?.rating || 0; },
+    bodyOf(sku) { return this.drafts[sku]?.body || ''; },
+    starOn(sku, n) { return n <= this.rateOf(sku); },
+    starLabel(n) { return this.words.review.star.replace(':n', n); },
+    setRate(sku, n) { this.drafts = { ...this.drafts, [sku]: { ...this.drafts[sku], rating: n } }; this.reviewError = ''; },
+    setBody(sku, event) { this.drafts = { ...this.drafts, [sku]: { ...this.drafts[sku], body: event.target.value } }; },
+    async sendReview(sku) {
+        if (!this.rateOf(sku)) { this.reviewError = this.words.review.pick; return; }
+        this.reviewBusy = sku;
+        this.reviewError = '';
+        try {
+            await api.post(`/orders/${this.ref}/reviews`, { sku, rating: this.rateOf(sku), body: this.bodyOf(sku) }, this.headers());
+            await this.load();
+        } catch (e) {
+            this.reviewError = e.response?.status === 429 ? this.words.tooMany : this.words.review.failed;
+        } finally {
+            this.reviewBusy = '';
+        }
+    },
+
     async load() {
         // Muat ulang (setelah Snap ditutup atau cek status) tidak mengosongkan halaman.
         this.loading = !this.order;

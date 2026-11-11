@@ -2865,3 +2865,20 @@ html .tf-hero-content.is-welcome{ padding-top: 44px; }
 	.tf .tf-bnav-tab{ font-size: 11px; }
 	.tf .tf-bnav-tab[aria-current]{ flex-grow: 2; }
 }
+
+/* Ulasan produk di halaman pesanan selesai */
+.tf-od-rate-list { list-style: none; margin: 16px 0 0; padding: 0; display: grid; gap: 20px; }
+.tf-od-rate-list li { display: grid; gap: 8px; padding-top: 16px; border-top: 1px solid var(--tf-line); }
+.tf-od-rate-list li:first-child { border-top: 0; padding-top: 0; }
+.tf-od-rate-stars { display: inline-flex; gap: 2px; color: var(--tf-line); }
+.tf-od-rate-stars svg { display: block; fill: none; stroke: currentColor; stroke-width: 1.6; }
+.tf-od-rate-stars .is-on, .tf-od-rate-stars button.is-on { color: var(--tf-gold); }
+.tf-od-rate-stars .is-on svg, .tf-od-rate-stars button.is-on svg { fill: currentColor; }
+.tf-od-rate-stars i { display: inline-flex; font-style: normal; }
+.tf-od-rate-stars button { display: inline-grid; place-items: center; min-width: 44px; min-height: 44px; padding: 0; border: 0; background: none; color: var(--tf-line); cursor: pointer; transition: transform 160ms var(--tf-ease-out), color 160ms var(--tf-ease-out); }
+.tf-od-rate-stars button:active { transform: scale(0.9); }
+.tf-od-rate-stars button:focus-visible { outline: 2px solid var(--tf-ink); outline-offset: 2px; border-radius: 8px; }
+@media (hover: hover) and (pointer: fine) { .tf-od-rate-stars button:hover { color: var(--tf-gold); } }
+.tf-od-rate textarea { width: 100%; margin: 4px 0 12px; padding: 12px 14px; border: 1px solid var(--tf-line); border-radius: 14px; font: inherit; resize: vertical; background: #fff; }
+.tf-od-rate textarea:focus-visible { outline: 2px solid var(--tf-ink); outline-offset: 1px; }
+@media (prefers-reduced-motion: reduce) { .tf-od-rate-stars button { transition: none; } }

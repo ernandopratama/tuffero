@@ -150,6 +150,34 @@
 					</ul>
 					<a href="{{ $site::MAPS_URL }}" target="_blank" rel="noopener noreferrer" class="tf-more" aria-label="{{ $p['reviewsOpen'] }} ({{ $newTab }})">{{ $p['reviewsOpen'] }} {{ $site->icon('north_east', 12) }}</a>
 				</article>
+
+				<article id="ulasan-pembeli" class="tf-pd-card">
+					<h2>{{ $p['buyerTitle'] }}</h2>
+					@if ($buyer['count'] > 0)
+						@php($buyerPct = (($buyer['rating'] / 5) * 100).'%')
+						<div class="tf-pd-score">
+							<div class="tf-pd-score-num"><strong>{{ str_replace('.', $locale === 'id' ? ',' : '.', (string) $buyer['rating']) }}</strong><span>{{ $p['reviewsOutOf'] }}</span></div>
+							<div>
+								<span class="tf-stars-bar is-lg" style="--pct: {{ $buyerPct }}" role="img" aria-label="{{ $buyer['rating'] }} {{ $p['reviewsOutOf'] }}"><i>@for ($n = 0; $n < 5; $n++){{ $site->icon('star', 22) }}@endfor</i><b>@for ($n = 0; $n < 5; $n++){{ $site->icon('star', 22) }}@endfor</b></span>
+								<p>{{ $site->fill($p['buyerCount'], ['n' => $buyer['count']]) }}</p>
+							</div>
+						</div>
+						<ul class="tf-pd-reviews">
+							@foreach ($buyer['items'] as $r)
+								<li>
+									<span class="tf-pd-avatar" aria-hidden="true">{{ mb_strtoupper(mb_substr($r->author_name, 0, 1)) }}</span>
+									<div>
+										<strong>{{ $r->author_name }}</strong>
+										<span class="tf-stars-bar" style="--pct: {{ $r->rating * 20 }}%" role="img" aria-label="{{ $r->rating }} {{ $p['reviewsOutOf'] }}"><i>@for ($n = 0; $n < 5; $n++){{ $site->icon('star', 14) }}@endfor</i><b>@for ($n = 0; $n < 5; $n++){{ $site->icon('star', 14) }}@endfor</b></span>
+										@if ($r->body)<p lang="id">{{ $r->body }}</p>@endif
+									</div>
+								</li>
+							@endforeach
+						</ul>
+					@else
+						<p class="tf-pd-source">{{ $p['buyerEmpty'] }}</p>
+					@endif
+				</article>
 			</div>
 
 			<aside class="tf-pd-picks">

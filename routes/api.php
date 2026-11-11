@@ -17,6 +17,7 @@ use App\Http\Controllers\Api\V1\Admin\NewsItemController;
 use App\Http\Controllers\Api\V1\Admin\NotificationController as AdminNotificationController;
 use App\Http\Controllers\Api\V1\Admin\OrderController as AdminOrderController;
 use App\Http\Controllers\Api\V1\Admin\ProductController;
+use App\Http\Controllers\Api\V1\Admin\ProductReviewController;
 use App\Http\Controllers\Api\V1\Admin\ProfileController;
 use App\Http\Controllers\Api\V1\Admin\PromoContentController;
 use App\Http\Controllers\Api\V1\Admin\ReviewController;
@@ -82,6 +83,7 @@ Route::prefix('v1')->group(function () {
         Route::post('/orders/{ref}/payment', [OrderController::class, 'payment'])->whereUuid('ref')->middleware('throttle:checkout');
         Route::post('/orders/{ref}/payment/sync', [OrderController::class, 'syncPayment'])->whereUuid('ref')->middleware('throttle:60,1');
         Route::post('/orders/{ref}/cancellation', [OrderController::class, 'requestCancellation'])->whereUuid('ref')->middleware('throttle:checkout');
+        Route::post('/orders/{ref}/reviews', [OrderController::class, 'review'])->whereUuid('ref')->middleware('throttle:checkout');
     });
 
     // ------------------------------------------
@@ -160,6 +162,13 @@ Route::prefix('v1')->group(function () {
         Route::patch('/settings/{setting:key}', [SettingController::class, 'update'])->middleware(['permission:settings.manage|settings.manage_contact', 'mfa.enrolled']);
 
         Route::middleware('permission:reviews.manage')->group(function () {
+        Route::get('/product-reviews', [ProductReviewController::class, 'index'])->middleware('permission:product_reviews.view');
+        Route::middleware(['permission:product_reviews.manage', 'mfa.enrolled'])->group(function () {
+            Route::post('/product-reviews', [ProductReviewController::class, 'store']);
+            Route::patch('/product-reviews/{productReview}', [ProductReviewController::class, 'update']);
+            Route::delete('/product-reviews/{productReview}', [ProductReviewController::class, 'destroy']);
+        });
+
             Route::get('/reviews', [ReviewController::class, 'index']);
             Route::middleware('mfa.enrolled')->group(function () {
                 Route::post('/reviews', [ReviewController::class, 'store']);

@@ -40,20 +40,23 @@ class RolePermissionSeeder extends Seeder
         ],
     ];
 
+    private const VIEW_REVIEWS = 'product_reviews.view';
+
     /** @var list<string> */
-    private const SUPER_ADMIN_ONLY = ['users.manage', 'roles.manage', 'users.manage_mfa', 'settings.manage'];
+    private const SUPER_ADMIN_ONLY = ['users.manage', 'roles.manage', 'users.manage_mfa', 'settings.manage', 'product_reviews.manage'];
 
     public function run(): void
     {
         app(PermissionRegistrar::class)->forgetCachedPermissions();
 
-        $names = array_unique([...self::SUPER_ADMIN_ONLY, ...array_merge(...array_values(self::ROLES))]);
+        // Semua peran boleh melihat ulasan produk; hanya super-admin mengelolanya.
+        $names = array_unique([...self::SUPER_ADMIN_ONLY, self::VIEW_REVIEWS, ...array_merge(...array_values(self::ROLES))]);
         $permissions = array_map(fn (string $name) => Permission::findOrCreate($name, 'web'), $names);
 
         Role::findOrCreate('super-admin', 'web')->syncPermissions($permissions);
 
         foreach (self::ROLES as $role => $rolePermissions) {
-            Role::findOrCreate($role, 'web')->syncPermissions($rolePermissions);
+            Role::findOrCreate($role, 'web')->syncPermissions([...$rolePermissions, self::VIEW_REVIEWS]);
         }
 
         app(PermissionRegistrar::class)->forgetCachedPermissions();

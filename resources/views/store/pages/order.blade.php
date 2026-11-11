@@ -4,7 +4,7 @@
      menunggu bayar = FigCraft "11 Pembayaran" (Snap, D-075), Snap gagal = "11c", kedaluwarsa = "11b",
      dibayar/diproses/dikirim = "05 Status Pesanan", selesai = "06 Pesanan Selesai". --}}
 @section('content')
-	<script type="application/json" id="tf-order-data">{{ $site->json(['ref' => $ref, 'words' => ['status' => $c['status'], 'cancelStatus' => $c['cancel']['status'], 'cancelErrors' => $c['cancel']['errors'], 'tooMany' => $c['cancel']['tooMany'], 'cancelFailed' => $c['cancel']['failed'], 'payFailed' => $c['payFailed'], 'payExpired' => $c['payExpired'], ...\Illuminate\Support\Arr::only($c, ['payEyebrow', 'payBefore', 'how', 'products', 'shippingWith', 'expiredText', 'failedText', 'heading', 'carrierHeading', 'carrierStage', 'carrierEnd', 'thanks', 'stageLabel', 'stageState', 'itemsCount', 'doneTitle', 'itemsBadge', 'stillPending', 'checking', 'paidCheck', 'copy', 'copied', 'stages']), 'track' => $c['track']], 'pay' => $pay]) }}</script>
+	<script type="application/json" id="tf-order-data">{{ $site->json(['ref' => $ref, 'words' => ['status' => $c['status'], 'cancelStatus' => $c['cancel']['status'], 'cancelErrors' => $c['cancel']['errors'], 'tooMany' => $c['cancel']['tooMany'], 'review' => $c['review'], 'cancelFailed' => $c['cancel']['failed'], 'payFailed' => $c['payFailed'], 'payExpired' => $c['payExpired'], ...\Illuminate\Support\Arr::only($c, ['payEyebrow', 'payBefore', 'how', 'products', 'shippingWith', 'expiredText', 'failedText', 'heading', 'carrierHeading', 'carrierStage', 'carrierEnd', 'thanks', 'stageLabel', 'stageState', 'itemsCount', 'doneTitle', 'itemsBadge', 'stillPending', 'checking', 'paidCheck', 'copy', 'copied', 'stages']), 'track' => $c['track']], 'pay' => $pay]) }}</script>
 	<main class="tf-co tf-od" x-data="orderPage">
 		<template x-if="showFlow">
 			<div>@include('store.partials.flow-steps', ['steps' => $c['flow'], 'label' => $c['flowLabel'], 'variant' => 'inline'])</div>
@@ -286,6 +286,33 @@
 							<span>{{ $site->lineIcon('truck', 14) }} {{ $c['courierLabel'] }} <strong x-text="courierText"></strong></span>
 						</div>
 					</section>
+
+					<template x-if="reviewItems.length">
+						<section class="tf-od-card tf-od-rate" aria-labelledby="od-rate-title">
+							<h2 class="tf-od-h2 is-ruled" id="od-rate-title">{{ $c['review']['title'] }}</h2>
+							<p class="tf-od-muted">{{ $c['review']['hint'] }}</p>
+							<ul class="tf-od-rate-list">
+								<template x-for="item in reviewItems" :key="item.sku">
+									<li>
+										<strong x-text="productName(item)"></strong>
+										<template x-if="item.review">
+											<p class="tf-od-muted"><span class="tf-od-rate-stars"><template x-for="n in 5" :key="n"><i :class="{ 'is-on': n <= item.review.rating }">{{ $site->icon('star', 18) }}</i></template></span> <span>{{ $c['review']['done'] }}</span></p>
+										</template>
+										<template x-if="!item.review">
+											<div>
+												<div class="tf-od-rate-stars is-input" role="group" aria-label="{{ $c['review']['title'] }}">
+													<template x-for="n in 5" :key="n"><button type="button" :class="{ 'is-on': starOn(item.sku, n) }" :aria-label="starLabel(n)" :aria-pressed="starOn(item.sku, n)" @click="setRate(item.sku, n)">{{ $site->icon('star', 28) }}</button></template>
+												</div>
+												<textarea rows="3" maxlength="1000" placeholder="{{ $c['review']['placeholder'] }}" aria-label="{{ $c['review']['placeholder'] }}" :value="bodyOf(item.sku)" @input="setBody(item.sku, $event)"></textarea>
+												<button type="button" class="tf-btn" :disabled="reviewBusy === item.sku" @click="sendReview(item.sku)">{{ $c['review']['send'] }}</button>
+											</div>
+										</template>
+									</li>
+								</template>
+							</ul>
+							<template x-if="reviewError"><p class="tf-shop-issue" role="alert" x-text="reviewError"></p></template>
+						</section>
+					</template>
 
 					<div class="tf-od-cols is-even">
 						<section class="tf-od-card">

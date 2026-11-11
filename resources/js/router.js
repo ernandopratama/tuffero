@@ -128,6 +128,12 @@ const routes = [
                 meta: { permission: 'reviews.manage' },
             },
             {
+                path: 'ulasan-produk',
+                name: 'AdminProductReviews',
+                component: () => import('./pages/admin/ProductReviews.vue'),
+                meta: { permission: 'product_reviews.view' },
+            },
+            {
                 path: 'pelanggan',
                 name: 'AdminCustomers',
                 component: () => import('./pages/admin/Customers.vue'),

@@ -34,6 +34,7 @@ const MENU = [
             { label: 'Konten Promo', short: 'Konten', icon: 'image', any: ['content.view'], to: { name: 'AdminContents' } },
             { label: 'Galeri Website', short: 'Galeri', icon: 'photos', any: ['content.view'], to: { name: 'AdminGallery' } },
             { label: 'Ulasan Toko', short: 'Ulasan', icon: 'sparkles', any: ['reviews.manage'], to: { name: 'AdminReviews' } },
+            { label: 'Ulasan Produk', short: 'Ulasan', icon: 'sparkles', any: ['product_reviews.view'], to: { name: 'AdminProductReviews' } },
             { label: 'Berita Popup', short: 'Berita', icon: 'bell', any: ['news.view'], to: { name: 'AdminNews' } },
         ],
     },

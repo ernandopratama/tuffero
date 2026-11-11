@@ -5,11 +5,13 @@ namespace App\Http\Controllers\Api\V1\Store;
 use App\Http\Controllers\Controller;
 use App\Models\Order;
 use App\Models\OrderItem;
+use App\Models\ProductReview;
 use App\Models\Setting;
 use App\Services\CancellationService;
 use App\Services\MidtransService;
 use App\Services\Shipping\BiteshipTracker;
 use App\Traits\ApiResponse;
+use Illuminate\Database\UniqueConstraintViolationException;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
@@ -24,7 +26,7 @@ class OrderController extends Controller
 
     public function show(Request $request, string $ref): JsonResponse
     {
-        $order = Order::with('items.variant.product.images', 'shipment', 'histories')->where('public_ref', $ref)->first();
+        $order = Order::with('items.variant.product.images', 'items.review', 'shipment', 'histories')->where('public_ref', $ref)->first();
 
         if (! $order || ! $this->canAccess($request, $order)) {
             return $this->error('Order not found.', [], 404);
@@ -69,8 +71,53 @@ class OrderController extends Controller
                 'quantity' => $item->quantity,
                 'line_total' => $item->line_total,
                 'photo' => ($path = $item->variant?->product?->images->first()?->path) ? '/storage/'.$path : null,
+                'can_review' => $order->status === Order::COMPLETED && $item->variant?->product_id !== null && $item->review === null,
+                'review' => $item->review?->only(['rating', 'body']),
             ]),
         ]);
+    }
+
+    /**
+     * Ulasan produk dari pembeli: hanya setelah pesanan selesai, satu kali per barang pesanan. Nama ditampilkan disingkat.
+     */
+    public function review(Request $request, string $ref): JsonResponse
+    {
+        $order = Order::with('items.variant', 'items.review')->where('public_ref', $ref)->first();
+
+        if (! $order || ! $this->canAccess($request, $order)) {
+            return $this->error('Order not found.', [], 404);
+        }
+
+        $validated = $request->validate([
+            'sku' => ['required', 'string', 'max:64'],
+            'rating' => ['required', 'integer', 'between:1,5'],
+            'body' => ['nullable', 'string', 'max:1000'],
+        ]);
+
+        $item = $order->items->firstWhere('sku_snapshot', $validated['sku']);
+        $productId = $item?->variant?->product_id;
+
+        if ($order->status !== Order::COMPLETED || ! $productId) {
+            return $this->error('Order cannot be reviewed.', [], 422);
+        }
+
+        // Nama depan + inisial nama belakang ("Budi Uji" menjadi "Budi U.") supaya identitas pembeli tidak tampil penuh.
+        [$first, $last] = array_pad(preg_split('/\s+/', trim($order->customer_name), 2), 2, null);
+        $author = $last ? $first.' '.mb_strtoupper(mb_substr($last, 0, 1)).'.' : $first;
+
+        try {
+            ProductReview::create([
+                'product_id' => $productId,
+                'order_item_id' => $item->id,
+                'author_name' => mb_substr($author, 0, 100),
+                'rating' => $validated['rating'],
+                'body' => filled($validated['body'] ?? null) ? trim($validated['body']) : null,
+            ]);
+        } catch (UniqueConstraintViolationException) {
+            return $this->error('Item already reviewed.', [], 422);
+        }
+
+        return $this->success('Review saved.', [], 201);
     }
 
     /**

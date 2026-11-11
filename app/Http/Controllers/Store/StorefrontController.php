@@ -6,6 +6,8 @@ use App\Http\Controllers\Controller;
 use App\Models\Campaign;
 use App\Models\GalleryPhoto;
 use App\Models\Order;
+use App\Models\ProductReview;
+use App\Models\ProductVariant;
 use App\Models\PromoContent;
 use App\Services\MidtransService;
 use App\Services\NewsService;
@@ -159,8 +161,17 @@ class StorefrontController extends Controller
 
         $photo = $item['photos'][0]['src'] ?? null;
 
+        // Ulasan pembeli untuk produk ini (semua varian), terpisah dari ulasan toko.
+        $productId = ProductVariant::where('sku', $item['sku'])->value('product_id');
+        $buyerReviews = ProductReview::where('product_id', $productId)->where('is_published', true);
+        $buyer = [
+            'count' => (clone $buyerReviews)->count(),
+            'rating' => round((float) (clone $buyerReviews)->avg('rating'), 1),
+            'items' => $buyerReviews->latest('id')->limit(10)->get(['author_name', 'rating', 'body']),
+        ];
+
         return response()->view('store.pages.product', [
-            'c' => $c, 'p' => $p, 'x' => $item, 'description' => $description, 'picks' => $picks, 'also' => $also, 'reviews' => $this->catalog->reviews(),
+            'c' => $c, 'p' => $p, 'x' => $item, 'description' => $description, 'picks' => $picks, 'also' => $also, 'reviews' => $this->catalog->reviews(), 'buyer' => $buyer,
             'seo' => [
                 'title' => $item['name'][$locale].$p['metaSuffix'],
                 'description' => $description,
