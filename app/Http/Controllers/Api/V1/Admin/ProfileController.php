@@ -4,10 +4,13 @@ namespace App\Http\Controllers\Api\V1\Admin;
 
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Admin\ChangePasswordRequest;
+use App\Http\Requests\Admin\ChangeUsernameRequest;
 use App\Http\Requests\Admin\UpdateProfileRequest;
 use App\Models\AuditLog;
+use App\Models\User;
 use App\Services\ImageService;
 use App\Services\MfaService;
+use App\Services\ProfileOtpService;
 use App\Services\ProfileService;
 use App\Services\SessionService;
 use App\Services\StaffNotifier;
@@ -25,11 +28,11 @@ class ProfileController extends Controller
 
     public function __construct(private ProfileService $profiles, private SessionService $sessions, private MfaService $mfa, private StaffNotifier $notifier) {}
 
-    public function show(Request $request): JsonResponse
+    public function show(Request $request, ProfileOtpService $otp): JsonResponse
     {
         abort_unless($request->user()->getRoleNames()->isNotEmpty(), 403);
 
-        return $this->success('Profile retrieved.', $this->profiles->show($request->user()));
+        return $this->success('Profile retrieved.', $this->withChannels($this->profiles->show($request->user()), $request->user(), $otp));
     }
 
     public function update(UpdateProfileRequest $request): JsonResponse
@@ -37,6 +40,37 @@ class ProfileController extends Controller
         $user = $this->profiles->update($request->user(), $request->safe()->only(['name', 'email', 'phone']));
 
         return $this->success('Profile updated.', [...$this->profiles->show($user), 'user' => $user->accessProfile()]);
+    }
+
+    /** Langkah 1 ganti username sendiri: kirim kode ke email akun atau WhatsApp terverifikasi. */
+    public function usernameCode(Request $request, ProfileOtpService $otp): JsonResponse
+    {
+        $user = $request->user();
+        abort_unless($user->getRoleNames()->isNotEmpty(), 403);
+
+        $validated = $request->validate(['channel' => ['required', Rule::in(ProfileOtpService::CHANNELS)]]);
+
+        return $this->success('Code sent.', $otp->send($user, $validated['channel']));
+    }
+
+    /** Langkah 2: kode benar, maka username diganti. Perubahan oleh Super Admin (halaman Pengguna) tidak lewat sini dan tanpa OTP. */
+    public function username(ChangeUsernameRequest $request, ProfileOtpService $otp): JsonResponse
+    {
+        $user = $request->user();
+
+        if (! $otp->verify($user, $request->validated('channel'), $request->validated('code'))) {
+            throw ValidationException::withMessages(['code' => 'Kode salah atau sudah kedaluwarsa.']);
+        }
+
+        $user = $this->profiles->setUsername($user, $request->validated('username'));
+
+        return $this->success('Username updated.', $this->withChannels($this->profiles->show($user), $user, $otp));
+    }
+
+    /** @param array<string, mixed> $profile */
+    private function withChannels(array $profile, User $user, ProfileOtpService $otp): array
+    {
+        return [...$profile, 'otp_channels' => $otp->channelsFor($user)];
     }
 
     public function avatar(Request $request): JsonResponse

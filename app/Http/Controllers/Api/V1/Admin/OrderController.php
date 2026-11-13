@@ -7,6 +7,7 @@ use App\Models\Order;
 use App\Models\OrderItem;
 use App\Models\OrderStatusHistory;
 use App\Models\Warehouse;
+use App\Services\CancellationService;
 use App\Services\OrderStatusService;
 use App\Traits\ApiResponse;
 use BaconQrCode\Common\ErrorCorrectionLevel;
@@ -14,12 +15,18 @@ use BaconQrCode\Encoder\Encoder;
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Validation\ValidationException;
 
 class OrderController extends Controller
 {
     use ApiResponse;
 
     private const WEBSITE = 'https://tuffero.com';
+
+    private const COURIERS = ['jnt', 'sicepat'];
+
+    /** Daftar ambil dan cetak resi massal dibatasi supaya satu permintaan tidak membengkak. */
+    public const BULK_LIMIT = 50;
 
     public function index(Request $request): JsonResponse
     {
@@ -80,12 +87,19 @@ class OrderController extends Controller
     {
         $search = $request->string('search')->trim()->toString();
         $status = $request->string('status')->trim()->toString();
+        $courier = $request->string('courier')->trim()->toString();
+        $waybill = $request->string('waybill')->trim()->toString();
+        $newestFirst = $request->query('sort') === 'newest';
 
         $page = Order::with(['items', 'shipment'])
             ->whereIn('status', [Order::PAID, Order::PROCESSING])
             ->when(in_array($status, [Order::PAID, Order::PROCESSING], true), fn ($query) => $query->where('status', $status))
+            ->when(in_array($courier, self::COURIERS, true), fn ($query) => $query->where('shipping_courier', $courier))
+            ->when($waybill === 'with', fn ($query) => $query->whereHas('shipment', fn ($shipment) => $shipment->whereNotNull('waybill_id')))
+            ->when($waybill === 'without', fn ($query) => $query->whereDoesntHave('shipment', fn ($shipment) => $shipment->whereNotNull('waybill_id')))
             ->when($search !== '', fn ($query) => $query->where('order_number', 'like', "%{$search}%"))
-            ->orderBy('paid_at')
+            ->orderBy('paid_at', $newestFirst ? 'desc' : 'asc')
+            ->orderBy('id', $newestFirst ? 'desc' : 'asc')
             ->paginate($this->perPage($request));
 
         return $this->paged('Fulfillment retrieved.', $page, fn (Order $order) => [
@@ -98,6 +112,55 @@ class OrderController extends Controller
                 'variant_name' => $item->variant_name_snapshot,
                 'quantity' => $item->quantity,
             ]),
+        ]);
+    }
+
+    /**
+     * Rekap barang yang harus diambil dari rak untuk beberapa pesanan sekaligus. Hanya pesanan terbayar atau diproses;
+     * tanpa harga, pembayaran, atau data pembeli (gudang tidak membutuhkannya untuk mengambil barang).
+     */
+    public function pickList(Request $request): JsonResponse
+    {
+        // ?ids=1,2,3; bentuk lain (misalnya ids[]=1) dianggap kosong, bukan galat server.
+        $raw = $request->query('ids');
+        $ids = collect(is_string($raw) ? explode(',', $raw) : [])
+            ->map(fn (string $id) => (int) $id)->filter(fn (int $id) => $id > 0)->unique()->values();
+
+        if ($ids->isEmpty() || $ids->count() > self::BULK_LIMIT) {
+            throw ValidationException::withMessages(['ids' => 'Pilih 1 sampai '.self::BULK_LIMIT.' pesanan.']);
+        }
+
+        $orders = Order::with('items')->whereIn('id', $ids)->whereIn('status', [Order::PAID, Order::PROCESSING])->orderBy('paid_at')->orderBy('id')->get();
+
+        $lines = $orders->flatMap(fn (Order $order) => $order->items)
+            ->groupBy('sku_snapshot')
+            ->map(fn ($items, $sku) => [
+                'sku' => $sku,
+                'product_name' => $items->first()->product_name_snapshot,
+                'variant_name' => $items->first()->variant_name_snapshot,
+                'quantity' => (int) $items->sum('quantity'),
+                'orders' => $items->pluck('order_id')->unique()->count(),
+            ])
+            ->sortBy([['product_name', 'asc'], ['sku', 'asc']])
+            ->values();
+
+        return $this->success('Pick list retrieved.', [
+            'generated_at' => now()->toIso8601String(),
+            'requested' => $ids->count(),
+            'skipped' => $ids->count() - $orders->count(),
+            'total_quantity' => (int) $lines->sum('quantity'),
+            'lines' => $lines,
+            'orders' => $orders->map(fn (Order $order) => [
+                'order_number' => $order->order_number,
+                'courier' => strtoupper(trim($order->shipping_courier.' '.$order->shipping_service)),
+                'paid_at' => $order->paid_at,
+                'items' => $order->items->map(fn (OrderItem $item) => [
+                    'sku' => $item->sku_snapshot,
+                    'name' => $item->product_name_snapshot,
+                    'variant' => $item->variant_name_snapshot,
+                    'quantity' => $item->quantity,
+                ]),
+            ])->values(),
         ]);
     }
 
@@ -141,9 +204,30 @@ class OrderController extends Controller
             ->orderByDesc('id')
             ->paginate($this->perPage($request));
 
+        // Dana masuk untuk pesanan yang sudah ditutup: ditandai supaya Admin Toko melihat tombol "dana sudah dikembalikan".
+        $needsRefund = Order::latePaymentClosed()->whereIn('id', collect($page->items())->pluck('id'))->pluck('id')->all();
+
         return $this->paged('Payments retrieved.', $page, fn (Order $order) => $order->only([
             'id', 'order_number', 'payment_status', 'total', 'paid_at', 'expires_at', 'created_at',
-        ]));
+        ]) + ['needs_refund' => in_array($order->id, $needsRefund, true)]);
+    }
+
+    /** Dana masuk untuk pesanan yang sudah ditutup sudah dikembalikan manual. Satu Admin Toko cukup; catatan wajib. */
+    public function markLateRefunded(Request $request, Order $order, CancellationService $cancellations): JsonResponse
+    {
+        $validated = $request->validate(
+            ['note' => ['required', 'string', 'max:500']],
+            ['note.required' => 'Catatan wajib diisi, misalnya referensi transfer.', 'note.max' => 'Catatan maksimal 500 karakter.'],
+        );
+
+        $note = trim(strip_tags($validated['note']));
+        if ($note === '') {
+            throw ValidationException::withMessages(['note' => 'Catatan wajib diisi, misalnya referensi transfer.']);
+        }
+
+        $cancellations->markLatePaymentRefunded($order, $note, $request->user());
+
+        return $this->success('Late payment refund recorded.');
     }
 
     public function startProcessing(Request $request, Order $order, OrderStatusService $status): JsonResponse

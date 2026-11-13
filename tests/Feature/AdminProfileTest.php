@@ -4,10 +4,14 @@ namespace Tests\Feature;
 
 use App\Models\AuditLog;
 use App\Models\User;
+use App\Notifications\ProfileChangeCode;
+use App\Services\Otp\OtpSender;
 use Database\Seeders\DatabaseSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Routing\Middleware\ThrottleRequests;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Facades\Notification;
 use Tests\TestCase;
 
 class AdminProfileTest extends TestCase
@@ -162,5 +166,109 @@ class AdminProfileTest extends TestCase
 
         $this->putJson('/api/v1/admin/profile/password', ['current_password' => self::PASSWORD, 'password' => 'Password-Baru-12', 'password_confirmation' => 'Password-Baru-12'])->assertStatus(429);
         $this->assertTrue(Hash::check(self::PASSWORD, $user->fresh()->password));
+    }
+
+    /** Menangkap kode OTP yang dikirim ke WhatsApp (pengirim palsu); email lewat Notification::fake(). */
+    private function captureCodes(): object
+    {
+        Notification::fake();
+        $sender = new class implements OtpSender
+        {
+            public ?string $code = null;
+
+            public function send(string $phone, string $code): void
+            {
+                $this->code = $code;
+            }
+        };
+        $this->app->instance(OtpSender::class, $sender);
+
+        return $sender;
+    }
+
+    private function emailCode(User $user): string
+    {
+        $code = null;
+        Notification::assertSentTo($user, ProfileChangeCode::class, function ($notification) use (&$code) {
+            $code = $notification->code;
+
+            return true;
+        });
+
+        return $code;
+    }
+
+    public function test_username_change_needs_an_email_code_and_is_audited(): void
+    {
+        $this->captureCodes();
+        $user = $this->staff('marketing', ['username' => 'lama']);
+        $this->actingAs($user);
+
+        $this->putJson('/api/v1/admin/profile/username', ['username' => 'Baru.Nama', 'channel' => 'email', 'code' => '123456'])->assertUnprocessable()->assertJsonValidationErrors('code');
+        $this->assertSame('lama', $user->fresh()->username);
+
+        $this->postJson('/api/v1/admin/profile/username/code', ['channel' => 'email'])->assertOk();
+        $code = $this->emailCode($user);
+
+        $this->putJson('/api/v1/admin/profile/username', ['username' => 'Baru.Nama', 'channel' => 'email', 'code' => $code])->assertOk()->assertJsonPath('data.username', 'baru.nama');
+        $this->assertSame('baru.nama', $user->fresh()->username);
+        $this->assertSame(['old' => 'lama', 'new' => 'baru.nama'], AuditLog::where('action', 'profile.username_changed')->firstOrFail()->changes['username']);
+
+        // Kode hanya sekali pakai.
+        $this->putJson('/api/v1/admin/profile/username', ['username' => 'lain', 'channel' => 'email', 'code' => $code])->assertUnprocessable();
+        $this->assertSame('baru.nama', $user->fresh()->username);
+    }
+
+    public function test_whatsapp_code_works_only_for_a_verified_phone(): void
+    {
+        $sender = $this->captureCodes();
+        $user = $this->staff('owner', ['phone' => '+6281200000001', 'phone_verified_at' => null]);
+        $this->actingAs($user);
+
+        $this->postJson('/api/v1/admin/profile/username/code', ['channel' => 'phone'])->assertUnprocessable();
+        $this->assertNull($sender->code);
+
+        $user->forceFill(['phone_verified_at' => now()])->save();
+        $this->postJson('/api/v1/admin/profile/username/code', ['channel' => 'phone'])->assertOk();
+        $this->assertNotNull($sender->code);
+
+        // Kode WhatsApp tidak berlaku untuk saluran email.
+        $this->putJson('/api/v1/admin/profile/username', ['username' => 'owner.baru', 'channel' => 'email', 'code' => $sender->code])->assertUnprocessable();
+        $this->putJson('/api/v1/admin/profile/username', ['username' => 'owner.baru', 'channel' => 'phone', 'code' => $sender->code])->assertOk();
+        $this->assertSame('owner.baru', $user->fresh()->username);
+    }
+
+    public function test_username_code_is_bound_to_the_account_locks_after_wrong_tries_and_rejects_taken_names(): void
+    {
+        $this->captureCodes();
+        $user = $this->staff('marketing');
+        $other = $this->staff('owner', ['username' => 'dipakai']);
+
+        $this->actingAs($user)->postJson('/api/v1/admin/profile/username/code', ['channel' => 'email'])->assertOk();
+        $code = $this->emailCode($user);
+
+        // Akun lain tidak bisa memakai kode ini.
+        $this->actingAs($other)->putJson('/api/v1/admin/profile/username', ['username' => 'curian', 'channel' => 'email', 'code' => $code])->assertUnprocessable();
+        $this->assertSame('dipakai', $other->fresh()->username);
+
+        $this->actingAs($user)->putJson('/api/v1/admin/profile/username', ['username' => 'dipakai', 'channel' => 'email', 'code' => $code])->assertUnprocessable()->assertJsonValidationErrors('username');
+
+        // Lima kode salah mengunci saluran; kode yang benar pun ditolak. Batas laju rute dilepas supaya yang diuji kuncinya.
+        $this->withoutMiddleware(ThrottleRequests::class);
+        foreach (range(1, 5) as $try) {
+            $this->actingAs($user)->putJson('/api/v1/admin/profile/username', ['username' => 'aman', 'channel' => 'email', 'code' => '000000'])->assertUnprocessable();
+        }
+        $this->actingAs($user)->putJson('/api/v1/admin/profile/username', ['username' => 'aman', 'channel' => 'email', 'code' => $code])->assertUnprocessable();
+        $this->assertNull($user->fresh()->username);
+    }
+
+    public function test_generic_profile_update_cannot_change_username_and_roleless_accounts_are_refused(): void
+    {
+        $user = $this->staff('marketing', ['username' => 'tetap']);
+
+        $this->actingAs($user)->patchJson('/api/v1/admin/profile', ['name' => 'Baru', 'email' => $user->email, 'username' => 'bypass'])->assertOk();
+        $this->assertSame('tetap', $user->fresh()->username);
+
+        $this->actingAs(User::factory()->create())->postJson('/api/v1/admin/profile/username/code', ['channel' => 'email'])->assertForbidden();
     }
 }

@@ -1,0 +1,191 @@
+/* Halaman galat toko: maskot mengintip di atas kartu. Gerak hanya transform dan opacity. */
+/* Satu layar tanpa scroll: ukuran angka, maskot, dan kartu mengikuti tinggi layar (dvh), lalu lebar. */
+:root{
+	--err-ink: #2B1B14;
+	--err-brown: #6D4C3D;
+	--err-orange: #CF6F30;
+	--err-ivory: #F6F0E5;
+	--err-line: #E3D5C0;
+	--err-ease: cubic-bezier(0.23, 1, 0.32, 1);
+	--err-top: 0px; /* tinggi bar atas; hanya tampil di layar lebar */
+	--err-vh: 1vh;
+}
+@supports (height: 1dvh){ :root{ --err-vh: 1dvh; } }
+@media (min-width: 992px){ :root{ --err-top: 36px; } }
+
+.err-page{
+	margin: 0;
+	min-height: 100vh;
+	background: radial-gradient(70% 55% at 50% 0, rgb(207 111 48 / 0.14), transparent 70%), var(--err-ivory);
+	color: var(--err-brown);
+	font-family: "Be Vietnam Pro", ui-sans-serif, system-ui, sans-serif;
+	-webkit-font-smoothing: antialiased;
+}
+
+.err{
+	box-sizing: border-box;
+	display: flex;
+	flex-direction: column;
+	align-items: center;
+	justify-content: center;
+	width: 100%;
+	max-width: 560px;
+	min-height: calc(100vh - var(--err-top));
+	min-height: calc(100dvh - var(--err-top));
+	margin: 0 auto;
+	padding: clamp(12px, calc(var(--err-vh) * 3), 28px) 16px clamp(12px, calc(var(--err-vh) * 4), 40px);
+}
+.err *, .err *::before, .err *::after{ box-sizing: border-box; }
+
+/* Angka besar; angka tengah memakai warna maskot. */
+.err .err-code{
+	display: flex;
+	gap: 0.04em;
+	margin: 0 0 clamp(2px, calc(var(--err-vh) * 1), 8px);
+	font: 600 min(22vw, calc(var(--err-vh) * 12), 112px)/1 "EB Garamond", Georgia, serif;
+	letter-spacing: -0.02em;
+	color: var(--err-ink);
+}
+.err .err-code span{
+	display: block;
+	animation: err-rise 420ms var(--err-ease) both;
+	animation-delay: calc(var(--i, 0) * 60ms);
+}
+.err .err-code .err-o{ color: var(--err-orange); }
+
+/* Maskot naik dari balik kartu. Kartu di atasnya (z-index) menyembunyikan bagian bawah selama naik. */
+.err .err-stage{
+	position: relative;
+	z-index: 1;
+	width: min(100%, 360px, calc(var(--err-vh) * 36));
+	margin-bottom: -1px;
+}
+.err-mascot{
+	display: block;
+	width: 100%;
+	height: auto;
+	overflow: visible;
+	animation: err-peek 520ms 120ms var(--err-ease) both;
+}
+.err-mascot.is-dizzy{ animation: err-peek 520ms 120ms var(--err-ease) both, err-shake 420ms 640ms var(--err-ease) both; }
+
+.err .err-card{
+	position: relative;
+	z-index: 2;
+	width: 100%;
+	padding: clamp(16px, calc(var(--err-vh) * 3.5), 28px) clamp(16px, 5vw, 24px) clamp(16px, calc(var(--err-vh) * 3), 24px);
+	text-align: center;
+	background: #fff;
+	border: 1px solid var(--err-line);
+	border-radius: 24px;
+	box-shadow: 0 8px 30px -4px rgb(43 27 20 / 0.08);
+	animation: err-rise 420ms 200ms var(--err-ease) both;
+}
+.err .err-title{
+	margin: 0 0 clamp(4px, calc(var(--err-vh) * 1), 8px);
+	font: 500 clamp(22px, min(6.5vw, calc(var(--err-vh) * 4.6)), 34px)/1.2 "EB Garamond", Georgia, serif;
+	color: var(--err-ink);
+}
+.err .err-text{
+	margin: 0 auto clamp(12px, calc(var(--err-vh) * 3), 24px);
+	max-width: 40ch;
+	font-size: clamp(13px, calc(var(--err-vh) * 2.2), 16px);
+	line-height: 1.5;
+}
+.err .err-actions{ display: flex; flex-wrap: wrap; justify-content: center; gap: 12px; }
+
+.err .err-btn{
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	min-height: clamp(44px, calc(var(--err-vh) * 6), 48px);
+	padding: 0 24px;
+	font: 600 15px/1 "Be Vietnam Pro", ui-sans-serif, system-ui, sans-serif;
+	color: var(--err-ink);
+	text-decoration: none;
+	background: transparent;
+	border: 1px solid var(--err-line);
+	border-radius: 999px;
+	cursor: pointer;
+	transition: transform 160ms var(--err-ease), background-color 160ms ease, border-color 160ms ease, color 160ms ease;
+}
+.err .err-btn.is-primary{ color: var(--err-ivory); background: var(--err-ink); border-color: var(--err-ink); }
+.err .err-btn:active{ transform: scale(0.97); }
+.err .err-btn:focus-visible{ outline: 2px solid var(--err-orange); outline-offset: 2px; }
+@media (hover: hover) and (pointer: fine){
+	.err .err-btn:hover{ border-color: var(--err-orange); color: var(--err-orange); }
+	.err .err-btn.is-primary:hover{ background: var(--err-orange); border-color: var(--err-orange); color: #fff; }
+}
+
+/* Layar pendek dan lebar (HP miring, laptop kecil): dua kolom. Angka dan maskot di kiri, maskot menempel di tepi bawah layar; kartu di kanan. */
+@media (max-height: 520px) and (min-width: 560px){
+	.err{
+		display: grid;
+		grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+		grid-template-rows: 1fr auto;
+		grid-template-areas: "code card" "stage card";
+		column-gap: 32px;
+		align-items: center;
+		justify-items: center;
+		max-width: 920px;
+		padding-bottom: 0;
+		overflow: clip;
+	}
+	.err .err-code{ grid-area: code; align-self: end; margin: 0; font-size: min(14vw, calc(var(--err-vh) * 18), 112px); }
+	.err .err-stage{ grid-area: stage; align-self: end; width: min(100%, calc(var(--err-vh) * 52)); margin-bottom: 0; }
+	.err .err-card{ grid-area: card; align-self: center; margin-bottom: 16px; }
+}
+
+/* Mata: berkedip, dan pupil menengok di 404. */
+.err-eye{ transform-box: fill-box; transform-origin: center; animation: err-blink 6s var(--err-ease) 1.2s infinite; }
+.is-look .err-pupil{ animation: err-glance 7s ease-in-out 0.8s infinite; }
+
+/* Properti per halaman. */
+.err-q{ transform-box: fill-box; transform-origin: 50% 100%; animation: err-pop 360ms 560ms var(--err-ease) both; }
+.err-z{ opacity: 0; transform-box: fill-box; transform-origin: 50% 100%; animation: err-zzz 2.8s ease-out infinite; }
+.err-drop{ transform-box: fill-box; animation: err-drip 2.4s ease-in 0.9s infinite; opacity: 0; }
+.err-clock{ animation: err-fade 360ms 560ms var(--err-ease) both; }
+.err-clock-hand{ transform-box: view-box; transform-origin: 0 0; animation: err-spin 6s linear infinite; }
+.err-hand-rise{ transform: translate(140px, 500px); animation: err-hand-up 520ms 380ms var(--err-ease) both; }
+.err-hand-wave{ transform-box: fill-box; transform-origin: 50% 90%; animation: err-wave 900ms 900ms ease-in-out 3 both; }
+
+@keyframes err-rise{ from{ opacity: 0; transform: translateY(12px); } to{ opacity: 1; transform: none; } }
+@keyframes err-peek{ from{ transform: translateY(14%); } to{ transform: none; } }
+@keyframes err-pop{ from{ opacity: 0; transform: scale(0.6) rotate(-8deg); } 70%{ transform: scale(1.08) rotate(4deg); } to{ opacity: 1; transform: none; } }
+@keyframes err-fade{ from{ opacity: 0; } to{ opacity: 1; } }
+@keyframes err-blink{ 0%, 94%, 100%{ transform: scaleY(1); } 97%{ transform: scaleY(0.08); } }
+@keyframes err-glance{
+	0%, 18%, 100%{ transform: none; }
+	28%, 44%{ transform: translate(-20px, 6px); }
+	54%, 72%{ transform: translate(16px, -4px); }
+	82%{ transform: none; }
+}
+@keyframes err-shake{ 0%, 100%{ transform: none; } 20%{ transform: translateX(-6px); } 40%{ transform: translateX(6px); } 60%{ transform: translateX(-4px); } 80%{ transform: translateX(3px); } }
+@keyframes err-zzz{ 0%{ opacity: 0; transform: translateY(14px) scale(0.8); } 25%{ opacity: 1; } 100%{ opacity: 0; transform: translateY(-36px) scale(1.1); } }
+@keyframes err-drip{ 0%{ opacity: 0; transform: translateY(-10px); } 20%{ opacity: 1; } 100%{ opacity: 0; transform: translateY(46px); } }
+@keyframes err-spin{ to{ transform: rotate(360deg); } }
+@keyframes err-hand-up{ from{ transform: translate(140px, 650px); } to{ transform: translate(140px, 500px); } }
+@keyframes err-wave{ 0%, 100%{ transform: rotate(0); } 50%{ transform: rotate(9deg); } }
+
+/* Gerak dikurangi: tanpa perpindahan, hanya muncul perlahan. */
+@media (prefers-reduced-motion: reduce){
+	.err-code span, .err-card, .err-mascot, .err-q, .err-clock, .err-hand-rise{ animation: err-fade 200ms both; }
+	.err-hand-rise{ transform: translate(140px, 500px); }
+	.err-eye, .is-look .err-pupil, .err-z, .err-drop, .err-clock-hand, .err-hand-wave{ animation: none; }
+	.err-z{ opacity: 1; }
+}
+
+/* Bar atas seperti .tf-topbar toko; disembunyikan di layar sempit seperti di toko. */
+.err-topbar{ background: var(--err-ink); border-bottom: 1px solid #F6F0E524; }
+.err-topbar-bar{ display: flex; align-items: center; justify-content: space-between; width: min(1184px, 100% - 48px); height: 35px; margin-inline: auto; font-size: 13px; line-height: 20px; color: #F6F0E5CC; }
+.err-topbar p{ display: flex; align-items: center; gap: 8px; margin: 0; }
+.err-promo-dot{ width: 6px; height: 6px; border-radius: 3px; background: #C6A15B; }
+.err-toplinks{ display: flex; align-items: center; gap: 24px; }
+.err-toplinks a{ color: inherit; text-decoration: none; transition: color 150ms ease; }
+.err-toplinks a.is-active{ color: #C6A15B; font-weight: 600; }
+.err-toplinks a:focus-visible{ outline: 2px solid #C6A15B; outline-offset: 2px; }
+@media (hover: hover) and (pointer: fine){ .err-toplinks a:hover{ color: #fff; } }
+@media (max-width: 991px){ .err-topbar{ display: none; } }
+
+/* Menang atas ".tf main > section:last-child" di toko (padding bawah 96px). */
+main.err > section.err-card:last-child{ padding: clamp(16px, calc(var(--err-vh) * 3.5), 28px) clamp(16px, 5vw, 24px) clamp(16px, calc(var(--err-vh) * 3), 24px); }

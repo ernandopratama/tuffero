@@ -20,6 +20,7 @@ class Setting extends Model
         'contact.whatsapp_number' => ['required', 'string', 'regex:/^\+[1-9][0-9]{7,14}$/'],
         'contact.admin_email' => ['required', 'string', 'email', 'max:255'],
         'refund.claim_window_hours' => ['required', 'integer', 'min:1', 'max:8760'],
+        'refund.return_window_days' => ['required', 'integer', 'min:1', 'max:30'],
         'refund.review_sla_hours' => ['nullable', 'integer', 'min:1', 'max:8760'],
         'refund.payout_days_max' => ['required', 'integer', 'min:1', 'max:90'],
         'refund.terms_version' => ['nullable', 'string', 'max:50'],
@@ -31,6 +32,8 @@ class Setting extends Model
         'discount.max_percent' => ['required', 'integer', 'min:1', 'max:90'],
         'checkout.reservation_minutes' => ['required', 'integer', 'min:5', 'max:1440'],
         'inventory.low_stock_threshold' => ['required', 'integer', 'min:0', 'max:1000'],
+        'marketing.posts_per_week' => ['required', 'integer', 'min:0', 'max:21'],
+        'marketing.videos_per_week' => ['required', 'integer', 'min:0', 'max:14'],
     ];
 
     /**

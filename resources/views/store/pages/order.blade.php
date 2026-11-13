@@ -1,7 +1,7 @@
 @extends('store.layouts.app')
 
 {{-- Satu halaman, beberapa tampilan menurut status pesanan dari server:
-     menunggu bayar = FigCraft "11 Pembayaran" (Snap, D-075), Snap gagal = "11c", kedaluwarsa = "11b",
+     menunggu bayar = FigCraft "11 Pembayaran" (Snap, D-096), Snap gagal = "11c", kedaluwarsa = "11b",
      dibayar/diproses/dikirim = "05 Status Pesanan", selesai = "06 Pesanan Selesai". --}}
 @section('content')
 	<script type="application/json" id="tf-order-data">{{ $site->json(['ref' => $ref, 'words' => ['status' => $c['status'], 'cancelStatus' => $c['cancel']['status'], 'cancelErrors' => $c['cancel']['errors'], 'tooMany' => $c['cancel']['tooMany'], 'review' => $c['review'], 'cancelFailed' => $c['cancel']['failed'], 'payFailed' => $c['payFailed'], 'payExpired' => $c['payExpired'], ...\Illuminate\Support\Arr::only($c, ['payEyebrow', 'payBefore', 'how', 'products', 'shippingWith', 'expiredText', 'failedText', 'heading', 'carrierHeading', 'carrierStage', 'carrierEnd', 'thanks', 'stageLabel', 'stageState', 'itemsCount', 'doneTitle', 'itemsBadge', 'stillPending', 'checking', 'paidCheck', 'copy', 'copied', 'stages']), 'track' => $c['track']], 'pay' => $pay]) }}</script>

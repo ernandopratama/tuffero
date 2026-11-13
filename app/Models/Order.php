@@ -5,13 +5,16 @@ namespace App\Models;
 use App\Http\Requests\Store\CheckoutRequest;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Attributes\Hidden;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\HasOne;
 use Illuminate\Database\Eloquent\Relations\MorphMany;
+use Illuminate\Support\Facades\DB;
 
 /**
  * @property array<string, string> $shipping_address
+ * @property-read Shipment|null $shipment
  */
 #[Fillable([
     'user_id', 'public_ref', 'order_number', 'access_token_hash', 'idempotency_key', 'warehouse_id',
@@ -52,6 +55,23 @@ class Order extends Model
         ];
     }
 
+    /**
+     * Pesanan kedaluwarsa atau dibatalkan sebelum bayar yang kemudian menerima pembayaran (settlement atau capture). OrderStatusService::markPaid
+     * tidak mengubahnya dan staf toko diberi tahu; dana harus dikembalikan manual. Pesanan yang sudah masuk alur refund berstatus
+     * refund_pending atau refunded, jadi tidak ikut terhitung.
+     *
+     * @param  Builder<Order>  $query
+     * @return Builder<Order>
+     */
+    public function scopeLatePaymentClosed(Builder $query): Builder
+    {
+        return $query->whereIn('status', [self::EXPIRED, self::CANCELLED])
+            ->whereIn('payment_status', ['expired', 'cancelled'])
+            ->whereExists(fn ($q) => $q->select(DB::raw(1))->from('payment_events')
+                ->whereColumn('payment_events.order_id', 'orders.id')
+                ->whereIn('payment_events.transaction_status', ['settlement', 'capture']));
+    }
+
     /** @return HasOne<Shipment, $this> */
     public function shipment(): HasOne
     {
@@ -68,6 +88,18 @@ class Order extends Model
     public function comments(): MorphMany
     {
         return $this->morphMany(AdminComment::class, 'commentable');
+    }
+
+    /** @return MorphMany<FollowUp, $this> */
+    public function followUps(): MorphMany
+    {
+        return $this->morphMany(FollowUp::class, 'followable');
+    }
+
+    /** @return MorphMany<CustomerEmail, $this> */
+    public function customerEmails(): MorphMany
+    {
+        return $this->morphMany(CustomerEmail::class, 'emailable');
     }
 
     /** Pembatalan hanya sebelum pesanan diserahkan ke kurir (D-043). */

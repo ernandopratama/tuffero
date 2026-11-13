@@ -5,6 +5,7 @@ import AdminIcon from '../components/AdminIcon.vue';
 import ActionTooltip from '../components/ui/ActionTooltip.vue';
 import AdminBottomNav from '../components/AdminBottomNav.vue';
 import NotificationBell from '../components/NotificationBell.vue';
+import QuickSearch from '../components/QuickSearch.vue';
 import { useAuthStore } from '../stores/auth';
 import { menuFor, OVERVIEW, ROLE_LABELS } from '../utils/adminMenu';
 
@@ -270,6 +271,7 @@ const initials = computed(() => (auth.user?.name || '?').split(/\s+/).slice(0, 2
       </nav>
 
       <div class="ml-auto flex items-center gap-1 md:ml-0">
+      <QuickSearch />
       <NotificationBell />
       <div ref="profileWrap" class="relative">
         <button

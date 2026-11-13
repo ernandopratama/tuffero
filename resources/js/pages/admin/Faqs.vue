@@ -119,7 +119,7 @@ onMounted(load);
       </li>
     </ul>
 
-    <ul class="mt-space-lg grid gap-space-md lg:grid-cols-2">
+    <ul class="mt-space-lg grid grid-cols-1 gap-space-md lg:grid-cols-2">
       <li
         v-for="faq in faqs"
         :key="faq.id"

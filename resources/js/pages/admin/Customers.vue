@@ -1,5 +1,10 @@
 <script setup>
+import { ref } from 'vue';
 import AdminIcon from '../../components/AdminIcon.vue';
+import AppModal from '../../components/ui/AppModal.vue';
+import api from '../../utils/api';
+import { apiError } from '../../utils/apiError';
+import { useAuthStore } from '../../stores/auth';
 import DataTable from '../../components/ui/DataTable.vue';
 import IconAction from '../../components/ui/IconAction.vue';
 import FilterSelect from '../../components/ui/FilterSelect.vue';
@@ -23,7 +28,34 @@ const AVATAR_TONES = ['bg-accent-tint-20 text-primary', 'bg-info-surface text-in
 
 const { rows, meta, page, perPage, search, filter, loading, error, load } = useDataTable('/admin/customers', { filters: { is_active: '' } });
 
-const initials = (name) => (name || '?').trim().split(/\s+/).slice(0, 2).map((part) => part[0]).join('').toUpperCase();
+const auth = useAuthStore();
+const deleteDialog = ref(null);
+const toDelete = ref(null);
+const deleting = ref(false);
+const deleteError = ref('');
+
+function askDelete(customer) {
+    toDelete.value = customer;
+    deleteError.value = '';
+    deleteDialog.value.showModal();
+}
+
+async function removeCustomer() {
+    deleting.value = true;
+    deleteError.value = '';
+    try {
+        await api.delete(`/admin/customers/${toDelete.value.id}`, { toast: 'Pelanggan dihapus.' });
+        deleteDialog.value.close();
+        await load();
+    } catch (e) {
+        const { message, fields } = apiError(e);
+        deleteError.value = fields.user?.[0] || message;
+    } finally {
+        deleting.value = false;
+    }
+}
+
+const initials =(name) => (name || '?').trim().split(/\s+/).slice(0, 2).map((part) => part[0]).join('').toUpperCase();
 const avatarTone = (name) => AVATAR_TONES[[...(name || '')].reduce((sum, ch) => sum + ch.charCodeAt(0), 0) % AVATAR_TONES.length];
 </script>
 
@@ -78,7 +110,22 @@ const avatarTone = (name) => AVATAR_TONES[[...(name || '')].reduce((sum, ch) => 
       </span>
     </template>
     <template #cell-actions="{ row }">
-      <div class="flex items-center justify-center gap-1"><IconAction icon="eye" label="Lihat detail" :subject="row.name" :to="{ name: 'AdminCustomerDetail', params: { id: row.id } }" /></div>
+      <div class="flex items-center justify-center gap-1">
+        <IconAction icon="eye" label="Lihat detail" :subject="row.name" :to="{ name: 'AdminCustomerDetail', params: { id: row.id } }" />
+        <IconAction v-if="auth.can('users.manage') && !row.orders_count" icon="trash" tone="danger" label="Hapus pelanggan" :subject="row.name" @click="askDelete(row)" />
+      </div>
     </template>
   </DataTable>
+
+  <AppModal ref="deleteDialog" variant="delete" size="md" title="Hapus pelanggan?" :subtitle="toDelete?.name" @close="toDelete = null">
+    <div v-if="toDelete" class="space-y-2 text-body-sm">
+      <p>Akun <strong class="break-all">{{ toDelete.email }}</strong> dihapus permanen dan tidak bisa dikembalikan, termasuk alamat tersimpan, klaim voucher, dan sesi loginnya.</p>
+      <p class="text-secondary">Bila hanya ingin menutup akses, nonaktifkan akun dari halaman detail pelanggan.</p>
+    </div>
+    <p v-if="deleteError" role="alert" class="mt-3 text-body-sm text-error">{{ deleteError }}</p>
+    <template #footer>
+      <button type="button" class="inline-flex min-h-10 items-center rounded-full border border-secondary px-4 text-label-md hover:bg-accent-tint-15 focus-visible:outline-2 focus-visible:outline-primary" @click="deleteDialog.close()">Batal</button>
+      <button type="button" :disabled="deleting" class="inline-flex min-h-10 items-center gap-1.5 rounded-full bg-error px-4 text-label-md text-surface hover:bg-error/90 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary disabled:opacity-60" @click="removeCustomer">{{ deleting ? 'Menghapus...' : 'Hapus pelanggan' }}</button>
+    </template>
+  </AppModal>
 </template>

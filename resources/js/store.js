@@ -12,6 +12,7 @@ import bottomNav from './store/bottomNav';
 import { initHome } from './store/home';
 import { initNewsPopup } from './store/newsPopup';
 import { contactPage, gallery, pinnedMap, reels } from './store/pages';
+import { refundPage } from './store/refund';
 import { cartPage, checkoutPage, lookupPage, orderPage } from './store/shop';
 import { initSite, pageData, scrollToHash } from './store/site';
 import { accountVouchersPage, vouchersPage } from './store/vouchers';
@@ -22,7 +23,7 @@ const shared = pageData('tf-store-data');
 Alpine.store('toast', toastStore(shared.toast));
 Alpine.store('cart', cartStore(shared.cartCount, shared.cart, Alpine.store('toast')));
 Object.entries({
-    siteHeader: header, bottomNav, pinnedMap, contactPage, gallery, reels, catalog, product, cartPage, checkoutPage, orderPage, lookupPage, authPage, accountPage, accountOrdersPage, addressesPage, chatWidget, vouchersPage, accountVouchersPage, countdown, cartButton,
+    siteHeader: header, bottomNav, pinnedMap, contactPage, gallery, reels, catalog, product, cartPage, checkoutPage, orderPage, lookupPage, refundPage, authPage, accountPage, accountOrdersPage, addressesPage, chatWidget, vouchersPage, accountVouchersPage, countdown, cartButton,
 }).forEach(([name, component]) => Alpine.data(name, component));
 
 window.Alpine = Alpine;

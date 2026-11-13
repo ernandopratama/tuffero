@@ -4,9 +4,9 @@
 	$cartWords = $pg['cart'];
 @endphp
 
-{{-- Tata letak FigCraft "04 Checkout" dan "04b Checkout / Modal Pengiriman". Pembayaran tetap lewat Snap (D-075): metode dipilih di jendela Midtrans setelah pesanan dibuat. --}}
+{{-- Tata letak FigCraft "04 Checkout" dan "04b Checkout / Modal Pengiriman". Pembayaran tetap lewat Snap (D-096): metode dipilih di jendela Midtrans setelah pesanan dibuat. --}}
 @section('content')
-	<script type="application/json" id="tf-checkout-data">{{ $site->json([...\Illuminate\Support\Arr::only($c, ['errors', 'tooMany', 'failed', 'lead', 'leadSignedIn', 'submit', 'submitting', 'shippingPending', 'saveLabelDefault', 'voucher', 'search', 'map', 'etd', 'confirmFirst', 'addressSaved', 'variant', 'qty', 'each', 'itemsTitle', 'productsTotal', 'shippingTotal']), 'customer' => $storeUser && ! $storeRole]) }}</script>
+	<script type="application/json" id="tf-checkout-data">{{ $site->json([...\Illuminate\Support\Arr::only($c, ['errors', 'tooMany', 'failed', 'lead', 'leadSignedIn', 'submit', 'submitting', 'shippingPending', 'saveLabelDefault', 'voucher', 'search', 'map', 'etd', 'confirmFirst', 'addressSaved', 'variant', 'qty', 'each', 'itemsTitle', 'productsTotal', 'shippingTotal']), 'customer' => $storeUser && ! $storeRole, 'otp' => config('services.whatsapp.otp_required') && ! ($storeUser && ! $storeRole) ? [...$c['otp'], 'siteKey' => config('services.turnstile.site_key')] : null]) }}</script>
 	<main class="tf-co" x-data="checkoutPage">
 		@include('store.partials.flow-steps', ['steps' => $c['flow'], 'label' => $c['flowLabel'], 'current' => 1, 'variant' => 'stack'])
 
@@ -166,6 +166,40 @@
 											</span>
 										</template>
 									</button>
+
+									{{-- Verifikasi WhatsApp tamu (D-051, D-093). Tampil hanya bila WHATSAPP_OTP_REQUIRED aktif dan pengunjung belum masuk sebagai member. --}}
+									<template x-if="otpRequired">
+										<div class="tf-co-tile tf-co-otp" id="co-otp" aria-labelledby="co-otp-title">
+											<span class="tf-co-tile-top">
+												<span class="tf-co-tile-meta" id="co-otp-title">{{ $site->lineIcon('shieldCheck', 14) }} {{ $c['otp']['title'] }}</span>
+											</span>
+											<div aria-live="polite" style="display: contents">
+												<template x-if="otpIsVerified"><p class="tf-confirm-ok">{{ $site->lineIcon('shieldCheck', 16) }} {{ $c['otp']['verified'] }}</p></template>
+												<template x-if="otpNeedsLogin">
+													<span style="display: contents">
+														<p class="tf-co-tile-text">{{ $c['otp']['loginRequired'] }}</p>
+														<a href="{{ $site->route('account') }}" class="tf-btn">{{ $c['otp']['signIn'] }}</a>
+													</span>
+												</template>
+												<template x-if="otpShowForm">
+													<span style="display: contents">
+														<p class="tf-co-tile-text" x-text="otpLead"></p>
+														<template x-if="otpSent">
+															<div class="tf-auth-field" :class="otpFieldClass">
+																<label for="co-otp-code">{{ $c['otp']['code'] }}</label>
+																<div class="tf-auth-input"><input id="co-otp-code" :value="otpCode" @input="onOtpInput" type="text" inputmode="numeric" autocomplete="one-time-code" pattern="[0-9]*" maxlength="6" aria-describedby="co-otp-hint" :aria-invalid="otpInvalid" :disabled="otpBusy"></div>
+																<p id="co-otp-hint" class="tf-field-hint">{{ $c['otp']['codeHint'] }}</p>
+															</div>
+														</template>
+														<div id="co-turnstile"></div>
+														<button type="button" class="tf-co-ghost" :disabled="!otpCanSend" @click="sendOtp" x-text="otpSendText"></button>
+													</span>
+												</template>
+												<template x-if="otpBusy"><span class="tf-confirm-wait" role="status">@include('store.partials.dot-wave') <span x-text="otpBusyText"></span></span></template>
+												<template x-if="otpError"><p class="tf-shop-issue" role="alert" x-text="otpError"></p></template>
+											</div>
+										</div>
+									</template>
 								</div>
 							</template>
 							<template x-if="invalid('courier')"><p class="tf-shop-issue" role="alert" x-text="errorFor('courier')"></p></template>

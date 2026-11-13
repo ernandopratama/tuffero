@@ -85,13 +85,19 @@
 				<div class="tf-head">
 					<p class="tf-eyebrow wow fadeInUp">{{ $p['legal']['eyebrow'] }}</p>
 					<h2 class="tf-h2 tf-h2-tight">{{ $doc['title'] }}</h2>
-					<p class="tf-legal-note">{{ $p['legal']['draft'] }}</p>
+					@if ($doc['id'] === 'syarat' && $terms)
+						<p class="tf-legal-version">{{ str_replace(['{version}', '{date}'], [$terms['version'], $terms['date']], $p['legal']['version']) }}</p>
+					@endif
 				</div>
 				<div class="tf-faq-list wow fadeInUp">
 					@foreach ($doc['items'] as [$heading, $body])
 						<details>
 							<summary>{{ $heading }}<svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg></summary>
-							<p>{{ $body }}</p>
+							{{-- Baris kosong memisahkan paragraf; teks selalu di-escape (isi S&K dari dashboard adalah teks polos). --}}
+							@foreach (preg_split('/
+{2,}/', $body) as $paragraph)
+								<p>{{ $paragraph }}</p>
+							@endforeach
 						</details>
 					@endforeach
 				</div>

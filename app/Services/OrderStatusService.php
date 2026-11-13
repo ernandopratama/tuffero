@@ -250,8 +250,8 @@ class OrderStatusService
                 }
             }
 
-            // Kurir sudah mengambil paket: pesanan yang menunggu diserahkan otomatis menjadi Dikirim.
-            if ($order->status === Order::PROCESSING && in_array($shipment->status, ['picked', 'in_transit', 'dropping_off', 'delivered'], true)) {
+            // Kurir sudah dialokasikan Biteship (atau lebih jauh): pesanan yang menunggu diserahkan otomatis menjadi Dikirim.
+            if ($order->status === Order::PROCESSING && in_array($shipment->status, ['allocated', 'picking_up', 'picked', 'in_transit', 'dropping_off', 'delivered'], true)) {
                 $shipment->shipped_at ??= now();
                 $from = $order->shipping_status;
                 $order->forceFill(['status' => Order::SHIPPED, 'shipping_status' => 'shipped'])->save();

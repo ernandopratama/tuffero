@@ -28,7 +28,14 @@ class StaffNotifier
         'cancellation_validated' => ['Pembatalan menunggu ACC Admin Toko', ['store-admin']],
         'cancellation_store_approved' => ['Pembatalan menunggu ACC Pemilik', ['owner']],
         'refund_pending' => ['Dana perlu dikembalikan', ['store-admin']],
+        'refund_submitted' => ['Pengajuan refund baru', ['customer-service']],
+        'refund_review' => ['Refund menunggu keputusan Pemilik', ['owner']],
+        'refund_approved' => ['Refund disetujui, dana menunggu dikembalikan', ['customer-service']],
         'cancellation_overdue' => ['Pembatalan lewat batas proses', ['customer-service', 'store-admin']],
+        'draft_submitted' => ['Draf konten menunggu keputusan Pemilik', ['owner']],
+        'draft_decided' => ['Draf konten disetujui atau ditolak', ['marketing']],
+        'draft_due' => ['Draf konten siap diposting (jadwal besok atau lewat)', ['marketing']],
+        'draft_waiting' => ['Draf konten menunggu keputusan lebih dari 2 hari', ['owner']],
     ];
 
     /** @param  list<string>  $roles */

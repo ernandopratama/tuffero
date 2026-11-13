@@ -74,6 +74,13 @@ class CustomerController extends Controller
         return $this->success('Customer updated.', $this->present($customer->fresh()->loadCount('orders')));
     }
 
+    public function destroy(Request $request, User $user): JsonResponse
+    {
+        $this->users->deleteCustomer($this->customer($user), $request->user());
+
+        return $this->success('Customer deleted.');
+    }
+
     private function customer(User $user): User
     {
         abort_if($user->getRoleNames()->isNotEmpty(), 404);

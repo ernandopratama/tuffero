@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Http\Requests\Store\CheckoutRequest;
 use App\Services\CartService;
 use App\Services\CheckoutService;
+use App\Services\PhoneOtpService;
 use App\Services\Shipping\ShippingProvider;
 use App\Traits\ApiResponse;
 use Illuminate\Http\JsonResponse;
@@ -31,7 +32,7 @@ class CheckoutController extends Controller
         return $this->success('Rates retrieved.', ['rates' => $shipping->rates($address, $weight)]);
     }
 
-    public function store(CheckoutRequest $request, CheckoutService $checkout): JsonResponse
+    public function store(CheckoutRequest $request, CheckoutService $checkout, PhoneOtpService $otp): JsonResponse
     {
         $key = (string) $request->header('Idempotency-Key');
 
@@ -43,6 +44,10 @@ class CheckoutController extends Controller
         $user = $request->user();
         // Hanya dari session, tidak pernah dari body. Pesanan staf bukan pesanan pelanggan.
         $data['user_id'] = $user?->getRoleNames()->isEmpty() ? $user->id : null;
+
+        if ($data['user_id'] === null && config('services.whatsapp.otp_required')) {
+            $otp->assertGuestMayCheckout($request->cookie(PhoneOtpService::DEVICE_COOKIE), $data['customer_phone']);
+        }
         $data['address'] = [...$data['address'], 'recipient' => $data['customer_name'], 'phone' => $data['customer_phone']];
         // Titik peta disimpan sebagai angka 7 desimal (sekitar 1 cm), atau tidak disimpan sama sekali.
         foreach (['latitude', 'longitude'] as $field) {

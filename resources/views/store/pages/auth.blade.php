@@ -1,7 +1,7 @@
 @extends('store.layouts.app', ['footer' => false, 'mainbar' => false])
 
 @section('content')
-	<script type="application/json" id="tf-auth-data">{{ $site->json(['words' => $a, 'mode' => $mode, 'dev' => app()->isLocal(), 'demoCode' => app()->isLocal() ? '123456' : null]) }}</script>
+	<script type="application/json" id="tf-auth-data">{{ $site->json(['words' => $a, 'mode' => $mode, 'dev' => app()->isLocal(), 'google' => \App\Http\Controllers\Store\GoogleAuthController::enabled(), 'googleStatus' => in_array(request('google'), ['failed', 'unavailable'], true) ? request('google') : null]) }}</script>
 	<main class="tf-wrap tf-auth" x-data="authPage">
 		<aside class="tf-auth-photo">
 			<img src="/images/Produk/gallery/Nastar Sultan 1.webp" alt="" width="800" height="800" fetchpriority="high">
@@ -83,15 +83,29 @@
 				</button>
 				<a href="{{ $site->route('products') }}" class="tf-auth-link">{{ $a['guest'] }}</a>
 				<p class="tf-auth-terms">{{ $a['termsA'] }} <a href="{{ $site->route('contact') }}#syarat">{{ $a['terms'] }}</a> {{ $a['termsB'] }} <a href="{{ $site->route('contact') }}#privasi">{{ $a['privacy'] }}</a>{{ $a['termsC'] && $a['termsC'] !== '.' ? ' ' : '' }}{{ $a['termsC'] }}</p>
-			</div>
-		</template>
 
-		<template x-if="showDone">
-			<div class="tf-auth-panel">
-				<p class="tf-eyebrow">{{ $a['otp']['eyebrow'] }}</p>
-				<h1>{{ $a['otp']['doneTitle'] }}</h1>
-				<p class="tf-auth-lead" role="status">{{ $a['otp']['doneText'] }}</p>
-				<a href="/" class="tf-btn tf-btn-block">{{ $a['otp']['home'] }}</a>
+				<!-- Pilihan saluran verifikasi: satu wajib dipilih; Esc atau "Ubah data" hanya kembali ke formulir -->
+				<dialog x-ref="methodDialog" class="tf-co-dialog tf-voucher-dialog tf-auth-methods" aria-labelledby="tf-methods-title">
+					<div class="tf-co-dialog-sheet">
+						<header class="tf-co-dialog-head">
+							<div>
+								<h2 id="tf-methods-title">{{ $a['methods']['title'] }}</h2>
+								<p>{{ $a['methods']['lead'] }}</p>
+							</div>
+						</header>
+						<div class="tf-co-dialog-body">
+							<button type="button" class="tf-auth-method" :disabled="busy" @click="chooseMethod('email')">
+								{{ $site->lineIcon('mail', 22) }}
+								<span><strong>{{ $a['methods']['email'] }}</strong><small x-text="email.trim()"></small></span>
+							</button>
+							<button type="button" class="tf-auth-method" :disabled="busy || !canWhatsapp" @click="chooseMethod('phone')">
+								{{ $site->lineIcon('phone', 22) }}
+								<span><strong>{{ $a['methods']['phone'] }}</strong><small x-text="whatsappTarget"></small></span>
+							</button>
+							<button type="button" class="tf-auth-link" @click="closeMethods">{{ $a['methods']['back'] }}</button>
+						</div>
+					</div>
+				</dialog>
 			</div>
 		</template>
 
@@ -103,10 +117,9 @@
 					</button>
 					@include('store.partials.home-button', ['label' => $a['backHome']])
 				</div>
-				<p class="tf-eyebrow" x-text="otpEyebrow"></p>
+				<p class="tf-eyebrow">{{ $a['otp']['eyebrow'] }}</p>
 				<h1 x-text="otpTitle"></h1>
 				<p class="tf-auth-lead" x-text="otpLead"></p>
-				<template x-if="showDemo"><p class="tf-auth-demo" x-text="demoText"></p></template>
 
 				<form novalidate @submit.prevent="verify">
 					<label for="tf-otp-input" class="visually-hidden">{{ $a['otp']['inputLabel'] }}</label>

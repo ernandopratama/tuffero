@@ -20,6 +20,7 @@ class SettingSeeder extends Seeder
         ['key' => 'antifraud.max_unpaid_orders', 'value' => '3', 'type' => 'int', 'group' => 'antifraud', 'is_public' => false],
         ['key' => 'antifraud.max_orders_per_day', 'value' => '5', 'type' => 'int', 'group' => 'antifraud', 'is_public' => false],
         ['key' => 'refund.claim_window_hours', 'value' => '168', 'type' => 'int', 'group' => 'refund', 'is_public' => false],
+        ['key' => 'refund.return_window_days', 'value' => '3', 'type' => 'int', 'group' => 'refund', 'is_public' => false],
         ['key' => 'refund.review_sla_hours', 'value' => null, 'type' => 'int', 'group' => 'refund', 'is_public' => false],
         ['key' => 'refund.payout_days_max', 'value' => '7', 'type' => 'int', 'group' => 'refund', 'is_public' => false],
         ['key' => 'refund.terms_version', 'value' => null, 'type' => 'string', 'group' => 'refund', 'is_public' => false],
@@ -27,6 +28,8 @@ class SettingSeeder extends Seeder
         ['key' => 'discount.max_percent', 'value' => '50', 'type' => 'int', 'group' => 'discount', 'is_public' => false],
         ['key' => 'checkout.reservation_minutes', 'value' => '60', 'type' => 'int', 'group' => 'checkout', 'is_public' => false],
         ['key' => 'inventory.low_stock_threshold', 'value' => '10', 'type' => 'int', 'group' => 'inventory', 'is_public' => false],
+        ['key' => 'marketing.posts_per_week', 'value' => '3', 'type' => 'int', 'group' => 'marketing', 'is_public' => false],
+        ['key' => 'marketing.videos_per_week', 'value' => '2', 'type' => 'int', 'group' => 'marketing', 'is_public' => false],
     ];
 
     public function run(): void

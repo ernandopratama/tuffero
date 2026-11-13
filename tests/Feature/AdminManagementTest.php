@@ -180,6 +180,61 @@ class AdminManagementTest extends TestCase
         $this->assertSame($admin->id, AuditLog::where('action', 'mfa.reset')->value('actor_user_id'));
     }
 
+    public function test_username_is_lowercased_unique_and_validated(): void
+    {
+        $admin = $this->staff('super-admin');
+        $body = ['name' => 'Budi', 'email' => 'budi@example.com', 'password' => self::STRONG_PASSWORD, 'role' => 'warehouse'];
+
+        $this->actingAs($admin)->postJson('/api/v1/admin/users', [...$body, 'username' => '  Budi.Gudang '])->assertCreated()->assertJsonPath('data.username', 'budi.gudang');
+        $this->actingAs($admin)->postJson('/api/v1/admin/users', [...$body, 'email' => 'b2@example.com', 'username' => 'BUDI.gudang'])->assertUnprocessable()->assertJsonValidationErrors('username');
+        $this->actingAs($admin)->postJson('/api/v1/admin/users', [...$body, 'email' => 'b3@example.com', 'username' => 'a@b'])->assertUnprocessable()->assertJsonValidationErrors('username');
+        $this->actingAs($admin)->postJson('/api/v1/admin/users', [...$body, 'email' => 'b4@example.com', 'username' => 'ab'])->assertUnprocessable()->assertJsonValidationErrors('username');
+
+        $id = User::where('email', 'budi@example.com')->value('id');
+        $this->actingAs($admin)->patchJson("/api/v1/admin/users/{$id}", ['username' => null])->assertOk()->assertJsonPath('data.username', null);
+    }
+
+    public function test_super_admin_deletes_staff_and_audit_keeps_identity(): void
+    {
+        $admin = $this->staff('super-admin');
+        $target = $this->staff('warehouse');
+        $target->createToken('t');
+
+        $this->actingAs($admin)->deleteJson("/api/v1/admin/users/{$target->id}")->assertOk();
+
+        $this->assertDatabaseMissing('users', ['id' => $target->id]);
+        $this->assertDatabaseMissing('personal_access_tokens', ['tokenable_id' => $target->id]);
+        $log = AuditLog::where('action', 'user.deleted')->firstOrFail();
+        $this->assertSame($admin->id, $log->actor_user_id);
+        $this->assertSame($target->email, $log->changes['email']);
+        $this->assertSame('warehouse', $log->changes['role']);
+    }
+
+    public function test_cannot_delete_self_customer_or_user_with_internal_notes(): void
+    {
+        $admin = $this->staff('super-admin');
+        $customer = User::factory()->create();
+        $writer = $this->staff('marketing');
+        DB::table('admin_comments')->insert(['user_id' => $writer->id, 'commentable_type' => 'x', 'commentable_id' => 1, 'body' => 'catatan', 'created_at' => now()]);
+
+        $this->actingAs($admin)->deleteJson("/api/v1/admin/users/{$admin->id}")->assertUnprocessable();
+        $this->actingAs($admin)->deleteJson("/api/v1/admin/users/{$customer->id}")->assertUnprocessable();
+        $this->actingAs($admin)->deleteJson("/api/v1/admin/users/{$writer->id}")->assertUnprocessable();
+
+        foreach ([$admin, $customer, $writer] as $user) {
+            $this->assertDatabaseHas('users', ['id' => $user->id]);
+        }
+        $this->assertSame(0, AuditLog::where('action', 'user.deleted')->count());
+    }
+
+    public function test_only_super_admin_can_delete_users(): void
+    {
+        $target = $this->staff('warehouse');
+
+        $this->actingAs($this->staff('owner'))->deleteJson("/api/v1/admin/users/{$target->id}")->assertForbidden();
+        $this->assertDatabaseHas('users', ['id' => $target->id]);
+    }
+
     public function test_deactivated_user_loses_existing_session_and_cannot_log_in(): void
     {
         $user = $this->staff('owner', ['password' => Hash::make(self::STRONG_PASSWORD), 'mfa_required' => false]);

@@ -4,6 +4,7 @@ import { useRoute } from 'vue-router';
 import AdminIcon from '../../components/AdminIcon.vue';
 import AppModal from '../../components/ui/AppModal.vue';
 import IconAction from '../../components/ui/IconAction.vue';
+import RupiahInput from '../../components/ui/RupiahInput.vue';
 import api from '../../utils/api';
 import { apiError } from '../../utils/apiError';
 import { formatDate, fromLocalInput, toLocalInput } from '../../utils/datetime';
@@ -56,9 +57,9 @@ const editingVariant = ref(null);
 const variantBusy = ref(false);
 const variantError = ref('');
 const variantFields = ref({});
-const blankVariant = { sku: '', name: '', price: '', compare_at_price: '', weight_gram: '', net_weight_gram: '', length_cm: '', width_cm: '', height_cm: '', shelf_life_days: '', max_order_quantity: 50, is_active: true };
+const blankVariant = { sku: '', name: '', price: '', compare_at_price: '', weight_gram: '', net_weight_gram: '', length_cm: '', width_cm: '', height_cm: '', shelf_life_days: '', max_order_quantity: 50, low_stock_threshold: '', is_active: true };
 const variant = reactive({ ...blankVariant });
-const NUMERIC = ['price', 'compare_at_price', 'weight_gram', 'net_weight_gram', 'length_cm', 'width_cm', 'height_cm', 'shelf_life_days', 'max_order_quantity'];
+const NUMERIC = ['price', 'compare_at_price', 'weight_gram', 'net_weight_gram', 'length_cm', 'width_cm', 'height_cm', 'shelf_life_days', 'max_order_quantity', 'low_stock_threshold'];
 
 // Diskon produk per varian (D-070): harga jual varian tetap; potongan dihitung server per segmen.
 const AUDIENCES = { all: 'Semua pelanggan', guest: 'Non Member (tanpa akun)', member: 'Member (sudah login)' };
@@ -260,6 +261,56 @@ async function uploadImage() {
     }
 }
 
+// Urutan foto: foto pertama menjadi foto utama (dipakai toko). Perubahan langsung disimpan; gagal berarti urutan lama dikembalikan.
+const dragId = ref(null);
+const overId = ref(null);
+const orderBusy = ref(false);
+const orderError = ref('');
+
+async function commitOrder(list) {
+    const previous = product.value.images;
+    product.value.images = list;
+    orderBusy.value = true;
+    orderError.value = '';
+    try {
+        const { data } = await api.put(`/admin/products/${product.value.id}/images/order`, { ids: list.map((item) => item.id) }, { toast: 'Urutan foto disimpan.' });
+        product.value.images = data.data.images;
+    } catch (e) {
+        product.value.images = previous;
+        orderError.value = apiError(e).message;
+    } finally {
+        orderBusy.value = false;
+    }
+}
+
+function moveImage(image, delta) {
+    const list = [...product.value.images];
+    const from = list.findIndex((item) => item.id === image.id);
+    const to = from + delta;
+    if (to < 0 || to >= list.length) return;
+    [list[from], list[to]] = [list[to], list[from]];
+    commitOrder(list);
+}
+
+const makeMain = (image) => commitOrder([image, ...product.value.images.filter((item) => item.id !== image.id)]);
+
+function onDragStart(image, event) {
+    dragId.value = image.id;
+    event.dataTransfer.effectAllowed = 'move';
+    event.dataTransfer.setData('text/plain', String(image.id));
+}
+
+function onDrop(target) {
+    const from = dragId.value;
+    dragId.value = null;
+    overId.value = null;
+    if (!from || from === target.id) return;
+    const list = [...product.value.images];
+    const [moved] = list.splice(list.findIndex((item) => item.id === from), 1);
+    list.splice(list.findIndex((item) => item.id === target.id), 0, moved);
+    commitOrder(list);
+}
+
 function askRemoveImage(image) {
     imageToDelete.value = image;
     imageError.value = '';
@@ -358,7 +409,7 @@ onMounted(load);
     <p v-if="publishError" role="alert" class="mt-space-md rounded-2xl bg-error-surface px-4 py-3 text-body-sm text-on-error-surface">{{ publishError }}</p>
 
     <ul class="mt-space-lg grid gap-space-md sm:grid-cols-2 lg:grid-cols-4" aria-label="Ringkasan produk">
-      <li v-for="stat in stats" :key="stat.label" class="flex items-center gap-3 rounded-3xl border border-border bg-surface p-space-md shadow-card">
+      <li v-for="stat in stats" :key="stat.label" class="flex min-w-0 items-center gap-3 rounded-3xl border border-border bg-surface p-space-md shadow-card">
         <span class="grid size-11 shrink-0 place-items-center rounded-2xl bg-accent-tint-15 text-primary" aria-hidden="true"><AdminIcon :name="stat.icon" /></span>
         <span class="min-w-0">
           <span class="block text-body-sm text-secondary">{{ stat.label }}</span>
@@ -368,7 +419,7 @@ onMounted(load);
     </ul>
 
     <div class="mt-space-lg grid items-start gap-space-lg lg:grid-cols-3">
-      <div class="space-y-space-lg lg:col-span-2">
+      <div class="min-w-0 space-y-space-lg lg:col-span-2">
         <section :class="card" aria-labelledby="pe-info">
           <div class="flex items-start gap-3">
             <span class="grid size-10 shrink-0 place-items-center rounded-2xl bg-accent-tint-15" aria-hidden="true"><AdminIcon name="edit" :size="18" /></span>
@@ -430,7 +481,7 @@ onMounted(load);
           <p v-if="!product.variants.length" class="mt-space-md flex items-start gap-2 rounded-2xl border border-dashed border-border bg-background/70 p-4 text-body-sm text-secondary">
             <AdminIcon name="info" :size="16" class="mt-0.5 shrink-0" />Belum ada varian. Produk butuh minimal satu varian aktif sebelum dipublikasikan.
           </p>
-          <div v-else class="mt-space-md overflow-x-auto rounded-2xl border border-border">
+          <div v-else class="relative mt-space-md overflow-x-auto rounded-2xl border border-border">
             <table class="w-full min-w-[640px] text-center text-body-sm">
               <caption class="sr-only">Varian dan harga {{ product.name }}</caption>
               <thead class="bg-background/70 text-label-sm uppercase tracking-wide text-secondary">
@@ -476,7 +527,7 @@ onMounted(load);
             <AdminIcon name="info" :size="16" class="mt-0.5 shrink-0" />Harga jual varian tidak berubah. Pelanggan membayar harga setelah diskon. Diskon yang berlaku bersamaan ditumpuk, tetapi total potongan paling banyak {{ product.max_discount_percent }}% dari harga jual (atur di Pengaturan, bagian Diskon).
           </p>
           <p v-if="!discountRows.length" class="mt-space-md rounded-2xl border border-dashed border-border p-4 text-center text-body-sm text-secondary">Belum ada diskon.</p>
-          <div v-else class="mt-space-md overflow-x-auto rounded-2xl border border-border">
+          <div v-else class="relative mt-space-md overflow-x-auto rounded-2xl border border-border">
             <table class="w-full min-w-[720px] text-center text-body-sm">
               <caption class="sr-only">Diskon produk {{ product.name }}</caption>
               <thead class="bg-background/70 text-label-sm uppercase tracking-wide text-secondary">
@@ -556,20 +607,41 @@ onMounted(load);
         </section>
       </div>
 
-      <section :class="card" aria-labelledby="pe-photos">
+      <section class="min-w-0" :class="card" aria-labelledby="pe-photos">
         <div class="flex items-start gap-3">
           <span class="grid size-10 shrink-0 place-items-center rounded-2xl bg-accent-tint-15" aria-hidden="true"><AdminIcon name="eye" :size="18" /></span>
           <div><h2 id="pe-photos" class="font-heading text-headline-sm">Foto produk</h2><p class="text-body-sm text-secondary">{{ product.images.length }} foto. Foto pertama menjadi foto utama.</p></div>
         </div>
 
         <p v-if="!product.images.length" class="mt-space-md rounded-2xl border border-dashed border-border bg-background/70 p-6 text-center text-body-sm text-secondary">Belum ada foto.</p>
-        <ul v-else class="mt-space-md grid grid-cols-3 gap-2">
-          <li v-for="(image, index) in product.images" :key="image.id" class="relative overflow-hidden rounded-2xl border border-border" :class="index === 0 ? 'col-span-3' : ''">
-            <img :src="image.url" :alt="image.alt" loading="lazy" class="aspect-square w-full object-cover">
-            <span v-if="index === 0" class="absolute left-2 top-2 rounded-full bg-primary px-2.5 py-1 text-label-sm text-surface">Foto utama</span>
-            <IconAction v-if="canManage" icon="trash" tone="danger" label="Hapus foto" :subject="image.alt" class="absolute right-2 top-2 bg-surface/90 shadow-card" @click="askRemoveImage(image)" />
+        <ul v-else class="mt-space-md grid grid-cols-2 gap-2" aria-label="Foto produk, urut dari foto utama">
+          <li
+            v-for="(image, index) in product.images"
+            :key="image.id"
+            class="group relative overflow-hidden rounded-2xl border bg-surface transition-[border-color,box-shadow,opacity] duration-150"
+            :class="[index === 0 ? 'col-span-2' : '', overId === image.id && dragId !== image.id ? 'border-primary ring-2 ring-accent' : 'border-border', dragId === image.id ? 'opacity-50' : '']"
+            :draggable="canManage && product.images.length > 1"
+            @dragstart="onDragStart(image, $event)"
+            @dragover.prevent="dragId && image.id !== dragId && (overId = image.id)"
+            @dragleave="overId = null"
+            @drop.prevent="onDrop(image)"
+            @dragend="dragId = null; overId = null"
+          >
+            <img :src="image.url" :alt="image.alt" loading="lazy" draggable="false" class="w-full object-cover" :class="index === 0 ? 'aspect-[4/3]' : 'aspect-square'">
+            <span class="absolute left-2 top-2 rounded-full px-2.5 py-1 text-label-sm shadow-card" :class="index === 0 ? 'bg-primary text-surface' : 'bg-surface/90 tabular-nums'">{{ index === 0 ? 'Foto utama' : `#${index + 1}` }}</span>
+            <!-- Alat foto: muncul saat disorot atau difokus; di layar sentuh selalu terlihat. -->
+            <div v-if="canManage" class="absolute inset-x-0 bottom-0 flex flex-wrap items-center gap-1 bg-gradient-to-t from-primary/75 via-primary/30 to-transparent p-2 pt-8 opacity-0 transition-opacity duration-150 focus-within:opacity-100 group-hover:opacity-100 [@media(hover:none)]:opacity-100">
+              <IconAction v-if="index > 0" icon="star" label="Jadikan foto utama" :subject="image.alt" :disabled="orderBusy" class="bg-surface/95 shadow-card" @click="makeMain(image)" />
+              <template v-if="product.images.length > 1">
+                <IconAction icon="chevron-left" label="Geser ke depan" :subject="image.alt" :disabled="orderBusy || index === 0" class="bg-surface/95 shadow-card" @click="moveImage(image, -1)" />
+                <IconAction icon="chevron-right" label="Geser ke belakang" :subject="image.alt" :disabled="orderBusy || index === product.images.length - 1" class="bg-surface/95 shadow-card" @click="moveImage(image, 1)" />
+              </template>
+              <IconAction icon="trash" tone="danger" label="Hapus foto" :subject="image.alt" :disabled="orderBusy" class="ml-auto bg-surface/95 shadow-card" @click="askRemoveImage(image)" />
+            </div>
           </li>
         </ul>
+        <p v-if="canManage && product.images.length > 1" class="mt-2 text-body-sm text-secondary">Seret foto, atau pakai tombol panah, untuk mengubah urutan. Foto pertama menjadi foto utama.</p>
+        <p v-if="orderError" role="alert" class="mt-1 text-body-sm text-error">{{ orderError }}</p>
 
         <form v-if="canManage" class="mt-space-md space-y-space-sm border-t border-border pt-space-md" @submit.prevent="uploadImage">
           <label class="flex cursor-pointer flex-col items-center gap-1 rounded-2xl border border-dashed border-secondary px-4 py-5 text-center transition-colors duration-150 hover:bg-accent-tint-12 has-[:focus-visible]:outline-2 has-[:focus-visible]:outline-offset-2 has-[:focus-visible]:outline-primary">
@@ -608,14 +680,15 @@ onMounted(load);
         </label>
         <label class="block text-label-md">
           Jenis
-          <select v-model="discount.type" :class="field">
+          <select v-model="discount.type" :class="field" @change="discount.value = ''">
             <option value="percent">Persen</option>
             <option value="fixed">Potongan rupiah</option>
           </select>
         </label>
         <label class="block text-label-md">
           {{ discount.type === 'percent' ? 'Diskon (%, maksimal ' + product.max_discount_percent + ')' : 'Potongan (Rp)' }}
-          <input v-model.number="discount.value" type="number" required min="1" :max="discount.type === 'percent' ? product.max_discount_percent : undefined" :class="field">
+          <RupiahInput v-if="discount.type === 'fixed'" v-model="discount.value" required />
+          <input v-else v-model.number="discount.value" type="number" required min="1" :max="product.max_discount_percent" :class="field">
           <span v-if="discountFields.value" class="mt-1 block text-body-sm font-normal text-error">{{ discountFields.value[0] }}</span>
         </label>
         <label class="block text-label-md">
@@ -656,12 +729,12 @@ onMounted(load);
         </label>
         <label class="block text-label-md">
           Harga jual (Rp)
-          <input v-model.number="variant.price" type="number" required min="1" :class="field">
+          <RupiahInput v-model="variant.price" required />
           <span v-if="variantFields.price" class="mt-1 block text-body-sm font-normal text-error">{{ variantFields.price[0] }}</span>
         </label>
         <label class="block text-label-md">
           Harga normal <span class="font-normal text-secondary">(Rp, opsional)</span>
-          <input v-model.number="variant.compare_at_price" type="number" min="1" :class="field">
+          <RupiahInput v-model="variant.compare_at_price" />
           <span v-if="variantFields.compare_at_price" class="mt-1 block text-body-sm font-normal text-error">{{ variantFields.compare_at_price[0] }}</span>
         </label>
         <label class="block text-label-md">
@@ -681,6 +754,11 @@ onMounted(load);
           Batas jumlah per pesanan
           <input v-model.number="variant.max_order_quantity" type="number" required min="1" max="999" :class="field">
           <span v-if="variantFields.max_order_quantity" class="mt-1 block text-body-sm font-normal text-error">{{ variantFields.max_order_quantity[0] }}</span>
+        </label>
+        <label class="block text-label-md">
+          Batas stok menipis <span class="font-normal text-secondary">(opsional, kosong = ikut Pengaturan)</span>
+          <input v-model.number="variant.low_stock_threshold" type="number" min="0" max="1000" :class="field">
+          <span v-if="variantFields.low_stock_threshold" class="mt-1 block text-body-sm font-normal text-error">{{ variantFields.low_stock_threshold[0] }}</span>
         </label>
         <fieldset class="text-label-md sm:col-span-2">
           <legend>Dimensi paket <span class="font-normal text-secondary">(cm, opsional)</span></legend>

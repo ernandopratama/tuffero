@@ -12,7 +12,7 @@
 			</div>
 			<div class="tf-footer-fine">
 				<p>{{ $site->fill($t['footer']['copyright'], ['year' => now('Asia/Jakarta')->year]) }}</p>
-				<div>@foreach ($t['footer']['legal'] as $label)<a href="#">{{ $label }}</a>@endforeach</div>
+				<div>{{-- Kunci = id bagian S&K/Privasi di halaman Kontak. --}}@foreach ($t['footer']['legal'] as $anchor => $label)<a href="/kontak#{{ $anchor }}">{{ $label }}</a>@endforeach</div>
 			</div>
 		</div>
 		<div class="tf-footer-main">

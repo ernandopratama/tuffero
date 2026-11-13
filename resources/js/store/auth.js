@@ -10,13 +10,15 @@ const maskEmail = (v) => { const [name, domain] = v.split('@'); return `${name[0
 const maskPhone = (v) => { const d = `0${phoneDigits(v)}`; return `${d.slice(0, 4)}-••••-${d.slice(-4)}`; };
 const clock = (s) => `${String(Math.floor(s / 60)).padStart(2, '0')}:${String(s % 60).padStart(2, '0')}`;
 
+const errorCode = (e) => Object.values(e.response?.data?.errors ?? {})[0]?.[0];
+
 // Satu komponen untuk /masuk, /daftar, dan /masuk/verifikasi: identitas dan kata sandi hanya di memori, tidak pernah ditulis ke URL atau penyimpanan browser.
-// Backend akun pelanggan belum ada (OQ-18, OQ-22). Di luar environment local, masuk selalu menampilkan "belum tersedia" dan pratinjau verifikasi tidak ada.
-// Kode pratinjau datang dari server hanya di local, jadi tidak pernah ikut bundel atau halaman produksi.
+// Daftar: pelanggan memilih verifikasi lewat email atau WhatsApp, kode dikirim dan diperiksa server (D-095), akun dibuat setelah kode benar.
+// Masuk dengan kata sandi baru ada di local (OQ-18, OQ-22); di luar local tetap menampilkan "belum tersedia".
 export const authPage = () => ({
     a: {},
-    demoCodeValue: null,
     dev: false,
+    google: false,
     mode: 'login',
     channel: 'email',
     identity: '',
@@ -30,16 +32,12 @@ export const authPage = () => ({
     notice: '',
     busy: false,
     maskedId: '',
-    demoCode: '',
-    done: false,
     code: '',
     codeError: '',
     codeStatus: '',
     resendAt: 0,
     lockUntil: 0,
     now: Date.now(),
-    otpTargets: [],
-    otpIndex: 0,
     attemptsLeft: MAX_ATTEMPTS,
     ticker: null,
 
@@ -47,8 +45,9 @@ export const authPage = () => ({
         const data = pageData('tf-auth-data');
         this.a = data.words;
         this.dev = data.dev;
-        this.demoCodeValue = data.demoCode;
+        this.google = data.google;
         this.mode = data.mode;
+        if (data.googleStatus) this.notice = data.googleStatus === 'failed' ? this.a.googleFailed : this.a.googleUnavailable;
         window.addEventListener('popstate', () => {
             this.mode = window.location.pathname === '/daftar' ? 'register' : 'login';
             this.enterStep();
@@ -60,8 +59,7 @@ export const authPage = () => ({
     get isOtp() { return this.mode === 'otp'; },
     get isRegister() { return this.mode === 'register'; },
     get showForm() { return !this.isOtp; },
-    get showDone() { return this.isOtp && this.done; },
-    get showOtp() { return this.isOtp && !this.done; },
+    get showOtp() { return this.isOtp; },
     get words() { return this.isRegister ? this.a.register : this.a.login; },
     get channelWords() { return this.channel === 'email' ? this.a.email : this.a.phone; },
     get resendLeft() { return Math.max(0, Math.ceil((this.resendAt - this.now) / 1000)); },
@@ -72,10 +70,8 @@ export const authPage = () => ({
     get passwordAutocomplete() { return this.isRegister ? 'new-password' : 'current-password'; },
     get passwordHint() { return this.passwordError || (this.isRegister ? this.a.password.hintRegister : ''); },
     get phoneHint() { return this.phoneError || this.a.identity.hintRegister; },
-    get otpEyebrow() { return this.otpTargets.length > 1 ? this.a.otp.step.replace('{n}', this.otpIndex + 1).replace('{total}', this.otpTargets.length) : this.a.otp.eyebrow; },
     get otpTitle() { return this.locked ? this.a.otp.lockedTitle : this.a.otp.title; },
     get otpLead() { return this.locked ? this.a.otp.lockedLead : this.a.otp.lead.replace('{id}', this.maskedId); },
-    get demoText() { return this.a.otp.demo.replace('{code}', this.demoCode); },
     get lockedText() { return this.a.otp.locked.replace('{time}', clock(this.lockLeft)); },
     get resendText() { return this.a.otp.resendIn.replace('{time}', clock(this.resendLeft)); },
     get submitOtpText() { return this.locked ? this.a.otp.lockedTitle : this.a.otp.submit; },
@@ -84,7 +80,8 @@ export const authPage = () => ({
     get showStatus() { return !this.locked && !this.codeError && !!this.codeStatus; },
     get showCodeError() { return !this.locked && !!this.codeError; },
     get otpClass() { return { 'is-error': !!this.codeError, 'is-locked': this.locked }; },
-    get showDemo() { return !!this.demoCode && !this.locked; },
+    get canWhatsapp() { return phoneValid(this.phone.trim()); },
+    get whatsappTarget() { return this.canWhatsapp ? `+62 ${phoneDigits(this.phone)}` : this.a.methods.phoneMissing; },
     get codeCells() { return [0, 1, 2, 3, 4, 5]; },
     cellText(i) { return this.locked ? '' : (this.code[i] || ''); },
     cellClass(i) { return { 'is-next': this.code.length === i || (this.code.length === 6 && i === 5) }; },
@@ -110,14 +107,17 @@ export const authPage = () => ({
     clearField() { this.fieldError = ''; },
     clearPhone() { this.phoneError = ''; this.fieldError = ''; },
     clearPassword() { this.passwordError = ''; },
-    googleNotice() { this.notice = this.a.googleUnavailable; },
+    // Navigasi penuh (bukan fetch): Google mengalihkan browser, dan server menyimpan state OAuth di sesi.
+    googleNotice() {
+        if (this.google) window.location.assign('/auth/google');
+        else this.notice = this.a.googleUnavailable;
+    },
 
     validateRegister() {
         const mail = this.email.trim();
         const tel = this.phone.trim();
-        this.fieldError = !mail && !tel ? this.a.identity.required : (mail && !emailValid(mail) ? this.a.identity.emailInvalid : '');
+        this.fieldError = !mail ? this.a.identity.required : (emailValid(mail) ? '' : this.a.identity.emailInvalid);
         this.phoneError = tel && !phoneValid(tel) ? this.a.identity.phoneInvalid : '';
-        this.otpTargets = [...(mail ? [{ key: 'email', id: mail }] : []), ...(tel ? [{ key: 'phone', id: tel }] : [])];
     },
     validateLogin() {
         const value = this.identity.trim();
@@ -125,7 +125,8 @@ export const authPage = () => ({
         this.fieldError = valid ? '' : this.a.identity.invalid;
         this.phoneError = '';
     },
-    showTarget({ key, id }) { this.channel = key; this.maskedId = id; },
+    errorText(e) { return this.a.errors[errorCode(e)] || (e.response?.status === 429 ? this.a.errors.tooMany : this.a.errors.failed); },
+    startCountdown(seconds) { this.resendAt = Date.now() + seconds * 1000; this.now = Date.now(); },
     async submit() {
         if (this.busy) return;
         this.notice = '';
@@ -136,10 +137,12 @@ export const authPage = () => ({
             document.getElementById(this.fieldError ? (this.isRegister ? 'tf-auth-email' : 'tf-auth-id') : (this.phoneError ? 'tf-auth-phone' : 'tf-auth-password'))?.focus();
             return;
         }
+        // Daftar: pilihan saluran verifikasi dulu (dialog), kode baru dikirim setelah dipilih.
+        if (this.isRegister) { this.$refs.methodDialog.showModal(); return; }
         this.busy = true;
         try {
             // Hanya local: masuk memakai akun uji lewat /api/v1/auth/login. Di luar local tetap "belum tersedia" (OQ-18, OQ-22).
-            if (this.dev && !this.isRegister) {
+            if (this.dev) {
                 try {
                     await fetch('/sanctum/csrf-cookie', { credentials: 'same-origin' });
                     const { data } = await api.post('/auth/login', { email: this.identity.trim(), password: this.password });
@@ -151,18 +154,31 @@ export const authPage = () => ({
                 }
                 return;
             }
-            if (!this.isRegister || !this.demoCodeValue) { this.notice = this.words.unavailable; return; }
-            this.demoCode = this.demoCodeValue;
+            this.notice = this.words.unavailable;
+        } finally {
+            this.busy = false;
+        }
+    },
+    closeMethods() { this.$refs.methodDialog.close(); },
+    // Satu saluran wajib dipilih. Kata sandi dikirim sekali ke server (di-hash di sana dan disimpan di sesi), lalu dihapus dari memori.
+    async chooseMethod(channel) {
+        if (this.busy || (channel === 'phone' && !this.canWhatsapp)) return;
+        this.busy = true;
+        try {
+            const { data } = await api.post('/auth/register/send', { email: this.email.trim(), phone: this.phone.trim() || null, password: this.password, channel });
+            this.$refs.methodDialog.close();
             this.password = '';
-            this.otpTargets = this.otpTargets.map(({ key, id }) => ({ key, id: key === 'email' ? maskEmail(id) : maskPhone(id) }));
-            this.otpIndex = 0;
-            this.showTarget(this.otpTargets[0]);
-            this.resendAt = Date.now() + 60000;
-            this.now = Date.now();
+            this.channel = channel;
+            this.maskedId = channel === 'email' ? maskEmail(this.email.trim()) : maskPhone(this.phone);
+            this.startCountdown(data.data.resend_in ?? 60);
             this.code = '';
             this.codeError = '';
             this.codeStatus = '';
+            this.attemptsLeft = MAX_ATTEMPTS;
             this.go('otp', '/masuk/verifikasi');
+        } catch (e) {
+            this.$refs.methodDialog.close();
+            this.notice = this.errorText(e);
         } finally {
             this.busy = false;
         }
@@ -175,40 +191,49 @@ export const authPage = () => ({
     async verify() {
         if (this.busy || this.locked) return;
         if (this.code.length < 6) { this.codeError = this.a.otp.incomplete; this.$refs.codeEl?.focus(); return; }
-        // Pratinjau pengembangan, bukan keamanan: backend sungguhan wajib menegakkan semua batas ini di server (AUTH-03, AUTH-04).
-        if (this.code === this.demoCodeValue) {
-            if (this.otpIndex + 1 >= this.otpTargets.length) { this.done = true; return; }
-            this.otpIndex += 1;
-            this.showTarget(this.otpTargets[this.otpIndex]);
-            this.resendAt = Date.now() + 60000;
-            this.now = Date.now();
+        this.busy = true;
+        try {
+            await api.post('/auth/register/verify', { code: this.code });
+            window.location.assign('/akun');
+            return;
+        } catch (e) {
+            const failure = errorCode(e);
+            this.code = '';
+            this.codeStatus = '';
+            // Sesi pendaftaran habis (mis. cookie dihapus): kembali ke formulir.
+            if (failure === 'otp_expired') { this.notice = this.a.errors.otp_expired; this.backToRegister(); return; }
+            if (failure !== 'otp_invalid') { this.codeError = this.errorText(e); return; }
+            // Server menegakkan batasnya (AUTH-03, AUTH-04); hitungan di sini hanya cerminan untuk tampilan.
+            this.attemptsLeft -= 1;
+            if (this.attemptsLeft <= 0) {
+                this.attemptsLeft = MAX_ATTEMPTS;
+                this.lockUntil = Date.now() + 900000;
+                this.now = Date.now();
+                this.codeError = '';
+                return;
+            }
+            this.codeError = this.a.otp.wrong.replace('{n}', this.attemptsLeft);
+            this.$refs.codeEl?.focus();
+        } finally {
+            this.busy = false;
+        }
+    },
+    async resend() {
+        if (this.busy || this.resendLeft > 0 || this.locked) return;
+        this.busy = true;
+        try {
+            const { data } = await api.post('/auth/register/resend');
+            this.startCountdown(data.data.resend_in ?? 60);
             this.code = '';
             this.codeError = '';
-            this.codeStatus = '';
+            this.codeStatus = this.a.otp.resent;
             this.$refs.codeEl?.focus();
-            return;
+        } catch (e) {
+            this.codeStatus = '';
+            this.codeError = this.errorText(e);
+        } finally {
+            this.busy = false;
         }
-        this.code = '';
-        this.codeStatus = '';
-        this.attemptsLeft -= 1;
-        if (this.attemptsLeft <= 0) {
-            this.attemptsLeft = MAX_ATTEMPTS;
-            this.lockUntil = Date.now() + 900000;
-            this.now = Date.now();
-            this.codeError = '';
-            return;
-        }
-        this.codeError = this.a.otp.wrong.replace('{n}', this.attemptsLeft);
-        this.$refs.codeEl?.focus();
-    },
-    resend() {
-        if (this.busy || this.resendLeft > 0 || this.locked) return;
-        this.resendAt = Date.now() + 60000;
-        this.now = Date.now();
-        this.code = '';
-        this.codeError = '';
-        this.codeStatus = this.a.otp.resent;
-        this.$refs.codeEl?.focus();
     },
     enterStep() {
         document.title = this.isOtp ? this.a.otp.meta : this.words.meta;
@@ -218,8 +243,6 @@ export const authPage = () => ({
         if (this.isOtp) {
             this.ticker = setInterval(() => { this.now = Date.now(); }, 1000);
             this.$nextTick(() => this.$refs.codeEl?.focus());
-        } else {
-            this.done = false;
         }
         window.scrollTo({ top: 0 });
     },

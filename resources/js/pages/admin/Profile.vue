@@ -4,6 +4,7 @@ import AdminIcon from '../../components/AdminIcon.vue';
 import AvatarEditor from '../../components/ui/AvatarEditor.vue';
 import ActivityCard from '../../components/ActivityCard.vue';
 import MfaResetDialog from '../../components/MfaResetDialog.vue';
+import UsernameDialog from '../../components/UsernameDialog.vue';
 import NotificationPrefsCard from '../../components/NotificationPrefsCard.vue';
 import SessionsCard from '../../components/SessionsCard.vue';
 import { useAuthStore } from '../../stores/auth';
@@ -54,8 +55,11 @@ const rules = computed(() => [
 ]);
 const pwReady = computed(() => pw.current_password !== '' && rules.value.every((r) => r.ok));
 
+const usernameDialog = ref(null);
+
 function fill(data) {
-    profile.value = data;
+    // Respons simpan profil tidak memuat saluran kode; WhatsApp hanya untuk nomor yang sudah terverifikasi.
+    profile.value = { ...data, otp_channels: data.otp_channels || (data.phone && data.phone_verified ? ['email', 'phone'] : ['email']) };
     form.name = data.name;
     form.email = data.email;
     form.phone = data.phone || '';
@@ -183,6 +187,15 @@ onMounted(load);
                 <p v-if="fieldErrors.phone" role="alert" class="mt-1 text-body-sm text-error">{{ fieldErrors.phone[0] }}</p>
               </div>
 
+              <div>
+                <span class="text-label-md">Username <span class="font-normal text-secondary">(opsional)</span></span>
+                <div class="mt-1 flex items-center justify-between gap-3 rounded-xl border border-border bg-background/60 px-4 py-2">
+                  <span class="min-w-0 truncate" :class="profile.username ? 'font-mono text-body-md' : 'text-body-sm text-secondary'">{{ profile.username || 'Belum diatur, masuk memakai email' }}</span>
+                  <button type="button" class="inline-flex min-h-9 shrink-0 items-center rounded-full border border-secondary px-4 text-label-md transition-[transform,background-color] duration-[160ms] ease-out-strong hover:bg-accent-tint-15 focus-visible:outline-2 focus-visible:outline-primary active:scale-[0.97]" @click="usernameDialog.open()">{{ profile.username ? 'Ubah' : 'Atur' }}</button>
+                </div>
+                <p class="mt-1 text-body-sm text-secondary">Bisa dipakai masuk selain email. Mengubahnya perlu kode konfirmasi lewat email atau WhatsApp.</p>
+              </div>
+
               <!-- Mengganti email atau nomor HP: konfirmasi identitas dulu -->
               <div v-if="sensitiveChanged" class="animate-pop origin-top grid gap-4 rounded-2xl border border-accent bg-accent-tint-12 p-4">
                 <p class="flex items-start gap-2 text-body-sm"><AdminIcon name="shield" :size="16" class="mt-0.5 shrink-0" />Email dan nomor HP dipakai untuk memulihkan akun, jadi perubahannya perlu dikonfirmasi{{ needsMfa ? ' dengan password dan kode autentikator' : ' dengan password saat ini' }}.</p>
@@ -285,6 +298,7 @@ onMounted(load);
       <NotificationPrefsCard class="mt-4" />
       <ActivityCard class="mt-4" />
       <MfaResetDialog ref="mfaDialog" @replaced="onMfaReplaced" />
+      <UsernameDialog ref="usernameDialog" :current="profile.username" :channels="profile.otp_channels" :email="profile.email" @changed="fill" />
     </template>
   </div>
 </template>

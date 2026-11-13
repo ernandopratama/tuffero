@@ -4,6 +4,7 @@ namespace App\Services;
 
 use App\Models\Order;
 use App\Models\PaymentEvent;
+use App\Models\WebhookRejection;
 use App\Notifications\StaffEvent;
 use Illuminate\Database\UniqueConstraintViolationException;
 use Illuminate\Support\Facades\Cache;
@@ -95,11 +96,20 @@ class MidtransService
      *
      * @param  array<string, mixed>  $payload
      */
-    public function handleNotification(array $payload): bool
+    public function handleNotification(array $payload, bool $fromWebhook = true): bool
     {
+        // Penolakan hanya dicatat untuk webhook sungguhan; hasil API Status (syncStatus) datang dari permintaan pembeli, bukan dari Midtrans.
+        $reject = function (string $reason) use ($fromWebhook): bool {
+            if ($fromWebhook) {
+                WebhookRejection::record('midtrans', $reason);
+            }
+
+            return false;
+        };
+
         foreach (['order_id', 'status_code', 'gross_amount', 'signature_key', 'transaction_id', 'transaction_status'] as $field) {
             if (! is_string($payload[$field] ?? null) || $payload[$field] === '') {
-                return false;
+                return $reject('invalid_payload');
             }
         }
 
@@ -108,7 +118,7 @@ class MidtransService
         if (! $this->enabled() || ! hash_equals($expected, $payload['signature_key'])) {
             Log::warning('Midtrans notification with invalid signature', ['order_id' => $payload['order_id']]);
 
-            return false;
+            return $reject('invalid_signature');
         }
 
         $order = Order::where('order_number', $payload['order_id'])->first();
@@ -117,7 +127,7 @@ class MidtransService
         if (! $order || ! is_numeric($amount) || (float) $amount !== (float) $order->total) {
             Log::warning('Midtrans notification does not match an order', ['order_id' => $payload['order_id']]);
 
-            return false;
+            return $reject('order_mismatch');
         }
 
         try {
@@ -198,10 +208,10 @@ class MidtransService
             return false;
         }
 
-        return $this->handleNotification($response->json());
+        return $this->handleNotification($response->json(), false);
     }
 
-    private function statusApiUrl(string $orderNumber): string
+    public function statusApiUrl(string $orderNumber): string
     {
         return (config('services.midtrans.is_production') ? 'https://api.midtrans.com' : 'https://api.sandbox.midtrans.com').'/v2/'.rawurlencode($orderNumber).'/status';
     }

@@ -8,7 +8,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\SoftDeletes;
 
-#[Fillable(['sku', 'name', 'price', 'compare_at_price', 'weight_gram', 'net_weight_gram', 'length_cm', 'width_cm', 'height_cm', 'shelf_life_days', 'max_order_quantity', 'is_active'])]
+#[Fillable(['sku', 'name', 'price', 'compare_at_price', 'weight_gram', 'net_weight_gram', 'length_cm', 'width_cm', 'height_cm', 'shelf_life_days', 'max_order_quantity', 'low_stock_threshold', 'is_active'])]
 class ProductVariant extends Model
 {
     use SoftDeletes;

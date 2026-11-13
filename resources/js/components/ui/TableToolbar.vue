@@ -9,8 +9,8 @@ const search = defineModel({ type: String, default: '' });
 </script>
 
 <template>
-  <div class="ml-auto flex flex-row-reverse flex-wrap items-center gap-2" role="search">
-    <label class="relative block w-full sm:w-64">
+  <div class="ml-auto flex max-w-full min-w-0 flex-row-reverse flex-wrap items-center gap-2 max-sm:ml-0 max-sm:w-full max-sm:flex-row max-sm:*:min-w-[calc(50%-0.25rem)] max-sm:*:flex-1" role="search">
+    <label class="relative block w-full sm:w-64 max-sm:order-first max-sm:min-w-full">
       <span class="sr-only">{{ placeholder }}</span>
       <span class="pointer-events-none absolute left-3.5 top-1/2 -translate-y-1/2 text-secondary"><AdminIcon name="search" :size="18" /></span>
       <input

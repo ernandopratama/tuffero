@@ -2,7 +2,9 @@
 
 namespace Tests\Unit;
 
+use App\Models\Warehouse;
 use App\Services\Shipping\BiteshipShippingProvider;
+use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\Client\Request;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Validation\ValidationException;
@@ -10,6 +12,9 @@ use Tests\TestCase;
 
 class BiteshipShippingProviderTest extends TestCase
 {
+    // Kode pos asal dibaca dari tabel warehouses (cadangan: env), jadi tes ini butuh database.
+    use RefreshDatabase;
+
     protected function setUp(): void
     {
         parent::setUp();
@@ -44,6 +49,16 @@ class BiteshipShippingProviderTest extends TestCase
             && $request['destination_postal_code'] === 12440
             && $request['couriers'] === 'jnt,sicepat'
             && $request['items'][0]['weight'] === 1500);
+    }
+
+    public function test_origin_postal_code_comes_from_the_active_warehouse_before_the_env_fallback(): void
+    {
+        Warehouse::create(['code' => 'MLG', 'name' => 'Gudang Malang', 'city' => 'Malang', 'postal_code' => '65141', 'is_active' => true]);
+        Http::fake(['api.biteship.com/v1/rates/couriers' => Http::response(['success' => true, 'pricing' => []])]);
+
+        (new BiteshipShippingProvider)->rates(['postal_code' => '12440'], 1000);
+
+        Http::assertSent(fn (Request $request) => $request['origin_postal_code'] === 65141);
     }
 
     public function test_biteship_error_means_shipping_unavailable(): void

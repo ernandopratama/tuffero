@@ -6,9 +6,15 @@ use Carbon\CarbonInterface;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\MorphMany;
 
 /**
  * @property CarbonInterface $due_at
+ * @property CarbonInterface|null $validated_at
+ * @property CarbonInterface|null $store_approved_at
+ * @property CarbonInterface|null $owner_approved_at
+ * @property CarbonInterface|null $rejected_at
+ * @property CarbonInterface|null $refunded_at
  */
 #[Fillable(['request_number', 'reason', 'channel', 'status', 'due_at'])]
 class OrderCancellationRequest extends Model
@@ -54,5 +60,23 @@ class OrderCancellationRequest extends Model
     public function order(): BelongsTo
     {
         return $this->belongsTo(Order::class);
+    }
+
+    /** @return MorphMany<AdminComment, $this> */
+    public function comments(): MorphMany
+    {
+        return $this->morphMany(AdminComment::class, 'commentable');
+    }
+
+    /** @return MorphMany<FollowUp, $this> */
+    public function followUps(): MorphMany
+    {
+        return $this->morphMany(FollowUp::class, 'followable');
+    }
+
+    /** @return MorphMany<CustomerEmail, $this> */
+    public function customerEmails(): MorphMany
+    {
+        return $this->morphMany(CustomerEmail::class, 'emailable');
     }
 }

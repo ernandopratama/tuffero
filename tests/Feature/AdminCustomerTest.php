@@ -4,6 +4,7 @@ namespace Tests\Feature;
 
 use App\Models\AuditLog;
 use App\Models\User;
+use Database\Seeders\DatabaseSeeder;
 use Database\Seeders\RolePermissionSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
@@ -38,7 +39,7 @@ class AdminCustomerTest extends TestCase
             'super admin' => ['super-admin', true, true],
             'pemilik' => ['owner', true, true],
             'admin toko' => ['store-admin', true, false],
-            'customer service' => ['customer-service', false, false],
+            'customer service' => ['customer-service', true, false],
             'gudang' => ['warehouse', false, false],
             'marketing' => ['marketing', false, false],
         ];
@@ -55,6 +56,47 @@ class AdminCustomerTest extends TestCase
         $this->actingAs($staff)->patchJson("/api/v1/admin/customers/{$customer->id}", ['is_active' => false])->assertStatus($canDeactivate ? 200 : 403);
 
         $this->assertSame(! $canDeactivate, $customer->fresh()->is_active);
+    }
+
+    public function test_super_admin_deletes_customer_and_audit_keeps_identity(): void
+    {
+        $customer = $this->customer();
+        DB::table('customer_addresses')->insert(['user_id' => $customer->id, 'label' => 'Rumah', 'recipient_name' => 'A', 'phone' => '081234567890', 'street' => 'Jl. A', 'district' => 'B', 'city' => 'Malang', 'province' => 'Jawa Timur', 'postal_code' => '65111', 'is_default' => true, 'created_at' => now(), 'updated_at' => now()]);
+
+        $this->actingAs($this->staff('super-admin'))->deleteJson("/api/v1/admin/customers/{$customer->id}")->assertOk();
+
+        $this->assertDatabaseMissing('users', ['id' => $customer->id]);
+        $this->assertDatabaseMissing('customer_addresses', ['user_id' => $customer->id]);
+        $this->assertSame($customer->email, AuditLog::where('action', 'customer.deleted')->firstOrFail()->changes['email']);
+    }
+
+    public function test_customer_with_orders_cannot_be_deleted(): void
+    {
+        $this->seed(DatabaseSeeder::class);
+        $customer = $this->customer();
+        DB::table('orders')->insert([
+            'user_id' => $customer->id, 'public_ref' => (string) str()->uuid(), 'order_number' => 'TF-TEST-1', 'access_token_hash' => str_repeat('a', 64),
+            'idempotency_key' => 'k-1', 'warehouse_id' => DB::table('warehouses')->value('id'), 'customer_name' => 'A', 'customer_email' => 'a@example.com',
+            'customer_phone' => '081234567890', 'shipping_address' => '{}', 'shipping_courier' => 'jnt', 'shipping_service' => 'ez', 'status' => 'completed',
+            'payment_status' => 'paid', 'shipping_status' => 'delivered', 'subtotal' => 1000, 'shipping_fee' => 0, 'total' => 1000, 'created_at' => now(), 'updated_at' => now(),
+        ]);
+
+        $this->actingAs($this->staff('super-admin'))->deleteJson("/api/v1/admin/customers/{$customer->id}")->assertUnprocessable();
+
+        $this->assertDatabaseHas('users', ['id' => $customer->id]);
+        $this->assertSame(0, AuditLog::where('action', 'customer.deleted')->count());
+    }
+
+    public function test_only_super_admin_deletes_customers_and_staff_are_not_customers(): void
+    {
+        $owner = $this->staff('owner');
+        $customer = $this->customer();
+
+        $this->actingAs($owner)->deleteJson("/api/v1/admin/customers/{$customer->id}")->assertForbidden();
+        $this->actingAs($this->staff('super-admin'))->deleteJson("/api/v1/admin/customers/{$owner->id}")->assertNotFound();
+
+        $this->assertDatabaseHas('users', ['id' => $customer->id]);
+        $this->assertDatabaseHas('users', ['id' => $owner->id]);
     }
 
     public function test_guest_and_customer_are_rejected(): void

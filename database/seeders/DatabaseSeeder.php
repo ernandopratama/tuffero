@@ -20,6 +20,7 @@ class DatabaseSeeder extends Seeder
             WarehouseSeeder::class,
             StoreReviewSeeder::class,
             ChatFaqSeeder::class,
+            ReplyTemplateSeeder::class,
         ]);
     }
 }

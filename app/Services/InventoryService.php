@@ -6,7 +6,6 @@ use App\Models\AuditLog;
 use App\Models\InventoryStock;
 use App\Models\Order;
 use App\Models\ProductVariant;
-use App\Models\Setting;
 use App\Models\StockReservation;
 use App\Models\User;
 use App\Notifications\StaffEvent;
@@ -111,7 +110,7 @@ class InventoryService
     private function warnIfLow(InventoryStock $stock, int $availableBefore, ?User $except = null): void
     {
         // Bawaan sama dengan label "menipis" di dashboard (D-055): tersedia di bawah 10.
-        $limit = (int) (Setting::where('key', 'inventory.low_stock_threshold')->value('value') ?? DashboardService::LOW_STOCK);
+        $limit = ProductVariant::whereKey($stock->product_variant_id)->value('low_stock_threshold') ?? DashboardService::lowStockLimit();
         $available = $stock->quantity - $stock->reserved;
 
         if ($availableBefore < $limit || $available >= $limit) {

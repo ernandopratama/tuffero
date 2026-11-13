@@ -8,6 +8,10 @@ const props = defineProps({
     kpi: { type: Object, required: true },
     index: { type: Number, default: 0 },
 });
+const emit = defineEmits(['open']);
+
+// Kartu dengan aksi (mis. "Perlu tindakan") menjadi tombol yang membuka rinciannya.
+const clickable = computed(() => !!props.kpi.action);
 
 const value = computed(() => (props.kpi.format === 'rupiah' ? rupiahCompact(props.kpi.value) : Number(props.kpi.value).toLocaleString('id-ID')));
 const delta = computed(() => {
@@ -26,7 +30,16 @@ const bars = computed(() => {
 </script>
 
 <template>
-  <article class="flex animate-rise flex-col sm:min-h-[11rem] gap-2.5 rounded-card border border-border bg-surface p-5 shadow-card" :style="{ animationDelay: `${60 + index * 50}ms` }" :aria-label="kpi.label">
+  <component
+    :is="clickable ? 'button' : 'article'"
+    :type="clickable ? 'button' : undefined"
+    class="flex animate-rise flex-col sm:min-h-[11rem] gap-2.5 rounded-card border border-border bg-surface p-5 text-left shadow-card"
+    :class="clickable ? 'w-full cursor-pointer transition-[transform,background-color] duration-[160ms] ease-out-strong hover:bg-accent-tint-15 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary active:scale-[0.98]' : ''"
+    :style="{ animationDelay: `${60 + index * 50}ms` }"
+    :aria-label="clickable ? `${kpi.label}: ${value}. Buka rincian` : kpi.label"
+    :aria-haspopup="clickable ? 'dialog' : undefined"
+    @click="clickable && emit('open', kpi.action)"
+  >
     <div class="flex items-start justify-between gap-2">
       <h3 class="text-body-sm font-medium text-secondary">{{ kpi.label }}</h3>
       <span class="flex size-8 shrink-0 items-center justify-center rounded-full" :class="BUBBLE[tone] || BUBBLE.neutral"><AdminIcon :name="kpi.icon" :size="16" /></span>
@@ -44,6 +57,9 @@ const bars = computed(() => {
         :style="{ height: `${h}px`, animationDelay: `${200 + i * 30}ms` }"
       ></span>
     </div>
-    <p class="mt-auto text-body-sm text-secondary">{{ kpi.foot }}</p>
-  </article>
+    <p class="mt-auto flex items-center justify-between gap-2 text-body-sm text-secondary">
+      <span>{{ kpi.foot }}</span>
+      <AdminIcon v-if="clickable" name="chevron-right" :size="16" class="shrink-0" />
+    </p>
+  </component>
 </template>

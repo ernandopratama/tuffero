@@ -11,6 +11,7 @@ use App\Models\User;
 use App\Models\Warehouse;
 use App\Services\InventoryService;
 use App\Services\OrderExpiryService;
+use App\Services\PhoneOtpService;
 use App\Services\Shipping\ShippingProvider;
 use App\Services\Shipping\UnavailableShippingProvider;
 use Database\Seeders\DatabaseSeeder;
@@ -71,6 +72,42 @@ class CheckoutTest extends TestCase
     private function stock(ProductVariant $variant): InventoryStock
     {
         return InventoryStock::where('product_variant_id', $variant->id)->firstOrFail();
+    }
+
+    public function test_guest_checkout_requires_whatsapp_otp_when_enabled(): void
+    {
+        config(['services.whatsapp.otp_required' => true]);
+        $this->variant();
+        $this->addToCart();
+
+        $this->checkout()->assertStatus(422)->assertJsonPath('errors.customer_phone.0', 'phone_unverified');
+        $this->withCredentials()->withCookie(PhoneOtpService::DEVICE_COOKIE, app(PhoneOtpService::class)->deviceCookie('+6281111111111')->getValue());
+        $this->checkout([], 'key-0000000000000002')->assertStatus(422)->assertJsonPath('errors.customer_phone.0', 'phone_unverified');
+        $this->assertSame(0, Order::count());
+
+        $this->withCookie(PhoneOtpService::DEVICE_COOKIE, app(PhoneOtpService::class)->deviceCookie('+6281234567890')->getValue());
+        $this->checkout([], 'key-0000000000000003')->assertCreated();
+    }
+
+    public function test_guest_cannot_check_out_with_a_member_number_when_otp_is_enabled(): void
+    {
+        config(['services.whatsapp.otp_required' => true]);
+        User::factory()->create(['phone' => '+6281234567890', 'phone_verified_at' => now()]);
+        $this->variant();
+        $this->addToCart();
+        $this->withCredentials()->withCookie(PhoneOtpService::DEVICE_COOKIE, app(PhoneOtpService::class)->deviceCookie('+6281234567890')->getValue());
+
+        $this->checkout()->assertStatus(422)->assertJsonPath('errors.customer_phone.0', 'phone_requires_login');
+    }
+
+    public function test_signed_in_customer_skips_guest_otp(): void
+    {
+        config(['services.whatsapp.otp_required' => true]);
+        $this->actingAs(User::factory()->create());
+        $this->variant();
+        $this->addToCart();
+
+        $this->checkout()->assertCreated();
     }
 
     public function test_cart_uses_server_price_and_ignores_client_price(): void

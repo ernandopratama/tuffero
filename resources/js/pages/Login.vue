@@ -7,7 +7,7 @@ import { useAuthStore } from '../stores/auth';
 
 const router = useRouter();
 const auth = useAuthStore();
-const form = reactive({ email: '', password: '' });
+const form = reactive({ login: '', password: '' });
 // credentials, setup, challenge, recovery-codes
 const step = ref('credentials');
 const code = ref('');
@@ -61,7 +61,7 @@ const title = computed(() => ({
 
 function errorMessage(e) {
     const messages = {
-        401: step.value === 'credentials' ? 'Email atau password salah.' : 'Sesi login berakhir. Masuk lagi.',
+        401: step.value === 'credentials' ? 'Email, username, atau password salah.' : 'Sesi login berakhir. Masuk lagi.',
         422: 'Kode salah atau sudah dipakai. Coba kode berikutnya.',
         429: 'Terlalu banyak percobaan. Coba lagi sebentar lagi.',
         503: 'Email gagal dikirim. Pakai kode authenticator atau coba lagi nanti.',
@@ -234,14 +234,16 @@ const ghostBtn = 'inline-flex h-10 items-center justify-center gap-2 rounded-ful
 
       <form v-if="step === 'credentials'" class="space-y-4" @submit.prevent="submitCredentials">
         <div>
-          <label for="login-email" class="text-label-md">Email</label>
+          <label for="login-email" class="text-label-md">Email atau username</label>
           <div class="relative mt-1">
             <svg class="pointer-events-none absolute left-3 top-1/2 size-5 -translate-y-1/2 text-secondary" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="8" r="4" /><path d="M4 21c0-4 3.6-7 8-7s8 3 8 7" /></svg>
             <input
               id="login-email"
-              v-model="form.email"
-              type="email"
+              v-model="form.login"
+              type="text"
               required
+              maxlength="255"
+              autocapitalize="none"
               autocomplete="username"
               spellcheck="false"
               class="w-full rounded-md border border-secondary py-2.5 pl-10 pr-3 text-body-md focus:border-accent focus:outline-2 focus:outline-primary"

@@ -140,17 +140,16 @@ class ArrangeOrderTest extends TestCase
         $this->assertDatabaseCount('shipments', 0);
     }
 
-    public function test_courier_pickup_webhook_marks_processing_order_shipped_and_delivery_completes_it(): void
+    public function test_courier_allocation_webhook_marks_processing_order_shipped_and_delivery_completes_it(): void
     {
         $this->fakeCreate();
         $order = $this->paidOrder();
         $this->arrange($order, ['method' => 'biteship']);
 
-        $this->webhook('allocated');
-        $this->webhook('picking_up');
+        $this->webhook('confirmed');
         $this->assertSame(Order::PROCESSING, $order->fresh()->status);
 
-        $this->webhook('picked');
+        $this->webhook('allocated');
         $order->refresh();
         $this->assertSame(Order::SHIPPED, $order->status);
         $this->assertNotNull($order->shipment->shipped_at);

@@ -107,11 +107,41 @@ class AdminAccessTest extends TestCase
             $this->assertTrue(User::where('email', "{$role}@tuffero.test")->firstOrFail()->hasRole($role));
         }
 
-        preg_match('/`owner@tuffero\.test` \| `([^`]+)`/', $file, $match);
+        preg_match('/`owner@tuffero\.test` \| `owner` \| `([^`]+)`/', $file, $match);
 
-        $this->postJson('/api/v1/auth/login', ['email' => 'owner@tuffero.test', 'password' => $match[1]])
+        $this->postJson('/api/v1/auth/login', ['login' => 'owner@tuffero.test', 'password' => $match[1]])
             ->assertOk()
             ->assertJsonPath('data.user.role', 'owner');
+        $this->app['auth']->guard('web')->logout();
+        $this->postJson('/api/v1/auth/login', ['login' => 'OWNER', 'password' => $match[1]])
+            ->assertOk()
+            ->assertJsonPath('data.user.role', 'owner');
+    }
+
+    public function test_login_accepts_username_and_rejects_wrong_inactive_or_unknown(): void
+    {
+        $user = $this->staff('marketing', ['username' => 'tim.marketing', 'mfa_required' => false]);
+        $inactive = $this->staff('owner', ['username' => 'ex-owner', 'is_active' => false]);
+
+        $this->postJson('/api/v1/auth/login', ['login' => 'tim.marketing', 'password' => self::PASSWORD])
+            ->assertOk()->assertJsonPath('data.user.role', 'marketing');
+        $this->app['auth']->guard('web')->logout();
+
+        $wrong = $this->postJson('/api/v1/auth/login', ['login' => 'tim.marketing', 'password' => 'salah']);
+        $unknown = $this->postJson('/api/v1/auth/login', ['login' => 'tidak-ada', 'password' => self::PASSWORD]);
+        $off = $this->postJson('/api/v1/auth/login', ['login' => 'ex-owner', 'password' => self::PASSWORD]);
+
+        $wrong->assertUnauthorized();
+        $this->assertSame($wrong->json(), $unknown->json());
+        $this->assertSame($wrong->json(), $off->json());
+        $this->assertGuest('web');
+    }
+
+    public function test_username_cannot_be_used_with_an_at_sign_to_hijack_email_lookup(): void
+    {
+        $this->staff('owner', ['username' => 'sama']);
+
+        $this->postJson('/api/v1/auth/login', ['login' => 'sama@tuffero.test', 'password' => self::PASSWORD])->assertUnauthorized();
     }
 
     public function test_demo_customers_have_no_role_and_no_admin_access(): void
@@ -130,7 +160,7 @@ class AdminAccessTest extends TestCase
             $this->assertNotNull(User::where('email', "pelanggan{$number}@tuffero.test")->firstOrFail()->phone_verified_at);
         }
 
-        preg_match('/`pelanggan1@tuffero\.test` \| `([^`]+)`/', $file, $match);
+        preg_match('/`pelanggan1@tuffero\.test` \| `pelanggan1` \| `([^`]+)`/', $file, $match);
 
         $this->postJson('/api/v1/auth/login', ['email' => 'pelanggan1@tuffero.test', 'password' => $match[1]])
             ->assertOk()

@@ -1,5 +1,6 @@
 import api from './api';
 import { addressPicker, mix } from './addressPicker';
+import { phoneOtp } from './phoneOtp';
 import { pageData } from './site';
 import { clearStoredVouchers, voucherPicker } from './voucherPicker';
 
@@ -160,7 +161,7 @@ const CARRIER_ROUTE = { confirmed: 0.08, allocated: 0.18, picking_up: 0.3, picke
 const FAILED_CARRIER = ['cancelled', 'return_in_transit', 'returned', 'rejected', 'disposed'];
 const PROBLEM_CARRIER = ['on_hold', 'courier_not_found', 'cancelled', 'return_in_transit', 'returned', 'rejected', 'disposed'];
 
-export const checkoutPage = () => mix(addressPicker('co'), voucherPicker(), {
+export const checkoutPage = () => mix(addressPicker('co'), voucherPicker(), phoneOtp(), {
         cart: null,
         loading: true,
         loadFailed: false,
@@ -292,6 +293,7 @@ export const checkoutPage = () => mix(addressPicker('co'), voucherPicker(), {
             this.accepting = false;
             this.addressConfirmed = true;
             this.$nextTick(() => document.getElementById('co-courier')?.scrollIntoView({ behavior: 'smooth', block: 'start' }));
+            this.probeOtp();
         },
         onEscape() { if (this.confirming) this.editAddress(); },
         get confirmChecking() { return this.ratesLoading; },
@@ -306,6 +308,7 @@ export const checkoutPage = () => mix(addressPicker('co'), voucherPicker(), {
             this.selected = null;
             this.ratesFailed = false;
             this.ratesLoading = false;
+            this.resetOtp();
             this.$nextTick(() => document.getElementById('co-street')?.focus());
         },
         retryRates() { return this.loadRates(this.form.postal_code); },
@@ -365,6 +368,11 @@ export const checkoutPage = () => mix(addressPicker('co'), voucherPicker(), {
             if (!this.addressConfirmed) {
                 this.formError = this.words.confirmFirst;
                 document.getElementById('co-confirm')?.focus();
+                return;
+            }
+            if (!this.phoneOk) {
+                this.formError = this.words.otp.needed;
+                document.getElementById('co-otp')?.scrollIntoView({ behavior: 'smooth', block: 'center' });
                 return;
             }
             this.submitting = true;

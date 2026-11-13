@@ -16,6 +16,8 @@ const auth = useAuthStore();
 const comments = ref([]);
 const meta = ref({ current_page: 1, last_page: 1, total: 0 });
 const staff = ref([]);
+const canCs = ref(false); // pemegang izin comments.cs boleh menulis catatan yang hanya terlihat CS
+const visibility = ref('staff');
 const body = ref('');
 const picked = ref([]); // staf yang dipilih dari daftar @ pada catatan yang sedang ditulis
 const loading = ref(true);
@@ -30,7 +32,7 @@ const listId = `mention-list-${Math.random().toString(36).slice(2, 8)}`;
 const options = computed(() => {
     if (query.value === null) return [];
     const needle = query.value.text.toLowerCase();
-    return staff.value.filter((user) => user.name.toLowerCase().includes(needle)).slice(0, 6);
+    return staff.value.filter((user) => (visibility.value !== 'cs' || user.cs) && user.name.toLowerCase().includes(needle)).slice(0, 6);
 });
 
 // Dikirim hanya setelah data termuat, supaya induk tidak menganggap 0 sebagai jumlah sebenarnya.
@@ -44,6 +46,7 @@ async function load(page = 1) {
         comments.value = data.data.comments;
         meta.value = data.data.meta;
         staff.value = data.data.mentionable || [];
+        canCs.value = !!data.data.can_cs;
     } catch (e) {
         error.value = apiError(e).message;
     } finally {
@@ -93,9 +96,9 @@ async function submit() {
     saving.value = true;
     error.value = '';
     // Hanya yang namanya masih ada di teks (bisa saja dihapus setelah dipilih).
-    const mentions = picked.value.filter((user) => body.value.includes(`@${user.name}`)).map((user) => user.id);
+    const mentions = picked.value.filter((user) => (visibility.value !== 'cs' || user.cs) && body.value.includes(`@${user.name}`)).map((user) => user.id);
     try {
-        await api.post(props.url, { body: body.value, mentions });
+        await api.post(props.url, { body: body.value, mentions, ...(canCs.value ? { visibility: visibility.value } : {}) });
         body.value = '';
         picked.value = [];
         query.value = null;
@@ -179,7 +182,14 @@ onMounted(load);
           </ul>
         </span>
       </label>
-      <div class="mt-4 flex justify-end">
+      <div class="mt-4 flex flex-wrap items-center justify-end gap-3">
+        <label v-if="canCs" class="flex items-center gap-2 text-label-md">
+          Terlihat oleh
+          <select v-model="visibility" class="rounded-full border border-border bg-surface px-3 py-1.5 text-body-sm focus:border-primary focus:outline-2 focus:outline-primary">
+            <option value="staff">Semua staf</option>
+            <option value="cs">Hanya CS</option>
+          </select>
+        </label>
         <button :disabled="saving" class="rounded-full bg-primary px-5 py-2 text-label-md text-background transition-[transform,opacity] duration-[160ms] ease-out-strong hover:opacity-90 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary active:scale-[0.97] disabled:opacity-60">{{ saving ? 'Mengirim...' : 'Kirim catatan' }}</button>
       </div>
     </form>
@@ -191,6 +201,7 @@ onMounted(load);
       <li v-for="comment in comments" :key="comment.id" class="rounded-xl bg-surface p-3 text-body-sm" :class="mentionsMe(comment) ? 'ring-2 ring-accent' : ''">
         <span class="text-label-md">{{ comment.author }}</span>
         <span class="ml-space-sm text-secondary">{{ formatDate(comment.created_at) }}</span>
+        <span v-if="comment.visibility === 'cs'" class="ml-space-sm rounded-full bg-primary px-2 py-0.5 text-label-sm text-background">Hanya CS</span>
         <span v-if="mentionsMe(comment)" class="ml-space-sm rounded-full bg-accent px-2 py-0.5 text-label-sm">Anda disebut</span>
         <p class="mt-1 break-words whitespace-pre-line"><template v-for="(part, i) in segments(comment)" :key="i"><span v-if="part.mention" class="rounded bg-accent-tint-20 px-1 font-semibold">{{ part.text }}</span><template v-else>{{ part.text }}</template></template></p>
       </li>

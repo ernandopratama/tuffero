@@ -6,7 +6,7 @@ use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
-#[Fillable(['status_type', 'from_status', 'to_status', 'source', 'actor_user_id', 'reason'])]
+#[Fillable(['refund_id', 'status_type', 'from_status', 'to_status', 'source', 'actor_user_id', 'reason'])]
 class OrderStatusHistory extends Model
 {
     public const UPDATED_AT = null;

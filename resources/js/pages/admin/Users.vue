@@ -27,13 +27,14 @@ const { rows, meta, page, perPage, search, filter, loading, error, load } = useD
 const roles = ref([]);
 const roleOptions = computed(() => roles.value.map((role) => ({ value: role.name, label: ROLE_LABELS[role.name] || role.name })));
 const pageError = ref('');
+const pageNotice = ref('');
 
 const dialog = ref(null);
 const editing = ref(null);
 const saving = ref(false);
 const formError = ref('');
 const fieldErrors = ref({});
-const form = reactive({ name: '', email: '', role: '', password: '', is_active: true, mfa_required: true });
+const form = reactive({ name: '', email: '', username: '', role: '', password: '', is_active: true, mfa_required: true });
 const isSelf = computed(() => editing.value?.id === auth.user?.id);
 
 async function loadRoles() {
@@ -50,6 +51,7 @@ function openForm(user = null) {
     Object.assign(form, {
         name: user?.name || '',
         email: user?.email || '',
+        username: user?.username || '',
         role: user?.role || '',
         password: '',
         is_active: user?.is_active ?? true,
@@ -66,12 +68,12 @@ async function save() {
     fieldErrors.value = {};
     try {
         if (editing.value) {
-            const body = { name: form.name, email: form.email };
+            const body = { name: form.name, email: form.email, username: form.username || null };
             if (!isSelf.value) Object.assign(body, { role: form.role, is_active: form.is_active, mfa_required: form.mfa_required });
             if (form.password) body.password = form.password;
             await api.patch(`/admin/users/${editing.value.id}`, body, { toast: 'Akun diperbarui.' });
         } else {
-            await api.post('/admin/users', { name: form.name, email: form.email, role: form.role, password: form.password }, { toast: 'Akun dibuat. Pengguna mendaftarkan MFA saat login pertama.' });
+            await api.post('/admin/users', { name: form.name, email: form.email, username: form.username || null, role: form.role, password: form.password }, { toast: 'Akun dibuat. Pengguna mendaftarkan MFA saat login pertama.' });
         }
         form.password = '';
         dialog.value.close();
@@ -98,6 +100,32 @@ async function resetMfa(user) {
     }
 }
 
+const deleteDialog = ref(null);
+const toDelete = ref(null);
+const deleting = ref(false);
+const deleteError = ref('');
+
+function askDelete(user) {
+    toDelete.value = user;
+    deleteError.value = '';
+    deleteDialog.value.showModal();
+}
+
+async function removeUser() {
+    deleting.value = true;
+    deleteError.value = '';
+    try {
+        await api.delete(`/admin/users/${toDelete.value.id}`, { toast: 'Akun dihapus.' });
+        deleteDialog.value.close();
+        await load();
+    } catch (e) {
+        const { message, fields } = apiError(e);
+        deleteError.value = fields.user?.[0] || message;
+    } finally {
+        deleting.value = false;
+    }
+}
+
 function mfaLabel(user) {
     if (!user.mfa_required) return 'Tidak wajib';
     return user.mfa_enrolled ? 'Aktif' : 'Belum daftar';
@@ -120,6 +148,8 @@ onMounted(loadRoles);
 
   <p v-if="pageError" role="alert" class="mt-space-md rounded bg-error-surface px-3 py-2 text-body-sm text-on-error-surface">{{ pageError }}</p>
 
+  <p v-if="pageNotice" role="status" class="mt-space-md rounded bg-success-surface px-3 py-2 text-body-sm text-success">{{ pageNotice }}</p>
+
   <DataTable
     v-model:page="page"
     v-model:per-page="perPage"
@@ -137,6 +167,7 @@ onMounted(loadRoles);
     <template #cell-name="{ row }">
       <span class="block text-label-md">{{ row.name }}<template v-if="row.id === auth.user?.id"> (Anda)</template></span>
       <span class="break-all text-secondary">{{ row.email }}</span>
+      <span v-if="row.username" class="block font-mono text-label-sm text-secondary">@{{ row.username }}</span>
     </template>
     <template #cell-role="{ row }">{{ ROLE_LABELS[row.role] || 'Tanpa role' }}</template>
     <template #cell-status="{ row }">
@@ -147,6 +178,7 @@ onMounted(loadRoles);
       <div class="flex items-center justify-center gap-1">
         <IconAction icon="edit" label="Ubah" :subject="row.name" @click="openForm(row)" />
         <IconAction v-if="row.mfa_enrolled && row.id !== auth.user?.id" icon="shield" tone="danger" label="Reset MFA" :subject="row.name" @click="resetMfa(row)" />
+        <IconAction v-if="row.id !== auth.user?.id" icon="trash" tone="danger" label="Hapus akun" :subject="row.name" @click="askDelete(row)" />
       </div>
     </template>
   </DataTable>
@@ -174,6 +206,12 @@ onMounted(loadRoles);
         Email
         <input v-model="form.email" type="email" required autocomplete="off" class="mt-1 w-full rounded border border-secondary px-3 py-2 text-body-md focus:outline-2 focus:outline-primary">
         <span v-if="fieldErrors.email" class="mt-1 block text-body-sm text-error">{{ fieldErrors.email[0] }}</span>
+      </label>
+      <label class="block text-label-md">
+        Username (opsional)
+        <input v-model="form.username" maxlength="30" autocomplete="off" autocapitalize="none" spellcheck="false" class="mt-1 w-full rounded border border-secondary px-3 py-2 text-body-md focus:outline-2 focus:outline-primary">
+        <span class="mt-1 block text-body-sm font-normal text-secondary">Bisa dipakai masuk selain email. Huruf kecil, angka, titik, garis bawah, atau strip; 3 sampai 30 karakter.</span>
+        <span v-if="fieldErrors.username" class="mt-1 block text-body-sm text-error">{{ fieldErrors.username[0] }}</span>
       </label>
       <label class="block text-label-md">
         Role
@@ -205,6 +243,18 @@ onMounted(loadRoles);
     <template #footer>
       <button type="button" class="rounded border border-secondary px-4 py-2 text-label-md hover:bg-accent-tint-15 focus-visible:outline-2 focus-visible:outline-primary" @click="dialog.close()">Batal</button>
       <button form="user-form" :disabled="saving" class="rounded bg-accent px-4 py-2 text-label-md hover:bg-accent-hover focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary disabled:opacity-60">{{ saving ? 'Menyimpan...' : 'Simpan' }}</button>
+    </template>
+  </AppModal>
+
+  <AppModal ref="deleteDialog" variant="delete" size="md" title="Hapus akun?" :subtitle="toDelete?.name" @close="toDelete = null">
+    <div v-if="toDelete" class="space-y-2 text-body-sm">
+      <p>Akun <strong class="break-all">{{ toDelete.email }}</strong> dihapus permanen dan tidak bisa dikembalikan. Sesi loginnya langsung berakhir.</p>
+      <p class="text-secondary">Riwayat kerjanya di audit log, pesanan, dan stok tetap ada, tetapi nama pelakunya tidak lagi tertaut. Bila hanya ingin menutup akses, nonaktifkan akun lewat tombol Ubah.</p>
+    </div>
+    <p v-if="deleteError" role="alert" class="mt-3 text-body-sm text-error">{{ deleteError }}</p>
+    <template #footer>
+      <button type="button" class="inline-flex min-h-10 items-center rounded-full border border-secondary px-4 text-label-md hover:bg-accent-tint-15 focus-visible:outline-2 focus-visible:outline-primary" @click="deleteDialog.close()">Batal</button>
+      <button type="button" :disabled="deleting" class="inline-flex min-h-10 items-center gap-1.5 rounded-full bg-error px-4 text-label-md text-surface hover:bg-error/90 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary disabled:opacity-60" @click="removeUser">{{ deleting ? 'Menghapus...' : 'Hapus akun' }}</button>
     </template>
   </AppModal>
 </template>

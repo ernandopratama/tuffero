@@ -17,8 +17,10 @@ const KINDS = {
     content: { label: 'konten promo', route: () => 'AdminContents' },
     video: { label: 'video', route: () => 'AdminGallery' },
     cancellation: { label: 'pembatalan', route: () => 'AdminCancellations' },
+    refund: { label: 'refund', route: () => 'AdminRefunds' },
     stock: { label: 'stok', route: () => 'AdminStock' },
     security: { label: 'keamanan', route: () => 'AdminProfile' },
+    draft: { label: 'draf konten', route: () => 'AdminMarketingDrafts' },
 };
 
 const router = useRouter();

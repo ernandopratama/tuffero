@@ -102,6 +102,15 @@ class ProductController extends Controller
         return $this->success('Image added.', $this->present($product), 201);
     }
 
+    public function reorderImages(Request $request, Product $product): JsonResponse
+    {
+        $validated = $request->validate(['ids' => ['required', 'array', 'min:1', 'max:50'], 'ids.*' => ['integer', 'distinct']]);
+
+        $this->products->reorderImages($product, array_map('intval', $validated['ids']), $request->user());
+
+        return $this->success('Images reordered.', $this->present($product));
+    }
+
     public function destroyImage(Request $request, ProductImage $image): JsonResponse
     {
         $product = $image->product;
@@ -132,7 +141,7 @@ class ProductController extends Controller
             'max_discount_percent' => $this->discounts->maxPercent(),
             'variants' => $product->variants->sortBy('id')->values()->map(fn (ProductVariant $variant) => $variant->only([
                 'id', 'sku', 'name', 'name_en', 'price', 'compare_at_price', 'weight_gram', 'net_weight_gram',
-                'length_cm', 'width_cm', 'height_cm', 'shelf_life_days', 'max_order_quantity', 'is_active',
+                'length_cm', 'width_cm', 'height_cm', 'shelf_life_days', 'max_order_quantity', 'low_stock_threshold', 'is_active',
             ]) + ['discounts' => $variant->discounts->whereNull('campaign_id')->sortByDesc('id')->values()->map(fn ($discount) => $discount->only([
                 'id', 'audience', 'type', 'value', 'starts_at', 'ends_at', 'is_active',
             ]))]),

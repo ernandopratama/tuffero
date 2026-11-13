@@ -170,6 +170,29 @@ class ProductService
         });
     }
 
+    /**
+     * Urutan foto produk; foto pertama menjadi foto utama (dipakai toko). `$ids` harus memuat persis semua foto produk ini,
+     * tanpa kurang, lebih, atau ganda, supaya urutan tidak pernah menyisakan foto tanpa posisi.
+     *
+     * @param  list<int>  $ids
+     */
+    public function reorderImages(Product $product, array $ids, User $actor): void
+    {
+        DB::transaction(function () use ($product, $ids, $actor) {
+            $current = $product->images()->lockForUpdate()->pluck('id')->all();
+
+            if (count($ids) !== count($current) || array_diff($ids, $current) !== [] || count(array_unique($ids)) !== count($ids)) {
+                throw ValidationException::withMessages(['ids' => 'Daftar foto tidak cocok dengan foto produk ini. Muat ulang halaman.']);
+            }
+
+            foreach ($ids as $position => $id) {
+                ProductImage::whereKey($id)->update(['sort_order' => $position + 1]);
+            }
+
+            AuditLog::record('product.images_reordered', $product, ['order' => $ids, 'main_image_id' => $ids[0] ?? null], $actor->id);
+        });
+    }
+
     public function removeImage(ProductImage $image, User $actor): void
     {
         DB::transaction(function () use ($image, $actor) {

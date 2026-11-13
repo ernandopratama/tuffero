@@ -22,6 +22,7 @@ class ProfileService
         return [
             'name' => $user->name,
             'email' => $user->email,
+            'username' => $user->username,
             'phone' => $user->phone,
             'phone_verified' => $user->phone_verified_at !== null,
             'avatar_url' => $user->avatarUrl(),
@@ -62,6 +63,20 @@ class ProfileService
             DB::transaction(function () use ($user, $changes) {
                 $user->save();
                 AuditLog::record('profile.updated', $user, $changes, $user->id);
+            });
+        }
+
+        return $user;
+    }
+
+    /** Dipanggil setelah kode OTP terbukti benar. Null menghapus username (hanya email yang bisa dipakai masuk). */
+    public function setUsername(User $user, ?string $username): User
+    {
+        if ($user->username !== $username) {
+            DB::transaction(function () use ($user, $username) {
+                $old = $user->username;
+                $user->forceFill(['username' => $username])->save();
+                AuditLog::record('profile.username_changed', $user, ['username' => ['old' => $old, 'new' => $username]], $user->id);
             });
         }
 

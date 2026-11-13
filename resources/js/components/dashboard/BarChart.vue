@@ -13,24 +13,41 @@ const active = ref(props.chart.labels.length - 1);
 // Sumbu tanpa awalan Rp supaya muat satu baris: 500 rb, 1,5 jt.
 const axis = (v) => {
     if (props.chart.format !== 'rupiah') return Number(v).toLocaleString('id-ID');
-    if (v >= 1_000_000) return `${(v / 1_000_000).toLocaleString('id-ID', { maximumFractionDigits: 1 })} jt`;
-    return v >= 1_000 ? `${(v / 1_000).toLocaleString('id-ID', { maximumFractionDigits: 0 })} rb` : String(v);
+    const sign = v < 0 ? '-' : '';
+    const a = Math.abs(v);
+    if (a >= 1_000_000) return `${sign}${(a / 1_000_000).toLocaleString('id-ID', { maximumFractionDigits: 1 })} jt`;
+    return a >= 1_000 ? `${sign}${(a / 1_000).toLocaleString('id-ID', { maximumFractionDigits: 0 })} rb` : String(v);
 };
 const fmt = (v) => (props.chart.format === 'rupiah' ? rupiahCompact(v) : Number(v).toLocaleString('id-ID'));
-const max = computed(() => Math.max(0, ...props.chart.series.flatMap((s) => s.values)));
-const empty = computed(() => max.value === 0);
+const all = computed(() => props.chart.series.flatMap((s) => s.values));
+const max = computed(() => Math.max(0, ...all.value));
+// Nilai negatif (pendapatan bersih saat dana yang dikembalikan lebih besar dari penjualan) digambar di bawah garis nol.
+const min = computed(() => Math.min(0, ...all.value));
+const empty = computed(() => all.value.every((v) => v === 0));
 
-// Skala "rapi": 5 selang berukuran 1, 2, 2,5, atau 5 dikali pangkat 10.
-// Hitungan (pesanan, pcs) memakai selang bulat; rupiah boleh 2,5.
+// Skala "rapi": 5 selang berukuran 1, 2, 2,5, atau 5 dikali pangkat 10, dipilih yang terkecil sehingga selang di atas dan di bawah
+// nol muat dalam 5. Hitungan (pesanan, pcs) memakai selang bulat; rupiah boleh 2,5.
 const step = computed(() => {
     const whole = props.chart.format === 'number';
-    const raw = Math.max(max.value, 1) / 5;
+    const raw = Math.max(max.value - min.value, 1) / 5;
     const pow = Math.max(whole ? 1 : 0, 10 ** Math.floor(Math.log10(raw)));
-    return (whole ? [1, 2, 5, 10] : [1, 2, 2.5, 5, 10]).map((m) => m * pow).find((s) => s >= raw);
+    const mults = whole ? [1, 2, 5, 10, 20, 50, 100] : [1, 2, 2.5, 5, 10, 20, 25, 50, 100];
+    const fits = (s) => Math.ceil(max.value / s) + Math.ceil(-min.value / s) <= 5;
+
+    return mults.map((m) => m * pow).find((s) => s >= raw && fits(s));
 });
 const top = computed(() => step.value * 5);
+// Selang di bawah nol; garis nol berada setinggi `below` selang dari dasar area.
+const below = computed(() => Math.ceil(-min.value / step.value));
+const baseline = computed(() => (below.value / 5) * 100);
 // Dibulatkan agar 3 * 0,2 tidak tampil 0.6000000000000001.
-const ticks = computed(() => [5, 4, 3, 2, 1, 0].map((i) => Number((i * step.value).toPrecision(12))));
+const ticks = computed(() => [0, 1, 2, 3, 4, 5].map((i) => Number(((5 - below.value - i) * step.value).toPrecision(12))));
+const barStyle = (v, i) => {
+    const h = v === 0 ? 0 : Math.max(1.5, (Math.abs(v) / top.value) * 100);
+    const place = v < 0 ? { top: `${100 - baseline.value}%` } : { bottom: `${baseline.value}%` };
+
+    return { ...place, height: `${h}%`, animationDelay: `${i * 30}ms` };
+};
 
 const groups = computed(() => props.chart.labels.map((label, i) => ({ label, i, values: props.chart.series.map((s) => s.values[i]) })));
 const total = computed(() => props.chart.series.map((s) => s.values.reduce((a, b) => a + b, 0)));
@@ -38,7 +55,7 @@ const total = computed(() => props.chart.series.map((s) => s.values.reduce((a, b
 // Tooltip duduk di atas batang tertinggi kolom aktif, dan menempel ke kiri atau kanan pada kolom pinggir supaya tidak terpotong.
 const tipStyle = computed(() => {
     const n = props.chart.labels.length;
-    const tallest = (Math.max(...groups.value[active.value].values) / top.value) * 100;
+    const tallest = baseline.value + (Math.max(0, ...groups.value[active.value].values) / top.value) * 100;
     const style = { bottom: `min(calc(${tallest}% + 0.75rem), calc(100% - 7rem))` };
     if (active.value <= 1) return { ...style, left: '0' };
     if (active.value >= n - 2) return { ...style, right: '0' };
@@ -70,7 +87,7 @@ const describe = (g) => `${g.label}: ${props.chart.series.map((s, k) => `${s.nam
           <div
             v-for="g in groups"
             :key="g.i"
-            class="absolute inset-y-0 flex items-end justify-center gap-1 rounded-lg outline-none focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
+            class="absolute inset-y-0 flex justify-center gap-1 rounded-lg outline-none focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
             :style="{ left: `${(g.i / chart.labels.length) * 100}%`, width: `${100 / chart.labels.length}%` }"
             tabindex="0"
             role="group"
@@ -78,13 +95,13 @@ const describe = (g) => `${g.label}: ${props.chart.series.map((s, k) => `${s.nam
             @pointerenter="active = g.i"
             @focus="active = g.i"
           >
-            <span
-              v-for="(s, k) in chart.series"
-              :key="s.key"
-              class="w-2.5 origin-bottom animate-grow rounded-t-[4px] transition-opacity duration-150 ease-out sm:w-3"
-              :class="[BAR[s.tone], active === g.i ? 'opacity-100' : 'opacity-35']"
-              :style="{ height: `${g.values[k] > 0 ? Math.max(1.5, (g.values[k] / top) * 100) : 0}%`, animationDelay: `${g.i * 30}ms` }"
-            ></span>
+            <span v-for="(s, k) in chart.series" :key="s.key" class="relative h-full w-2.5 sm:w-3">
+              <span
+                class="absolute inset-x-0 animate-grow transition-opacity duration-150 ease-out"
+                :class="[BAR[s.tone], active === g.i ? 'opacity-100' : 'opacity-35', g.values[k] < 0 ? 'origin-top rounded-b-[4px]' : 'origin-bottom rounded-t-[4px]']"
+                :style="barStyle(g.values[k], g.i)"
+              ></span>
+            </span>
           </div>
 
           <div class="pointer-events-none absolute z-10 w-52 rounded-2xl border border-border bg-surface p-3 shadow-pop transition-[left,right,bottom] duration-200 ease-out-strong" :style="tipStyle" aria-hidden="true">

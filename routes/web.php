@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Controllers\Store\GoogleAuthController;
 use App\Http\Controllers\Store\StorefrontController;
 use App\Http\Middleware\SetStoreContext;
 use Illuminate\Support\Facades\Route;
@@ -10,6 +11,12 @@ Route::view('/lupa-kata-sandi', 'admin');
 Route::view('/admin/{any?}', 'admin')->where('any', '.*');
 
 Route::get('/sitemap.xml', [StorefrontController::class, 'sitemap']);
+
+// Masuk pelanggan dengan Google. Hanya pengunjung yang belum masuk; dibatasi agar tidak dipakai membanjiri Google atau log.
+Route::middleware(['store.account:guest', 'throttle:20,1'])->prefix('auth/google')->controller(GoogleAuthController::class)->group(function () {
+    Route::get('/', 'redirect');
+    Route::get('/callback', 'callback');
+});
 
 // Halaman toko: Blade + Alpine (D-053).
 Route::middleware(SetStoreContext::class)->controller(StorefrontController::class)->group(function () {
@@ -27,6 +34,7 @@ Route::middleware(SetStoreContext::class)->controller(StorefrontController::clas
     Route::get('/checkout', 'checkout');
     Route::get('/pesanan/{ref}', 'order');
     Route::get('/cek-pesanan', 'lookup');
+    Route::get('/ajukan-refund', 'refund');
 
     Route::middleware('store.account:guest')->group(function () {
         Route::get('/masuk', 'signIn');

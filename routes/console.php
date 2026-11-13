@@ -1,14 +1,21 @@
 <?php
 
+use App\Jobs\QueueHeartbeat;
 use App\Models\AuditLog;
+use App\Models\LoginFailure;
 use App\Models\User;
+use App\Models\WebhookRejection;
 use App\Services\CancellationService;
+use App\Services\IntegrationHealthService;
+use App\Services\MarketingReminderService;
 use App\Services\MfaService;
 use App\Services\OrderExpiryService;
+use App\Services\SystemHealthService;
 use Illuminate\Foundation\DevCommands;
 use Illuminate\Foundation\Inspiring;
 use Illuminate\Notifications\DatabaseNotification;
 use Illuminate\Support\Facades\Artisan;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schedule;
 use Illuminate\Support\Facades\Validator;
@@ -40,9 +47,13 @@ Artisan::command('dev:tunnel {--port=8000}', function () use ($cloudflared) {
     $process = new Process([$cloudflared, 'tunnel', '--no-autoupdate', '--url', 'http://127.0.0.1:'.$this->option('port')]);
     $process->setTimeout(null);
 
-    $process->run(function (string $type, string $output) use (&$shown) {
+    $tunnelFile = IntegrationHealthService::tunnelFile();
+
+    $process->run(function (string $type, string $output) use (&$shown, $tunnelFile) {
         if (! $shown && preg_match('~https://[a-z0-9-]+\.trycloudflare\.com~', $output, $match)) {
             $shown = true;
+            // Dibaca halaman Pengaturan (bagian Integrasi) supaya alamat webhook yang tampil di sana sama dengan tunnel ini.
+            file_put_contents($tunnelFile, $match[0]);
             $this->newLine();
             $this->info('Tunnel aktif. Isi Payment notification URL di dashboard Midtrans Sandbox dengan:');
             $this->line('  <options=bold>'.$match[0].'/api/v1/webhooks/midtrans</>');
@@ -60,11 +71,20 @@ Artisan::command('dev:tunnel {--port=8000}', function () use ($cloudflared) {
         }
     });
 
+    @unlink($tunnelFile);
+
     return $process->getExitCode();
 })->purpose('Run a Cloudflare quick tunnel and print the Midtrans notification URL (local only)');
 
 if ($cloudflared) {
     DevCommands::artisan('dev:tunnel', 'tunnel');
+}
+
+// `composer dev` bawaan hanya menjalankan queue:listen. Tanpa penjadwal, detak di Pengaturan tidak pernah muncul, pesanan
+// tidak kedaluwarsa, dan job QueueHeartbeat tidak pernah dikirim ke antrean. Hanya lokal: di server dev dan production
+// penjadwal berjalan dari cron `schedule:run` (lihat docs/infrastructure/ENVIRONMENT_AND_DEPLOYMENT.md bagian 4b).
+if (app()->environment('local')) {
+    DevCommands::artisan('schedule:work', 'schedule');
 }
 
 Artisan::command('inspire', function () {
@@ -77,11 +97,22 @@ Artisan::command('orders:expire', function (OrderExpiryService $expiry) {
 
 Schedule::command('orders:expire')->everyMinute()->withoutOverlapping();
 
+// Detak untuk halaman Pengaturan: penjadwal menulis waktu tiap menit, dan worker antrean menulisnya lewat job tiap 5 menit.
+Schedule::call(fn () => Cache::put(SystemHealthService::SCHEDULER_KEY, now()->timestamp, now()->addDay()))->name('system:scheduler-heartbeat')->everyMinute();
+Schedule::job(new QueueHeartbeat)->everyFiveMinutes();
+
 Artisan::command('cancellations:remind', function (CancellationService $cancellations) {
     $this->info($cancellations->remindOverdue().' pengingat pembatalan dikirim.');
 })->purpose('Notify staff about cancellation requests past their process deadline (once per request)');
 
 Schedule::command('cancellations:remind')->hourly()->withoutOverlapping();
+
+Artisan::command('marketing:remind', function (MarketingReminderService $reminders) {
+    $this->info($reminders->remind().' jenis pengingat draf konten dikirim.');
+})->purpose('Notify the marketing team about approved drafts due tomorrow and the owner about drafts waiting too long (once per day)');
+
+// 08.00 WIB; hari dihitung menurut jam toko. Pengingat Telegram untuk grup tim dikirim Hermes (D-079), bukan Laravel.
+Schedule::command('marketing:remind')->dailyAt('08:00')->timezone('Asia/Jakarta')->withoutOverlapping();
 
 Artisan::command('notifications:prune', function () {
     // Sudah dibaca disimpan 30 hari; belum dibaca 90 hari supaya tidak terlewat.
@@ -91,6 +122,8 @@ Artisan::command('notifications:prune', function () {
 })->purpose('Delete old notifications (read after 30 days, unread after 90 days)');
 
 Schedule::command('notifications:prune')->daily();
+Schedule::call(fn () => LoginFailure::where('created_at', '<', now()->subDays(LoginFailure::KEEP_DAYS))->delete())->name('login-failures:prune')->daily();
+Schedule::call(fn () => WebhookRejection::where('created_at', '<', now()->subDays(WebhookRejection::KEEP_DAYS))->delete())->name('webhook-rejections:prune')->daily();
 
 Artisan::command('admin:create-super-admin {email} {name}', function (string $email, string $name) {
     $password = $this->secret('Password (minimal 12 karakter, huruf besar, huruf kecil, angka)');

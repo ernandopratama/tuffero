@@ -1,6 +1,6 @@
 <section class="tf-wrap tf-page-hero">
 	<div class="tf-page-hero-box">
-		<img src="{{ $photo }}" alt="" fetchpriority="high">
+		<img src="{{ $photo }}" {{ $site->imageSize($photo) }} alt="" fetchpriority="high">
 		<div class="tf-page-hero-shade"></div>
 		<div class="tf-page-hero-content">
 			<nav class="tf-crumbs wow fadeInUp" aria-label="{{ $t['aria']['breadcrumb'] }}">

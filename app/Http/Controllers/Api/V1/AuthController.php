@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Api\V1;
 
 use App\Http\Controllers\Controller;
+use App\Models\LoginFailure;
 use App\Models\User;
 use App\Services\DeviceService;
 use App\Traits\ApiResponse;
@@ -18,16 +19,24 @@ class AuthController extends Controller
 
     public function login(Request $request): JsonResponse
     {
+        // Masuk dengan email atau username. Kolom `email` tetap diterima untuk klien lama (login toko mode dev).
+        $request->merge(['login' => $request->input('login', $request->input('email'))]);
         $credentials = $request->validate([
-            'email' => ['required', 'email', 'max:255'],
+            'login' => ['required', 'string', 'max:255'],
             'password' => ['required'],
         ]);
+        $login = trim($credentials['login']);
 
-        if (! Auth::validate([...$credentials, 'is_active' => true])) {
+        // Username tidak boleh memuat "@", jadi tidak ada tabrakan dengan email.
+        $user = str_contains($login, '@')
+            ? User::where('email', $login)->first()
+            : User::where('username', mb_strtolower($login))->first();
+
+        if (! $user || ! Auth::validate(['email' => $user->email, 'password' => $credentials['password'], 'is_active' => true])) {
+            LoginFailure::record($login);
+
             return $this->error('The provided credentials do not match our records.', [], 401);
         }
-
-        $user = User::where('email', $credentials['email'])->firstOrFail();
 
         $request->session()->regenerate();
 

@@ -9,10 +9,14 @@ use App\Models\Order;
 use App\Models\ProductReview;
 use App\Models\ProductVariant;
 use App\Models\PromoContent;
+use App\Models\Setting;
+use App\Models\TermsSection;
 use App\Services\MidtransService;
 use App\Services\NewsService;
 use App\Services\StoreCatalogService;
+use App\Services\TermsService;
 use App\Support\StoreSite;
+use Carbon\Carbon;
 use Illuminate\Contracts\View\View;
 use Illuminate\Http\Request;
 use Illuminate\Http\Response;
@@ -38,7 +42,7 @@ class StorefrontController extends Controller
         $google = $this->catalog->reviews();
 
         return view('store.pages.home', [
-            'seo' => ['title' => $t['meta']['title'], 'description' => $t['hero']['text'], 'jsonld' => $this->site->businessJsonLd()],
+            'seo' => ['title' => $t['meta']['title'], 'description' => $t['meta']['description'], 'jsonld' => $this->site->businessJsonLd($items->pluck('price')->all())],
             'google' => ['rating' => number_format($google['rating'], 1, ',', ''), 'count' => $google['count']],
             // Popup berita (D-085): data saja; JS membangun popup setelah halaman siap.
             'newsPopup' => $this->news->popup(app()->getLocale()),
@@ -121,8 +125,35 @@ class StorefrontController extends Controller
     public function contact(): View
     {
         $p = trans('store.pages.contact');
+        $terms = $this->terms($p);
 
-        return view('store.pages.contact', ['p' => $p, 'status' => $this->site->openStatus(), 'seo' => ['title' => $p['meta'], 'description' => $p['hero']['text'], 'image' => $this->site->productPhoto('Nastar Classic 5')]]);
+        return view('store.pages.contact', ['p' => $p, 'terms' => $terms, 'status' => $this->site->openStatus(), 'seo' => ['title' => $p['meta'], 'description' => $p['hero']['text'], 'image' => $this->site->productPhoto('Nastar Classic 5')]]);
+    }
+
+    /**
+     * S&K dari dashboard (butir tayang, urut). Tanpa butir tayang, teks bawaan di berkas bahasa dipakai. Versi dan tanggalnya ditampilkan
+     * supaya jelas teks mana yang disetujui pelanggan saat mengajukan refund.
+     *
+     * @param  array<string, mixed>  $p
+     * @return array{version: string, date: string}|null
+     */
+    private function terms(array &$p): ?array
+    {
+        $sections = TermsSection::published()->get();
+
+        if ($sections->isEmpty()) {
+            return null;
+        }
+
+        $en = app()->getLocale() === 'en';
+        $p['legal']['docs'][0]['items'] = $sections->map(fn (TermsSection $s) => $en ? [$s->title_en, $s->body_en] : [$s->title_id, $s->body_id])->all();
+
+        $updated = Setting::where('key', TermsService::VERSION_KEY)->value('updated_at');
+
+        return [
+            'version' => app(TermsService::class)->version(),
+            'date' => ($updated ? Carbon::parse($updated) : now())->locale($en ? 'en' : 'id')->translatedFormat('j F Y'),
+        ];
     }
 
     public function catalog(): View
@@ -190,6 +221,7 @@ class StorefrontController extends Controller
                             'offers' => [
                                 '@type' => 'Offer', 'priceCurrency' => 'IDR', 'price' => $item['price'], 'url' => url($item['path']),
                                 'availability' => $item['in_stock'] ? 'https://schema.org/InStock' : 'https://schema.org/OutOfStock',
+                                'hasMerchantReturnPolicy' => $this->site->returnPolicyJsonLd(),
                             ],
                         ]),
                         [
@@ -246,6 +278,14 @@ class StorefrontController extends Controller
         return view('store.pages.lookup', ['c' => $c, 'seo' => ['title' => $c['meta'], 'noindex' => true]]);
     }
 
+    public function refund(): View
+    {
+        $c = trans('store.pages.refund');
+
+        // Halaman alur pribadi (data pesanan): tidak diindeks dan tidak masuk sitemap.
+        return view('store.pages.refund', ['c' => $c, 'seo' => ['title' => $c['meta'], 'noindex' => true]]);
+    }
+
     public function signIn(): View
     {
         return $this->authView('login');
@@ -286,7 +326,7 @@ class StorefrontController extends Controller
         return view('store.pages.promos', [
             'c' => $c,
             'campaigns' => $campaigns,
-            'seo' => ['title' => $c['meta'], 'description' => $c['lead']],
+            'seo' => ['title' => $c['meta'], 'description' => $c['description']],
         ]);
     }
 
@@ -304,7 +344,7 @@ class StorefrontController extends Controller
             'campaign' => $campaign,
             'live' => $campaign->starts_at->lte(now()),
             'items' => $this->catalog->campaignItems($campaign),
-            'seo' => ['title' => $campaign->title.$c['metaSuffix'], 'description' => $campaign->description ?: $c['lead']],
+            'seo' => ['title' => $campaign->title.$c['metaSuffix'], 'description' => $campaign->description ?: $c['description']],
         ]);
     }
 
@@ -312,7 +352,7 @@ class StorefrontController extends Controller
     {
         $c = [...trans('store.pages.voucherCard'), ...trans('store.pages.vouchers')];
 
-        return view('store.pages.vouchers', ['c' => $c, 'seo' => ['title' => $c['meta'], 'description' => $c['lead']]]);
+        return view('store.pages.vouchers', ['c' => $c, 'seo' => ['title' => $c['meta'], 'description' => $c['description']]]);
     }
 
     public function accountVouchers(): View
@@ -350,7 +390,7 @@ class StorefrontController extends Controller
 
         $p = trans('store.pages.product');
 
-        return response()->view('store.pages.not-found', ['seo' => ['title' => $p['notFoundTitle'].$p['metaSuffix'], 'noindex' => true], 'p' => $p], 404);
+        return response()->view('store.pages.not-found', ['seo' => ['title' => trans('errors.404.title').$p['metaSuffix'], 'noindex' => true]], 404);
     }
 
     /**

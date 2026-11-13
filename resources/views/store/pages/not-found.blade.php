@@ -1,11 +1,6 @@
-@extends('store.layouts.app')
+@extends('store.layouts.app', ['footer' => false, 'mainbar' => false])
 
 @section('content')
-	<main>
-		<section class="tf-wrap tf-pd-missing">
-			<h1 class="tf-pd-title">{{ $p['notFoundTitle'] }}</h1>
-			<p>{{ $p['notFoundText'] }}</p>
-			<a href="/" class="tf-btn">{{ $t['nav'][0] }}</a>
-		</section>
-	</main>
+	<link rel="stylesheet" href="{{ asset('css/tuffero-error.css') }}?v={{ filemtime(public_path('css/tuffero-error.css')) }}">
+	@include('errors.partials.stage', ['code' => '404', 'loc' => $locale])
 @endsection

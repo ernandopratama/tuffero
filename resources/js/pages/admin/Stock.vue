@@ -1,5 +1,6 @@
 <script setup>
 import { computed, onMounted, reactive, ref } from 'vue';
+import { useRoute } from 'vue-router';
 import AdminIcon from '../../components/AdminIcon.vue';
 import AppModal from '../../components/ui/AppModal.vue';
 import IconAction from '../../components/ui/IconAction.vue';
@@ -27,12 +28,11 @@ const MOVEMENTS = {
     return: { label: 'Retur', icon: 'undo', tone: 'ok' },
 };
 
-// Batas "menipis" sama dengan dashboard (D-055): tersedia di bawah 10.
-const LOW_STOCK = 10;
+// Batas "menipis" tiap baris dari server: batas varian bila diisi, jika tidak batas bawaan Pengaturan (D-055).
 const DOT = { ok: 'bg-success', warn: 'bg-warning', bad: 'bg-error' };
 const level = (row) => {
     if (row.available <= 0) return { label: 'Habis', tone: 'bad' };
-    if (row.available < LOW_STOCK) return { label: 'Menipis', tone: 'warn' };
+    if (row.available < row.low_stock) return { label: 'Menipis', tone: 'warn' };
     return { label: 'Aman', tone: 'ok' };
 };
 
@@ -52,7 +52,10 @@ const TYPE_CHOICES = [
     { key: 'adjustment', title: 'Penyesuaian', text: 'Koreksi hasil hitung fisik. Boleh minus, misalnya -3.' },
 ];
 
-const { rows, meta, page, perPage, search, filter, loading, error, load } = useDataTable('/admin/stock', { filters: { warehouse_id: '', active: '' } });
+// ?level=low|out|alert datang dari tautan "Lihat semua" di dasbor Gudang dan Admin Toko.
+const route = useRoute();
+const LEVELS = { alert: 'Perlu perhatian', low: 'Menipis', out: 'Habis' };
+const { rows, meta, page, perPage, search, filter, loading, error, load } = useDataTable('/admin/stock', { filters: { warehouse_id: '', active: '', level: Object.hasOwn(LEVELS, route.query.level) ? route.query.level : '' } });
 
 // Tanpa pilihan, server memakai gudang aktif pertama; daftar gudang diambil sekali untuk pilihan filter.
 const warehouses = ref([]);
@@ -137,6 +140,8 @@ onMounted(async () => {
     <TableToolbar v-model="search" placeholder="Cari produk atau SKU">
       <FilterSelect v-model="filter.warehouse_id" label="Gudang" all-label="Utama" :options="warehouseOptions" />
       <FilterSelect v-model="filter.active" label="Varian" :options="ACTIVE" />
+      <FilterSelect v-model="filter.level" label="Stok" :options="LEVELS" />
+      <router-link :to="{ name: 'AdminStockHistory' }" class="inline-flex h-10 items-center gap-2 rounded-full border border-border px-4 text-body-sm hover:bg-accent-tint-15 focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-primary"><AdminIcon name="clock" :size="16" />Riwayat semua gerakan</router-link>
     </TableToolbar>
   </div>
 
@@ -147,6 +152,7 @@ onMounted(async () => {
     caption="Daftar stok varian"
     empty-text="Belum ada varian produk."
     min-width="min-w-[860px]"
+    stack
     row-key="variant_id"
     :columns="COLUMNS"
     :rows="rows"
@@ -170,7 +176,7 @@ onMounted(async () => {
       </span>
     </template>
     <template #cell-actions="{ row }">
-      <div class="flex items-center justify-center gap-1">
+      <div class="flex items-center justify-center gap-1 max-md:justify-start">
         <IconAction v-if="auth.can('stock.adjust')" icon="sliders" label="Ubah stok" :subject="row.sku" @click="openAdjust(row)" />
         <IconAction icon="clock" label="Riwayat stok" :subject="row.sku" @click="openHistory(row)" />
       </div>

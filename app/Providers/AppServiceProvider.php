@@ -3,10 +3,19 @@
 namespace App\Providers;
 
 use App\Models\Order;
+use App\Models\OrderCancellationRequest;
 use App\Models\PromoContent;
+use App\Models\Refund;
 use App\Models\Voucher;
+use App\Models\Warehouse;
 use App\Services\Chat\ChatModel;
 use App\Services\Chat\ClaudeChatModel;
+use App\Services\Marketing\ClaudeMarketingModel;
+use App\Services\Marketing\MarketingModel;
+use App\Services\Otp\LogOtpSender;
+use App\Services\Otp\MetaWhatsAppOtpSender;
+use App\Services\Otp\OtpSender;
+use App\Services\Otp\UnavailableOtpSender;
 use App\Services\Shipping\BiteshipShippingProvider;
 use App\Services\Shipping\ShippingProvider;
 use App\Services\Shipping\TestShippingProvider;
@@ -29,12 +38,19 @@ class AppServiceProvider extends ServiceProvider
     {
         $this->app->bind(ShippingProvider::class, fn () => match (true) {
             $this->app->environment('testing') => new TestShippingProvider,
-            filled(config('services.biteship.key')) && filled(config('services.biteship.origin_postal_code')) => new BiteshipShippingProvider,
+            filled(config('services.biteship.key')) && filled(Warehouse::originPostalCode()) => new BiteshipShippingProvider,
             $this->app->environment('local') => new TestShippingProvider,
             default => new UnavailableShippingProvider,
         });
+        $this->app->bind(OtpSender::class, fn () => match (true) {
+            $this->app->environment('testing') => new LogOtpSender,
+            filled(config('services.whatsapp.token')) && filled(config('services.whatsapp.phone_number_id')) && filled(config('services.whatsapp.otp_template')) => new MetaWhatsAppOtpSender,
+            $this->app->environment('local') => new LogOtpSender,
+            default => new UnavailableOtpSender,
+        });
         $this->app->bind(Translator::class, ClaudeTranslator::class);
         $this->app->bind(ChatModel::class, ClaudeChatModel::class);
+        $this->app->bind(MarketingModel::class, ClaudeMarketingModel::class);
     }
 
     /**
@@ -46,12 +62,14 @@ class AppServiceProvider extends ServiceProvider
         Route::model('voucher', Voucher::class);
         Route::model('content', PromoContent::class);
         Route::model('order', Order::class);
+        Route::model('refund', Refund::class);
+        Route::model('cancellation', OrderCancellationRequest::class);
 
         RateLimiter::for('login', function (Request $request) {
-            $email = $request->input('email');
+            $login = $request->input('login', $request->input('email'));
 
             return [
-                Limit::perMinute(5)->by(Str::lower(is_string($email) ? $email : '').'|'.$request->ip()),
+                Limit::perMinute(5)->by(Str::lower(is_string($login) ? trim($login) : '').'|'.$request->ip()),
                 Limit::perMinute(20)->by($request->ip()),
             ];
         });
@@ -87,6 +105,22 @@ class AppServiceProvider extends ServiceProvider
             Limit::perDay(60)->by('chat-ai-day|'.$request->ip()),
             Limit::perDay(3000)->by('chat-ai-store'),
         ]);
+
+        // Pembuat draf konten AI memakai kunci Claude berbayar dan pencarian web (D-079): 5 per menit dan 20 per jam per akun staf.
+        // Batas harian seluruh toko ada di MarketingGenerator::DAILY_LIMIT.
+        RateLimiter::for('marketing-ai', fn (Request $request) => [
+            Limit::perMinute(5)->by('marketing-ai-minute|'.$request->user()?->id),
+            Limit::perHour(20)->by('marketing-ai-hour|'.$request->user()?->id),
+        ]);
+
+        // Penerima laporan Hermes (D-079): jadwal mingguan hanya butuh beberapa kiriman, jadi batasnya kecil per IP.
+        RateLimiter::for('hermes-ingest', fn (Request $request) => [
+            Limit::perMinute(10)->by('hermes-ingest-minute|'.$request->ip()),
+            Limit::perDay(100)->by('hermes-ingest-day'),
+        ]);
+
+        // Batas kasar per permintaan. Batas pengiriman yang berbiaya (per nomor dan IP, D-093) ada di PhoneOtpService.
+        RateLimiter::for('phone-otp', fn (Request $request) => Limit::perMinute(20)->by('phone-otp|'.$request->ip()));
 
         // Ubah profil dan password butuh password saat ini; dibatasi per akun supaya sesi yang dibajak tidak bisa menebaknya.
         RateLimiter::for('profile', fn (Request $request) => Limit::perMinute(5)->by('profile|'.($request->user()?->id ?: $request->ip())));

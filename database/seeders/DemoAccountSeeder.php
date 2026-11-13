@@ -37,10 +37,10 @@ class DemoAccountSeeder extends Seeder
 
             $user = User::updateOrCreate(['email' => $email], ['name' => "Uji {$label}", 'password' => $password]);
             // shortcut: MFA dimatikan supaya enam role mudah dicek di lokal; akun nyata tetap wajib MFA (D-030).
-            $user->forceFill(['is_active' => true, 'mfa_required' => false, 'email_verified_at' => now()])->save();
+            $user->forceFill(['username' => $role, 'is_active' => true, 'mfa_required' => false, 'email_verified_at' => now()])->save();
             $user->syncRoles([$role]);
 
-            $rows[] = "| {$label} | `{$role}` | `{$email}` | `{$password}` |";
+            $rows[] = "| {$label} | `{$role}` | `{$email}` | `{$role}` | `{$password}` |";
         }
 
         $customerRows = [];
@@ -50,10 +50,10 @@ class DemoAccountSeeder extends Seeder
 
             $user = User::updateOrCreate(['email' => $email], ['name' => "Uji Pelanggan {$number}", 'password' => $password]);
             // shortcut: verifikasi email dan WhatsApp ditandai langsung karena provider belum tersambung, hanya untuk lokal; hapus saat OTP sungguhan aktif (D-051).
-            $user->forceFill(['is_active' => true, 'mfa_required' => false, 'email_verified_at' => now(), 'phone' => "+62811000000{$number}", 'phone_verified_at' => now()])->save();
+            $user->forceFill(['username' => "pelanggan{$number}", 'is_active' => true, 'mfa_required' => false, 'email_verified_at' => now(), 'phone' => "+62811000000{$number}", 'phone_verified_at' => now()])->save();
             $user->syncRoles([]);
 
-            $customerRows[] = "| Uji Pelanggan {$number} | `{$email}` | `{$password}` | `+62811000000{$number}` |";
+            $customerRows[] = "| Uji Pelanggan {$number} | `{$email}` | `pelanggan{$number}` | `{$password}` | `+62811000000{$number}` |";
         }
 
         $target = $path ?? base_path('docs/DEMO_ACCOUNTS.local.md');
@@ -65,18 +65,18 @@ class DemoAccountSeeder extends Seeder
             'Dibuat oleh `DemoAccountSeeder`. Hanya untuk MySQL lokal. Berkas ini diabaikan Git; jangan dibagikan atau di-commit.',
             'Password sengaja sederhana (slug role + -123) karena hanya untuk lokal; seeder menolak jalan di luar environment local. Akun ini tanpa MFA, jadi MFA diuji dengan `admin:create-super-admin`.',
             '',
-            'Masuk lewat `/login`.',
+            'Masuk lewat `/login` dengan **email atau username** (kolom pertama form), lalu password.',
             '',
-            '| Role | Slug | Email | Password |',
-            '|---|---|---|---|',
+            '| Role | Slug | Email | Username | Password |',
+            '|---|---|---|---|---|',
             ...$rows,
             '',
             '## Pelanggan',
             '',
-            'Tanpa role. Email dan WhatsApp sudah ditandai terverifikasi, tanpa OTP sungguhan (D-051). Masuk lewat `/masuk` hanya di build dev, dengan email. Di `/login` hasilnya halaman akses ditolak.',
+            'Tanpa role. Email dan WhatsApp sudah ditandai terverifikasi, tanpa OTP sungguhan (D-051). Masuk lewat `/masuk` hanya di build dev, dengan email (username hanya berlaku di `/login`). Di `/login` hasilnya halaman akses ditolak.',
             '',
-            '| Nama | Email | Password | WhatsApp |',
-            '|---|---|---|---|',
+            '| Nama | Email | Username | Password | WhatsApp |',
+            '|---|---|---|---|---|',
             ...$customerRows,
             '',
         ]));

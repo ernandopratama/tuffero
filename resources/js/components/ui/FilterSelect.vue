@@ -16,12 +16,12 @@ const list = computed(() => (Array.isArray(props.options)
 </script>
 
 <template>
-  <label class="relative block">
+  <label class="relative block max-w-full">
     <span class="sr-only">{{ label }}</span>
     <span class="pointer-events-none absolute left-3.5 top-1/2 -translate-y-1/2 text-secondary"><AdminIcon name="filter" :size="16" /></span>
     <select
       v-model="model"
-      class="h-10 max-w-full cursor-pointer appearance-none rounded-full border bg-surface pl-9 pr-9 text-body-sm focus:border-primary focus:outline-2 focus:outline-offset-1 focus:outline-primary"
+      class="h-10 w-full max-w-full cursor-pointer appearance-none rounded-full border bg-surface pl-9 pr-9 text-body-sm focus:border-primary focus:outline-2 focus:outline-offset-1 focus:outline-primary"
       :class="model === '' || model === null ? 'border-border text-secondary' : 'border-primary text-primary'"
     >
       <option value="">{{ label }}: {{ allLabel }}</option>

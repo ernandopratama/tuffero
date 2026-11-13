@@ -10,7 +10,7 @@ use Illuminate\Support\Str;
  */
 class MentionedInComment extends Notification
 {
-    /** @param  'order'|'voucher'|'content'|'video'  $kind */
+    /** @param  'order'|'voucher'|'content'|'video'|'refund'|'cancellation'  $kind */
     public function __construct(
         private readonly string $by,
         private readonly string $kind,
@@ -27,7 +27,7 @@ class MentionedInComment extends Notification
     /** @return array<string, string> */
     public function toArray(object $notifiable): array
     {
-        $noun = ['order' => 'pesanan', 'voucher' => 'voucher', 'content' => 'konten promo', 'video' => 'video'][$this->kind];
+        $noun = ['order' => 'pesanan', 'voucher' => 'voucher', 'content' => 'konten promo', 'video' => 'video', 'refund' => 'refund', 'cancellation' => 'pembatalan'][$this->kind];
 
         return [
             'event' => 'mention',

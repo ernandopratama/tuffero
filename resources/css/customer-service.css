@@ -48,6 +48,10 @@
 .cs-mascot, .cs-react, .cs-float { position: absolute; inset: 0; display: block; }
 .cs-float img { display: block; width: 100%; height: 100%; }
 .cs-face { position: absolute; inset: 0; width: 100%; height: 100%; overflow: visible; pointer-events: none; }
+/* Lapisan tersendiri: kedip dan percikan (animasi SVG, jalan di main thread) hanya menggambar ulang wajah, bukan badan maskot,
+   dan gerak melayang tetap murni di compositor. */
+.cs-float { will-change: transform; backface-visibility: hidden; }
+.cs-face { transform: translateZ(0); }
 
 /* Idle: hanya transform dan opacity, jadi berjalan di compositor. */
 .cs-launcher[data-status='idle'] .cs-float { animation: cs-float 3.6s ease-in-out infinite; }

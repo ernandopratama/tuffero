@@ -33,7 +33,7 @@ class StoreSite
 
     public const ROUTES = [
         'about' => '/tentang-kami', 'services' => '/layanan', 'products' => '/produk', 'offers' => '/#offers', 'gallery' => '/galeri', 'contact' => '/kontak',
-        'account' => '/masuk', 'profile' => '/akun', 'orders' => '/akun/pesanan', 'addresses' => '/akun/alamat', 'vouchers' => '/voucher', 'promos' => '/promo', 'myVouchers' => '/akun/voucher', 'cart' => '/keranjang', 'checkout' => '/checkout', 'track' => '/cek-pesanan',
+        'account' => '/masuk', 'profile' => '/akun', 'orders' => '/akun/pesanan', 'addresses' => '/akun/alamat', 'vouchers' => '/voucher', 'promos' => '/promo', 'myVouchers' => '/akun/voucher', 'cart' => '/keranjang', 'checkout' => '/checkout', 'track' => '/cek-pesanan', 'refund' => '/ajukan-refund',
     ];
 
     public const NAV_LINKS = ['/', '/tentang-kami', '/layanan', '/produk', '/promo', '/#offers', '/galeri', '/kontak'];
@@ -110,13 +110,15 @@ class StoreSite
      * JSON-LD Bakery untuk beranda (local SEO). Hanya fakta yang sudah ada di StoreSite dan teks footer.
      * Tanpa aggregateRating: Google tidak menampilkan ulasan yang dipasang sendiri oleh bisnis lokal.
      *
+     * @param  array<int, int>  $prices  harga produk tayang, untuk priceRange
      * @return array<string, mixed>
      */
-    public function businessJsonLd(): array
+    public function businessJsonLd(array $prices = []): array
     {
         $days = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
+        $range = $prices ? array_unique([$this->rupiah(min($prices)), $this->rupiah(max($prices))]) : [];
 
-        return [
+        return array_filter([
             '@context' => 'https://schema.org',
             '@type' => 'Bakery',
             'name' => 'Tuffero Bakery',
@@ -143,7 +145,39 @@ class StoreSite
                 ] : null)
                 ->filter()->values()->all(),
             'sameAs' => [self::INSTAGRAM_URL, self::TIKTOK_URL],
+            'priceRange' => implode('–', $range),
+            'servesCuisine' => ['Kue Kering', 'Pastry', 'Macaron'],
+        ]);
+    }
+
+    /**
+     * Kebijakan retur D-097: maksimal 3 hari kalender setelah diterima, produk utuh dan belum dibuka.
+     * Ongkir retur dan cara kirim balik belum diputuskan, jadi returnFees dan returnMethod sengaja kosong.
+     *
+     * @return array<string, mixed>
+     */
+    public function returnPolicyJsonLd(): array
+    {
+        return [
+            '@type' => 'MerchantReturnPolicy',
+            'applicableCountry' => 'ID',
+            'returnPolicyCategory' => 'https://schema.org/MerchantReturnFiniteReturnWindow',
+            'merchantReturnDays' => 3,
+            'itemCondition' => 'https://schema.org/NewCondition',
+            'merchantReturnLink' => url('/kontak#syarat'),
         ];
+    }
+
+    /**
+     * Atribut width dan height dari ukuran asli berkas di public/, agar browser menyiapkan ruang gambar
+     * sebelum dimuat (mencegah tata letak bergeser, CLS). Berkas tidak ada: atribut kosong.
+     */
+    public function imageSize(string $path): HtmlString
+    {
+        static $sizes = [];
+        $sizes[$path] ??= @getimagesize(public_path(rawurldecode(ltrim($path, '/')))) ?: null;
+
+        return new HtmlString($sizes[$path] ? 'width="'.$sizes[$path][0].'" height="'.$sizes[$path][1].'"' : '');
     }
 
     public function productPhoto(string $name): string

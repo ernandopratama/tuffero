@@ -24,6 +24,7 @@
 				</div>
 				<button type="submit" class="tf-btn tf-btn-block" :disabled="busy">{{ $c['submit'] }}</button>
 			</form>
+			<a href="{{ $site->route('refund') }}" class="tf-auth-link">{{ $c['refundLink'] }}</a>
 			<a href="{{ $site->route('contact') }}" class="tf-auth-link">{{ $c['help'] }}</a>
 		</div>
 	</main>

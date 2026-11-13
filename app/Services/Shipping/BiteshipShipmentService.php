@@ -5,6 +5,7 @@ namespace App\Services\Shipping;
 use App\Models\Order;
 use App\Models\Shipment;
 use App\Models\Warehouse;
+use App\Models\WebhookRejection;
 use App\Services\OrderStatusService;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Http;
@@ -23,7 +24,7 @@ class BiteshipShipmentService
 
     public function enabled(): bool
     {
-        return filled(config('services.biteship.key')) && filled(config('services.biteship.origin_postal_code'));
+        return filled(config('services.biteship.key')) && filled(Warehouse::originPostalCode());
     }
 
     public function supports(Order $order): bool
@@ -43,7 +44,7 @@ class BiteshipShipmentService
         $address = $order->shipping_address;
 
         if (blank($warehouse->address) || blank($warehouse->postal_code) || blank($warehouse->phone)) {
-            throw ValidationException::withMessages(['status' => 'Alamat, kode pos, atau telepon gudang belum diisi.']);
+            throw ValidationException::withMessages(['status' => 'Alamat, kode pos, atau telepon gudang belum diisi. Lengkapi di menu Operasional > Gudang (jika tidak punya akses ubah, minta Super Admin atau Admin Toko), atau pilih Resi manual.']);
         }
 
         try {
@@ -113,6 +114,7 @@ class BiteshipShipmentService
 
         if ($expected === '' || ! is_string($secret) || ! hash_equals($expected, $secret)) {
             Log::warning('Biteship webhook rejected.');
+            WebhookRejection::record('biteship', 'invalid_secret');
 
             return false;
         }

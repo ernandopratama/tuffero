@@ -16,7 +16,11 @@ const props = defineProps({
     rowKey: { type: String, default: 'id' },
     minWidth: { type: String, default: 'min-w-[720px]' },
     pageSizes: { type: Array, default: () => [10, 25, 50, 75, 100] },
+    // Di layar sempit (di bawah md) tiap baris menjadi kartu: judul kolom tampil di depan isi sel, tanpa geser mendatar.
+    stack: { type: Boolean, default: false },
 });
+// Kelas statis (bukan hasil rakitan string) supaya Tailwind mendeteksinya.
+const STACK_CELL = 'max-md:block max-md:px-0 max-md:py-1.5 max-md:text-left max-md:before:mb-0.5 max-md:before:block max-md:before:text-label-sm max-md:before:uppercase max-md:before:tracking-wide max-md:before:text-secondary max-md:before:content-[attr(data-label)]';
 const page = defineModel('page', { type: Number, default: 1 });
 const perPage = defineModel('perPage', { type: Number, default: 25 });
 const emit = defineEmits(['retry']);
@@ -43,27 +47,27 @@ const pages = computed(() => {
 
     <template v-else>
       <div class="relative overflow-x-auto" :aria-busy="loading">
-        <table class="w-full text-center text-body-sm" :class="minWidth">
+        <table class="w-full text-center text-body-sm" :class="[minWidth, stack ? 'max-md:block max-md:min-w-0' : '']">
           <caption class="sr-only">{{ caption }}</caption>
-          <thead class="bg-background/70 text-label-sm uppercase tracking-wide text-secondary">
+          <thead class="bg-background/70 text-label-sm uppercase tracking-wide text-secondary" :class="stack ? 'max-md:hidden' : ''">
             <tr>
               <th v-for="c in columns" :key="c.key" scope="col" class="whitespace-nowrap px-5 py-3.5" :class="c.class">
-                <span :class="c.srOnly ? 'sr-only' : ''">{{ c.label }}</span>
+                <slot :name="`head-${c.key}`"><span :class="c.srOnly ? 'sr-only' : ''">{{ c.label }}</span></slot>
               </th>
             </tr>
           </thead>
-          <tbody class="divide-y divide-border">
+          <tbody class="divide-y divide-border" :class="stack ? 'max-md:block' : ''">
             <template v-if="loading">
-              <tr v-for="n in 5" :key="n" aria-hidden="true">
-                <td v-for="c in columns" :key="c.key" class="px-5 py-4"><span class="block h-4 animate-pulse-soft rounded-full bg-secondary-tint-12" :class="c.srOnly ? 'mx-auto w-12' : 'mx-auto w-4/5'"></span></td>
+              <tr v-for="n in 5" :key="n" aria-hidden="true" :class="stack ? 'max-md:block' : ''">
+                <td v-for="c in columns" :key="c.key" class="px-5 py-4" :class="stack ? 'max-md:block max-md:py-2' : ''"><span class="block h-4 animate-pulse-soft rounded-full bg-secondary-tint-12" :class="c.srOnly ? 'mx-auto w-12' : 'mx-auto w-4/5'"></span></td>
               </tr>
             </template>
-            <tr v-else-if="!rows.length">
-              <td :colspan="columns.length" class="px-5 py-12 text-center text-secondary">{{ emptyText }}</td>
+            <tr v-else-if="!rows.length" :class="stack ? 'max-md:block' : ''">
+              <td :colspan="columns.length" class="px-5 py-12 text-center text-secondary" :class="stack ? 'max-md:block' : ''">{{ emptyText }}</td>
             </tr>
             <template v-else>
-              <tr v-for="row in rows" :key="row[rowKey]" class="transition-colors duration-150 hover:bg-accent-tint-12">
-                <td v-for="c in columns" :key="c.key" class="px-5 py-3.5" :class="c.cellClass ?? c.class">
+              <tr v-for="row in rows" :key="row[rowKey]" class="transition-colors duration-150 hover:bg-accent-tint-12" :class="stack ? 'max-md:block max-md:px-4 max-md:py-3' : ''">
+                <td v-for="c in columns" :key="c.key" class="px-5 py-3.5" :class="[c.cellClass ?? c.class, stack ? STACK_CELL : '']" :data-label="stack && !c.srOnly ? c.label : undefined">
                   <slot :name="`cell-${c.key}`" :row="row">{{ row[c.key] }}</slot>
                 </td>
               </tr>

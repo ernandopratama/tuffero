@@ -494,7 +494,7 @@ html[lang="id"] .tf-hero-content{ padding-top: 68px; }
 .tf-how-card .tf-btn{ height: 32px; margin-top: 24px; }
 .tf-step{ height: 220px; border: 1px solid var(--tf-line); border-radius: 8px; overflow: hidden; }
 .tf-step img{ position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; transition: transform 300ms var(--tf-ease-out); }
-.tf-step div{ position: absolute; inset: 0; padding: 24px; background: #2B1B1499; color: var(--tf-ivory); z-index: 1; }
+.tf-step div{ position: absolute; inset: 0; padding: 24px; background: linear-gradient(180deg, #2B1B14F2 0%, #2B1B14D9 42%, #2B1B1459 100%); color: var(--tf-ivory); z-index: 1; }
 .tf-step span{ display: block; font: 700 12px/16px var(--tf-sans); color: var(--tf-gold); }
 .tf-step h3{ font: 700 16px/24px var(--tf-sans); }
 .tf-step p{ margin-top: 4px !important; font-size: 12px; line-height: 16px !important; }
@@ -801,7 +801,6 @@ html.tf-menu-open{ overflow: hidden; }
 .tf-faq-list summary svg{ flex: none; color: var(--tf-brown); transition: transform 200ms var(--tf-ease-out); }
 .tf-faq-list details[open] summary svg{ transform: rotate(180deg); }
 .tf .tf-faq-list p{ padding-bottom: 20px; font-size: 14px; line-height: 22px; }
-.tf .tf-legal-note{ margin-top: 12px; font-size: 14px; line-height: 22px; }
 
 .tf-page-cta{ display: flex; align-items: center; justify-content: space-between; gap: 32px; padding: 48px 56px; border-radius: 12px; background: radial-gradient(120% 160% at 0% 0%, #4A3022 0%, #2B1B14 62%); }
 .tf-page-cta h2{ font: 400 40px/46px var(--tf-serif); letter-spacing: -0.5px; color: var(--tf-ivory); }
@@ -1200,7 +1199,15 @@ html:has(.tf-reel-dialog[open]){ overflow: hidden; }
 	.tf-home-btn:hover .tf-vine-3{ transform: rotate(0deg); animation: tfSway3 2s cubic-bezier(0.52, 0, 0.58, 1) 1s infinite; }
 }
 .tf-auth-back{ display: inline-flex; align-items: center; gap: 8px; min-height: 32px; margin-bottom: 12px; padding: 0; border: 0; background: none; color: var(--tf-brown); font: 600 14px/20px var(--tf-sans); cursor: pointer; }
-.tf .tf-auth-demo{ margin-top: 12px; padding: 8px 12px; border: 1px dashed var(--tf-brown); border-radius: 4px; color: var(--tf-ink); font-size: 13px; line-height: 20px; }
+.tf-auth-methods .tf-co-dialog-body{ display: grid; gap: 12px; padding: 20px; }
+.tf-auth-method{ display: flex; align-items: center; gap: 14px; width: 100%; padding: 14px 16px; border: 1px solid var(--tf-brown); border-radius: 6px; background: #fff; color: var(--tf-ink); font-family: var(--tf-sans); text-align: left; cursor: pointer; transition: background-color 150ms ease, transform 160ms var(--tf-ease-out); }
+.tf-auth-method:active:not(:disabled){ transform: scale(0.98); }
+.tf-auth-method:disabled{ border-color: var(--tf-line); color: var(--tf-brown); cursor: not-allowed; }
+.tf-auth-method span{ display: grid; gap: 2px; min-width: 0; }
+.tf-auth-method strong{ font: 600 15px/22px var(--tf-sans); }
+.tf-auth-method small{ overflow: hidden; font-size: 13px; line-height: 20px; color: var(--tf-brown); text-overflow: ellipsis; white-space: nowrap; }
+.tf-auth-method:focus-visible{ outline: 2px solid var(--tf-ink); outline-offset: 2px; }
+@media (hover: hover) and (pointer: fine){ .tf-auth-method:hover:not(:disabled){ background: var(--tf-ivory); } }
 .tf-otp{ position: relative; display: grid; grid-template-columns: repeat(6, 52px); gap: 12px; width: fit-content; margin-top: 22px; }
 .tf .tf-otp input{ position: absolute; inset: 0; width: 100%; height: 100%; padding: 0; border: 0; background: transparent; color: transparent; caret-color: transparent; font-size: 16px; opacity: 0; cursor: text; z-index: 1; }
 .tf-otp span{ display: grid; place-items: center; height: 60px; border: 1px solid var(--tf-brown); border-radius: 6px; background: #fff; font: 600 24px/30px var(--tf-sans); color: var(--tf-ink); transition: border-color 150ms ease; }
@@ -2882,3 +2889,68 @@ html .tf-hero-content.is-welcome{ padding-top: 44px; }
 .tf-od-rate textarea { width: 100%; margin: 4px 0 12px; padding: 12px 14px; border: 1px solid var(--tf-line); border-radius: 14px; font: inherit; resize: vertical; background: #fff; }
 .tf-od-rate textarea:focus-visible { outline: 2px solid var(--tf-ink); outline-offset: 1px; }
 @media (prefers-reduced-motion: reduce) { .tf-od-rate-stars button { transition: none; } }
+
+/* ---------- Ajukan refund atau retur (D-031, D-097) ---------- */
+.tf-refund{ max-width: 760px; }
+.tf-refund .tf-shop-card + .tf-shop-card, .tf-refund > .tf-shop-card + div, .tf-refund-form .tf-shop-card + .tf-shop-card, .tf-refund-bar + .tf-shop-card, .tf-refund-bar + form{ margin-top: 20px; }
+.tf-refund-form{ display: block; margin-top: 20px; }
+.tf-refund > div:not(.tf-shop-card){ margin-top: 20px; }
+.tf-refund-h{ margin-top: 24px; font: 500 20px/28px var(--tf-serif); color: var(--tf-ink); }
+.tf-refund-rules, .tf-refund-next{ display: grid; gap: 10px; margin: 12px 0 0; padding: 0; list-style: none; }
+.tf-refund-rules li, .tf-refund-next li{ position: relative; padding-left: 24px; font-size: 14px; line-height: 22px; color: var(--tf-brown); }
+.tf-refund-rules li::before{ content: ""; position: absolute; left: 6px; top: 9px; width: 6px; height: 6px; border-radius: 50%; background: var(--tf-gold); }
+.tf-refund-next{ counter-reset: rf; }
+.tf-refund-next li{ counter-increment: rf; padding-left: 32px; }
+.tf-refund-next li::before{ content: counter(rf); position: absolute; left: 0; top: 0; display: grid; place-items: center; width: 22px; height: 22px; border-radius: 50%; background: #C6A15B33; color: var(--tf-ink); font: 600 12px/1 var(--tf-sans); }
+.tf-refund-bar{ display: flex; align-items: center; justify-content: space-between; gap: 16px; padding-block: 16px; }
+.tf-refund-bar strong{ font: 600 15px/24px var(--tf-sans); color: var(--tf-ink); }
+.tf-refund-items{ margin: 8px 0 0; padding: 0; list-style: none; }
+.tf-refund-item{ display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: center; gap: 8px 16px; padding: 14px 0; border-top: 1px solid var(--tf-line); }
+.tf-refund-item:first-child{ border-top: 0; }
+.tf .tf-refund-name{ margin: 0; font: 600 15px/22px var(--tf-sans); color: var(--tf-ink); }
+.tf-refund-variant{ font-weight: 400; color: var(--tf-brown); }
+.tf .tf-refund-meta{ margin: 2px 0 0; font-size: 13px; line-height: 20px; color: var(--tf-brown); }
+.tf-refund-qty{ display: inline-flex; align-items: center; border: 1px solid var(--tf-brown); border-radius: 4px; background: #fff; }
+.tf-refund-qty button{ display: grid; place-items: center; width: 44px; height: 44px; border: 0; background: transparent; color: var(--tf-ink); cursor: pointer; transition: background-color 150ms ease, transform 160ms var(--tf-ease-out); }
+.tf-refund-qty button:active:not(:disabled){ transform: scale(0.92); }
+.tf-refund-qty button:disabled{ opacity: 0.35; cursor: default; }
+.tf-refund-qty button:focus-visible{ outline: 2px solid var(--tf-ink); outline-offset: -2px; }
+.tf-refund-qty output{ min-width: 32px; text-align: center; font: 600 15px/24px var(--tf-sans); color: var(--tf-ink); }
+.tf-refund-set{ min-width: 0; margin: 0; padding: 0; border: 0; }
+.tf-refund-set legend{ float: none; width: auto; margin: 0; padding: 0; }
+.tf-refund-set legend h2{ margin: 0; font: 500 24px/32px var(--tf-serif); color: var(--tf-ink); }
+.tf-refund .tf-shop-rates label[aria-disabled="true"]{ opacity: 0.5; cursor: default; }
+.tf-refund-pref{ grid-template-columns: repeat(2, minmax(0, 1fr)); }
+.tf-refund-text{ display: block; width: 100%; padding: 12px 14px; border: 1px solid var(--tf-brown); border-radius: 4px; background: #fff; color: var(--tf-ink); font: 400 16px/24px var(--tf-sans); resize: vertical; }
+.tf-refund-text:focus-visible{ outline: 2px solid var(--tf-ink); outline-offset: 1px; }
+.tf .tf-auth-field > p.tf-refund-count{ text-align: right; }
+.tf-refund-terms{ display: flex; align-items: flex-start; gap: 12px; margin-top: 20px; font-size: 14px; line-height: 22px; color: var(--tf-brown); cursor: pointer; }
+.tf-refund-terms input{ flex: none; width: 20px; height: 20px; margin-top: 1px; accent-color: var(--tf-ink); }
+.tf-refund-terms a{ color: var(--tf-ink); font-weight: 600; text-decoration: underline; text-underline-offset: 3px; }
+.tf-refund-total{ display: flex; align-items: center; justify-content: space-between; gap: 16px; margin-top: 20px; padding: 14px 16px; border-radius: 4px; background: #C6A15B1F; }
+.tf-refund-total div{ min-width: 0; }
+.tf-refund-total strong{ display: block; font: 600 15px/22px var(--tf-sans); color: var(--tf-ink); }
+.tf-refund-total span{ display: block; font-size: 13px; line-height: 20px; color: var(--tf-brown); }
+.tf-refund-total b{ flex: none; font: 600 22px/28px var(--tf-sans); color: var(--tf-ink); }
+.tf-refund-submit{ margin-top: 16px; }
+.tf-refund-submit:disabled{ opacity: 0.55; cursor: default; }
+.tf-refund-label{ margin-top: 20px; font: 600 12px/16px var(--tf-sans); letter-spacing: 1.2px; text-transform: uppercase; color: var(--tf-brown); }
+.tf .tf-refund-number{ margin-top: 4px; font: 600 30px/38px var(--tf-sans); letter-spacing: 0.04em; color: var(--tf-ink); overflow-wrap: anywhere; }
+.tf-refund-actions{ display: flex; flex-wrap: wrap; align-items: center; gap: 12px 20px; margin-top: 16px; }
+.tf-refund-done > .tf-shop-link{ margin-top: 20px; }
+.tf-refund-reveal{ animation: tf-refund-in 240ms var(--tf-ease-out) both; }
+@keyframes tf-refund-in{ from{ opacity: 0; transform: translateY(8px); } to{ opacity: 1; transform: none; } }
+@media (hover: hover) and (pointer: fine){
+	.tf-refund-qty button:hover:not(:disabled){ background: #C6A15B1F; }
+}
+@media (max-width: 575px){
+	.tf-refund-item{ grid-template-columns: minmax(0, 1fr); }
+	.tf-refund-pref{ grid-template-columns: minmax(0, 1fr); }
+	.tf-refund-total{ flex-direction: column; align-items: flex-start; gap: 8px; }
+	.tf-refund-bar{ flex-wrap: wrap; }
+}
+@media (prefers-reduced-motion: reduce){
+	.tf-refund-reveal{ animation: none; }
+	.tf-refund-qty button{ transition: none; }
+}
+.tf .tf-legal-version{ margin-top: 8px; font-size: 14px; line-height: 22px; color: var(--tf-brown); }

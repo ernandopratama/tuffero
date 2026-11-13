@@ -2,6 +2,7 @@
 
 namespace App\Services;
 
+use App\Models\AuditLog;
 use App\Models\Order;
 use App\Models\OrderCancellationRequest as CancellationRequest;
 use App\Models\Setting;
@@ -126,6 +127,31 @@ class CancellationService
             $order->histories()->create(['status_type' => 'payment', 'from_status' => 'refund_pending', 'to_status' => 'refunded', 'source' => 'admin', 'actor_user_id' => $actor->id]);
             $order->histories()->create(['status_type' => 'order', 'from_status' => Order::CANCELLED, 'to_status' => Order::REFUNDED, 'source' => 'admin', 'actor_user_id' => $actor->id]);
         });
+    }
+
+    /**
+     * Dana masuk untuk pesanan yang sudah ditutup (kedaluwarsa atau dibatalkan sebelum bayar) sudah dikembalikan ke pelanggan.
+     * Pesanan ini tidak punya pengajuan pembatalan, jadi tidak lewat markRefunded. Cukup satu Admin Toko; catatan wajib (misalnya
+     * referensi transfer) dan tercatat di riwayat status dan audit log. Hanya mengubah payment_status; status pesanan, stok,
+     * dan voucher tidak disentuh (sudah dilepas saat pesanan ditutup). Transfernya dilakukan manual di luar sistem (D-031).
+     */
+    public function markLatePaymentRefunded(Order $order, string $note, User $actor): Order
+    {
+        return DB::transaction(function () use ($order, $note, $actor) {
+            $locked = Order::whereKey($order->id)->lockForUpdate()->firstOrFail();
+
+            // Diperiksa ulang di dalam kunci: klik ganda atau dua admin bersamaan tidak mencatat dua kali.
+            if (! Order::latePaymentClosed()->whereKey($locked->id)->exists()) {
+                throw ValidationException::withMessages(['order' => 'Pesanan ini tidak punya dana masuk yang perlu dikembalikan.']);
+            }
+
+            $from = $locked->payment_status;
+            $locked->forceFill(['payment_status' => 'refunded'])->save();
+            $locked->histories()->create(['status_type' => 'payment', 'from_status' => $from, 'to_status' => 'refunded', 'source' => 'admin', 'actor_user_id' => $actor->id, 'reason' => $note]);
+            AuditLog::record('order.late_payment_refunded', $locked, ['note' => $note, 'total' => (int) $locked->total], $actor->id);
+
+            return $locked;
+        }, 3);
     }
 
     /** @param callable(CancellationRequest, Order): void $action */

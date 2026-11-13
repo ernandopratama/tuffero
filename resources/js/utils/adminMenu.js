@@ -16,11 +16,13 @@ const MENU = [
             { label: 'Pesanan', icon: 'receipt', any: ['orders.view'], to: { name: 'AdminOrders' } },
             { label: 'Pengemasan', icon: 'box', any: ['orders.view_fulfillment'], to: { name: 'AdminFulfillment' } },
             { label: 'Pengiriman', icon: 'truck', any: ['shipments.view'], to: { name: 'AdminShipments' } },
+            { label: 'Gudang', icon: 'warehouse', any: ['warehouses.view'], to: { name: 'AdminWarehouses' } },
             { label: 'Pembayaran', icon: 'wallet', any: ['payments.view'], to: { name: 'AdminPayments' } },
             { label: 'Pelanggan', icon: 'user', any: ['customers.view'], to: { name: 'AdminCustomers' } },
             { label: 'Pembatalan', icon: 'x', any: ['orders.cancel_request', 'orders.cancel', 'orders.cancel_final'], to: { name: 'AdminCancellations' } },
-            { label: 'Refund', icon: 'undo', any: ['refunds.view'] },
+            { label: 'Refund', icon: 'undo', any: ['refunds.view'], to: { name: 'AdminRefunds' } },
             { label: 'FAQ Chat', icon: 'chat', any: ['faqs.manage'], to: { name: 'AdminFaqs' } },
+            { label: 'Template Balasan', short: 'Template', icon: 'mail', any: ['templates.manage'], to: { name: 'AdminReplyTemplates' } },
         ],
     },
     {
@@ -33,15 +35,16 @@ const MENU = [
             { label: 'Voucher', icon: 'ticket', any: ['vouchers.view'], to: { name: 'AdminVouchers' } },
             { label: 'Konten Promo', short: 'Konten', icon: 'image', any: ['content.view'], to: { name: 'AdminContents' } },
             { label: 'Galeri Website', short: 'Galeri', icon: 'photos', any: ['content.view'], to: { name: 'AdminGallery' } },
-            { label: 'Ulasan Toko', short: 'Ulasan', icon: 'sparkles', any: ['reviews.manage'], to: { name: 'AdminReviews' } },
-            { label: 'Ulasan Produk', short: 'Ulasan', icon: 'sparkles', any: ['product_reviews.view'], to: { name: 'AdminProductReviews' } },
+            { label: 'Ulasan Toko', short: 'Ulasan', icon: 'store', any: ['reviews.manage'], to: { name: 'AdminReviews' } },
+            { label: 'Ulasan Produk', short: 'Ulasan', icon: 'star', any: ['product_reviews.view'], to: { name: 'AdminProductReviews' } },
             { label: 'Berita Popup', short: 'Berita', icon: 'bell', any: ['news.view'], to: { name: 'AdminNews' } },
+            { label: 'Draf Konten', short: 'Draf', icon: 'edit', any: ['marketing_drafts.view'], to: { name: 'AdminMarketingDrafts' } },
         ],
     },
     {
         label: 'Laporan',
         items: [
-            { label: 'Laporan', icon: 'chart', any: ['reports.view', 'reports.view_summary'] },
+            { label: 'Laporan', icon: 'chart', any: ['reports.view', 'reports.view_summary'], to: { name: 'AdminReports' } },
             { label: 'Audit Log', icon: 'shield', any: ['audit.view'], to: { name: 'AdminAudit' } },
         ],
     },
@@ -49,6 +52,7 @@ const MENU = [
         label: 'Sistem',
         items: [
             { label: 'Pengguna dan Role', short: 'Pengguna', icon: 'users', any: ['users.manage'], to: { name: 'AdminUsers' } },
+            { label: 'Syarat dan Ketentuan', short: 'S&K', icon: 'document', any: ['terms.manage'], to: { name: 'AdminTerms' } },
             { label: 'Pengaturan', icon: 'sliders', any: ['settings.manage', 'settings.manage_contact'], to: { name: 'AdminSettings' } },
         ],
     },
@@ -66,9 +70,13 @@ export function menuFor(permissions) {
 }
 
 // Ikon dan grup menu untuk judul halaman (PageHeader), dicari dari nama rute.
+// Halaman turunan memakai ikon dan grup induknya.
+const PAGE_PARENT = { AdminStockHistory: 'AdminStock' };
+
 export function pageMeta(routeName) {
+    const name = PAGE_PARENT[routeName] || routeName;
     for (const group of MENU) {
-        const item = group.items.find((entry) => entry.to?.name === routeName);
+        const item = group.items.find((entry) => entry.to?.name === name);
         if (item) return { group: group.label, icon: item.icon };
     }
     return null;

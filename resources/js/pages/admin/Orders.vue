@@ -2,6 +2,10 @@
 import { computed, nextTick, ref } from 'vue';
 import { useRouter } from 'vue-router';
 import AdminComments from '../../components/AdminComments.vue';
+import CustomerHistory from '../../components/CustomerHistory.vue';
+import FollowUps from '../../components/FollowUps.vue';
+import ReplyPicker from '../../components/ReplyPicker.vue';
+import { customerWaLink } from '../../utils/whatsapp';
 import AdminIcon from '../../components/AdminIcon.vue';
 import OrderActions from '../../components/OrderActions.vue';
 import AppModal from '../../components/ui/AppModal.vue';
@@ -222,6 +226,13 @@ async function refresh() {
           <p class="mt-1 text-label-md">{{ detail.customer_name }}</p>
           <p>{{ detail.customer_phone }}</p>
           <p class="break-all text-secondary">{{ detail.customer_email }}</p>
+          <a
+            v-if="auth.can('templates.manage') && customerWaLink(detail.customer_phone, `Halo ${detail.customer_name}, kami dari Tuffero terkait pesanan ${detail.order_number}.`)"
+            :href="customerWaLink(detail.customer_phone, `Halo ${detail.customer_name}, kami dari Tuffero terkait pesanan ${detail.order_number}.`)"
+            target="_blank"
+            rel="noopener noreferrer"
+            class="mt-2 inline-flex min-h-10 items-center gap-1.5 rounded-full border border-secondary px-4 text-label-md transition-[transform,background-color] duration-[160ms] ease-out-strong hover:bg-accent-tint-15 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary active:scale-[0.97]"
+          ><AdminIcon name="chat" :size="16" />Hubungi pelanggan</a>
         </div>
         <div>
           <h3 class="font-heading text-headline-sm">Alamat tujuan</h3>
@@ -252,6 +263,10 @@ async function refresh() {
           <li v-for="item in detail.cancellations" :key="item.request_number"><span class="font-mono">{{ item.request_number }}</span>: {{ CANCELLATION_STATUS[item.status] || item.status }}</li>
         </ul>
       </section>
+
+      <ReplyPicker :url="`/admin/orders/${detail.id}/reply-templates`" />
+      <FollowUps :url="`/admin/orders/${detail.id}/follow-ups`" />
+      <CustomerHistory :url="`/admin/orders/${detail.id}/customer-history`" @navigate="dialog.close()" />
 
       <!-- Dua tab: catatan staf dan riwayat. Panel memakai hidden supaya jumlah catatan tetap termuat untuk lencana -->
       <section aria-label="Catatan dan riwayat">

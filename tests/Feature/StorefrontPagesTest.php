@@ -5,6 +5,7 @@ namespace Tests\Feature;
 use App\Models\Campaign;
 use App\Models\Product;
 use App\Models\User;
+use App\Support\StoreSite;
 use Database\Seeders\RolePermissionSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Vite;
@@ -36,7 +37,7 @@ class StorefrontPagesTest extends TestCase
     public static function publicPages(): array
     {
         return [
-            'beranda' => ['/', 'Tuffero Bakery'],
+            'beranda' => ['/', 'Tuffero Bakery Malang – Nastar, Macaron &amp; Kue Kering Premium'],
             'tentang' => ['/tentang-kami', 'Tentang Kami | Tuffero Bakery'],
             'layanan' => ['/layanan', 'Layanan | Tuffero Bakery'],
             'katalog' => ['/produk', 'Produk | Tuffero Bakery'],
@@ -55,13 +56,15 @@ class StorefrontPagesTest extends TestCase
             ->assertSee('property="og:title"', false)
             ->assertSee('rel="canonical"', false)
             ->assertSee('hreflang="en"', false)
+            ->assertSee('href="/kontak#syarat"', false)
+            ->assertSee('href="/kontak#privasi"', false)
             ->assertDontSee('name="robots"', false);
     }
 
     /** @return array<string, array{string}> */
     public static function privatePages(): array
     {
-        return [['/keranjang'], ['/checkout'], ['/cek-pesanan'], ['/masuk'], ['/daftar'], ['/pesanan/00000000-0000-4000-8000-000000000000']];
+        return [['/keranjang'], ['/checkout'], ['/cek-pesanan'], ['/ajukan-refund'], ['/masuk'], ['/daftar'], ['/pesanan/00000000-0000-4000-8000-000000000000']];
     }
 
     #[DataProvider('privatePages')]
@@ -85,7 +88,13 @@ class StorefrontPagesTest extends TestCase
             ->assertSee('application/ld+json', false)
             ->assertSee('"price":123000', false)
             ->assertSee('"availability":"https://schema.org/OutOfStock"', false)
-            ->assertSee('"@type":"BreadcrumbList"', false);
+            ->assertSee('"@type":"BreadcrumbList"', false)
+            ->assertSee('"hasMerchantReturnPolicy":{"@type":"MerchantReturnPolicy"', false)
+            ->assertSee('"merchantReturnDays":3', false);
+
+        // Aturan retur di JSON-LD juga harus terbaca pelanggan di S&K (/kontak#syarat).
+        $this->get('/kontak')->assertSee('Retur dan klaim: batas waktu')->assertSee('3 hari kalender');
+        $this->get('/kontak?lang=en')->assertSee('within 3 calendar days');
 
         $this->get('/produk/NAS-UJI-01')->assertOk()->assertSee('Nastar Uji');
     }
@@ -236,13 +245,29 @@ class StorefrontPagesTest extends TestCase
         $this->assertStringContainsString('Malang', $footer);
         $this->assertStringContainsString('Jawa Timur', $footer);
 
+        $this->product();
         $this->get('/')
             ->assertOk()
             ->assertSee('"@type":"Bakery"', false)
             ->assertSee('"postalCode":"65151"', false)
             ->assertSee('"dayOfWeek":"Saturday"', false)
+            ->assertSee('"servesCuisine":["Kue Kering","Pastry","Macaron"]', false)
             ->assertDontSee('"dayOfWeek":"Sunday"', false)
-            ->assertDontSee('aggregateRating', false);
+            ->assertDontSee('aggregateRating', false)
+            // Satu produk: harga termurah = termahal, jadi priceRange satu angka.
+            ->assertSee('"priceRange":"Rp123.000"', false);
+    }
+
+    public function test_home_images_carry_intrinsic_size(): void
+    {
+        $this->get('/')
+            ->assertSee('src="/images/Tuffero Bakery Treats Showcase.webp" width="1671" height="941"', false)
+            // Foto kartu "Cara pesan": tangkapan layar halaman Produk dan Checkout harus berkas yang ada (sebelumnya step-*.jpg 404).
+            ->assertSee('src="/images/landing/cara-katalog.webp" width="960" height="675"', false)
+            ->assertSee('src="/images/landing/cara-checkout.webp" width="960" height="675"', false)
+            ->assertSee('src="/images/landing/cara-terima.webp" width="1000" height="746"', false)
+            ->assertDontSee('step-pick.jpg', false);
+        $this->assertSame('', (string) app(StoreSite::class)->imageSize('/images/tidak-ada.webp'));
     }
 
     public function test_admin_pages_stay_on_vue_shell(): void

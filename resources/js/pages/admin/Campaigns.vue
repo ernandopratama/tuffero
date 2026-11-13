@@ -332,7 +332,7 @@ onMounted(load);
       <section class="mt-space-lg border-t border-border pt-space-md" aria-labelledby="cp-items">
         <h3 id="cp-items" class="font-heading text-headline-sm">Produk dalam kampanye</h3>
         <p v-if="!campaignItems.length" class="mt-space-sm rounded-2xl border border-dashed border-border p-4 text-center text-body-sm text-secondary">Belum ada produk.</p>
-        <div v-else class="mt-space-sm overflow-x-auto rounded-2xl border border-border">
+        <div v-else class="relative mt-space-sm overflow-x-auto rounded-2xl border border-border">
           <table class="w-full min-w-[560px] text-center text-body-sm">
             <caption class="sr-only">Produk dalam kampanye</caption>
             <thead class="bg-background/70 text-label-sm uppercase tracking-wide text-secondary">

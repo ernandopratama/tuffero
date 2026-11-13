@@ -28,6 +28,7 @@ class VariantRequest extends FormRequest
             'height_cm' => ['nullable', 'integer', 'min:1', 'max:1000'],
             'shelf_life_days' => ['nullable', 'integer', 'min:1', 'max:3650'],
             'max_order_quantity' => ['sometimes', 'integer', 'min:1', 'max:999'],
+            'low_stock_threshold' => ['sometimes', 'nullable', 'integer', 'min:0', 'max:1000'],
             'is_active' => ['sometimes', 'boolean'],
         ];
     }

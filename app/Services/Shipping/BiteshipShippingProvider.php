@@ -2,6 +2,7 @@
 
 namespace App\Services\Shipping;
 
+use App\Models\Warehouse;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Validation\ValidationException;
@@ -24,7 +25,7 @@ class BiteshipShippingProvider implements ShippingProvider
                 ->timeout(10)
                 ->connectTimeout(5)
                 ->post('/v1/rates/couriers', [
-                    'origin_postal_code' => (int) config('services.biteship.origin_postal_code'),
+                    'origin_postal_code' => (int) Warehouse::originPostalCode(),
                     'destination_postal_code' => (int) $address['postal_code'],
                     'couriers' => self::COURIERS,
                     // shortcut: satu paket gabungan tanpa nilai barang, ganti dengan item asli saat order Biteship dibuat.

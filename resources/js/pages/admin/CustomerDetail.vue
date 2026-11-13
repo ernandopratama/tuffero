@@ -1,6 +1,6 @@
 <script setup>
 import { computed, onMounted, ref } from 'vue';
-import { useRoute } from 'vue-router';
+import { useRoute, useRouter } from 'vue-router';
 import AdminIcon from '../../components/AdminIcon.vue';
 import AppModal from '../../components/ui/AppModal.vue';
 import PageHeader from '../../components/ui/PageHeader.vue';
@@ -10,6 +10,7 @@ import { ORDER_STATUS, ORDER_STATUS_TONE, TONE_CLASS, rupiah } from '../../utils
 import { useAuthStore } from '../../stores/auth';
 
 const route = useRoute();
+const router = useRouter();
 const auth = useAuthStore();
 const customer = ref(null);
 const loading = ref(true);
@@ -67,6 +68,31 @@ function toggleActive() {
     else setActive(true);
 }
 
+// Hapus permanen hanya untuk Super Admin dan hanya bila pelanggan belum punya pesanan; selain itu cukup dinonaktifkan.
+const canDelete = computed(() => auth.can('users.manage') && customer.value?.orders_count === 0);
+const deleteDialog = ref(null);
+const deleting = ref(false);
+const deleteError = ref('');
+
+function askDelete() {
+    deleteError.value = '';
+    deleteDialog.value.showModal();
+}
+
+async function removeCustomer() {
+    deleting.value = true;
+    deleteError.value = '';
+    try {
+        await api.delete(`/admin/customers/${customer.value.id}`, { toast: 'Pelanggan dihapus.' });
+        router.push({ name: 'AdminCustomers' });
+    } catch (e) {
+        const { message, fields } = apiError(e);
+        deleteError.value = fields.user?.[0] || message;
+    } finally {
+        deleting.value = false;
+    }
+}
+
 onMounted(load);
 </script>
 
@@ -105,6 +131,14 @@ onMounted(load);
           @click="toggleActive"
         >
           <AdminIcon :name="customer.is_active ? 'x' : 'check'" :size="16" />{{ customer.is_active ? 'Nonaktifkan akun' : 'Aktifkan akun' }}
+        </button>
+        <button
+          v-if="canDelete"
+          type="button"
+          :class="`inline-flex min-h-10 items-center gap-1.5 rounded-full bg-error px-4 text-label-md text-surface hover:bg-error/90 ${press}`"
+          @click="askDelete"
+        >
+          <AdminIcon name="trash" :size="16" />Hapus pelanggan
         </button>
       </div>
     </div>
@@ -164,7 +198,7 @@ onMounted(load);
           <p class="text-body-sm text-secondary">10 pesanan terakhir. Rincian ada di menu Pesanan.</p>
         </div>
         <p v-if="!customer.orders.length" class="px-space-lg py-12 text-center text-body-sm text-secondary">Belum ada pesanan dari akun ini.</p>
-        <div v-else class="mt-space-md overflow-x-auto">
+        <div v-else class="relative mt-space-md overflow-x-auto">
           <table class="w-full min-w-[520px] text-center text-body-sm">
             <caption class="sr-only">Pesanan terbaru {{ customer.name }}</caption>
             <thead class="bg-background/70 text-label-sm uppercase tracking-wide text-secondary">
@@ -194,6 +228,15 @@ onMounted(load);
       <template #footer>
         <button type="button" :disabled="saving" :class="`inline-flex min-h-10 items-center rounded-full border border-secondary px-4 text-label-md hover:bg-accent-tint-15 ${press}`" @click="confirmDialog.close()">Batal</button>
         <button type="button" :disabled="saving" :class="`inline-flex min-h-10 items-center rounded-full bg-error px-4 text-label-md text-surface hover:bg-error/90 ${press}`" @click="setActive(false)">{{ saving ? 'Menonaktifkan...' : 'Nonaktifkan' }}</button>
+      </template>
+    </AppModal>
+
+    <AppModal v-if="canDelete" ref="deleteDialog" variant="delete" size="md" title="Hapus pelanggan?" :subtitle="customer.name">
+      <p class="text-body-sm">Akun <strong class="break-all">{{ customer.email }}</strong> dihapus permanen dan tidak bisa dikembalikan, termasuk alamat tersimpan, klaim voucher, dan sesi loginnya. Penghapusan tercatat di audit log.</p>
+      <p v-if="deleteError" role="alert" class="mt-3 text-body-sm text-error">{{ deleteError }}</p>
+      <template #footer>
+        <button type="button" :disabled="deleting" :class="`inline-flex min-h-10 items-center rounded-full border border-secondary px-4 text-label-md hover:bg-accent-tint-15 ${press}`" @click="deleteDialog.close()">Batal</button>
+        <button type="button" :disabled="deleting" :class="`inline-flex min-h-10 items-center gap-1.5 rounded-full bg-error px-4 text-label-md text-surface hover:bg-error/90 ${press}`" @click="removeCustomer">{{ deleting ? 'Menghapus...' : 'Hapus pelanggan' }}</button>
       </template>
     </AppModal>
   </template>

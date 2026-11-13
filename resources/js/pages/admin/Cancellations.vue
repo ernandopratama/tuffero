@@ -1,5 +1,10 @@
 <script setup>
 import { ref } from 'vue';
+import AdminComments from '../../components/AdminComments.vue';
+import CustomerHistory from '../../components/CustomerHistory.vue';
+import FollowUps from '../../components/FollowUps.vue';
+import ReplyPicker from '../../components/ReplyPicker.vue';
+import { customerWaLink } from '../../utils/whatsapp';
 import AdminIcon from '../../components/AdminIcon.vue';
 import AppModal from '../../components/ui/AppModal.vue';
 import IconAction from '../../components/ui/IconAction.vue';
@@ -56,6 +61,16 @@ function stagesOf(item) {
 // Konfirmasi sebelum ACC atau tandai dana kembali: langkah ini tidak bisa dibatalkan dari dashboard.
 const confirmDialog = ref(null);
 const pending = ref(null);
+
+const contactLink = (item) => customerWaLink(item.customer_phone, `Halo ${item.customer_name}, kami dari Tuffero terkait pengajuan pembatalan ${item.request_number} untuk pesanan ${item.order_number}.`);
+
+const notesDialog = ref(null);
+const notesFor = ref(null);
+
+function openNotes(item) {
+    notesFor.value = item;
+    notesDialog.value.showModal();
+}
 
 const rejectDialog = ref(null);
 const rejecting = ref(null);
@@ -184,13 +199,34 @@ async function submitReject() {
     </template>
     <template #cell-actions="{ row }">
       <div class="flex items-center justify-center gap-1">
+        <a
+          v-if="auth.can('templates.manage') && contactLink(row)"
+          :href="contactLink(row)"
+          target="_blank"
+          rel="noopener noreferrer"
+          class="inline-flex size-9 items-center justify-center rounded-full text-primary transition-[transform,background-color] duration-[160ms] ease-out-strong hover:bg-accent-tint-15 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary active:scale-[0.97]"
+          :aria-label="`Hubungi pelanggan ${row.request_number} lewat WhatsApp`"
+          title="Hubungi pelanggan"
+        ><AdminIcon name="mail" :size="18" /></a>
+        <IconAction icon="chat" label="Catatan dan balasan" :subject="row.request_number" @click="openNotes(row)" />
         <IconAction v-if="nextStep(row)" icon="check" tone="primary" :label="nextStep(row).label" :subject="row.request_number" :disabled="busy" @click="ask(row, nextStep(row).path, nextStep(row).label, 'Pengajuan lanjut ke tahap berikutnya dan tercatat atas nama Anda.')" />
         <IconAction v-if="canMarkRefunded(row)" icon="wallet" tone="primary" label="Dana sudah dikembalikan" :subject="row.request_number" :disabled="busy" @click="ask(row, 'refunded', 'Dana sudah dikembalikan', 'Tandai hanya bila dana sudah diterima pelanggan.')" />
         <IconAction v-if="canReject(row)" icon="x" tone="danger" label="Tolak pengajuan" :subject="row.request_number" :disabled="busy" @click="openReject(row)" />
-        <span v-if="!nextStep(row) && !canMarkRefunded(row) && !canReject(row)" class="text-secondary">-</span>
       </div>
     </template>
   </DataTable>
+
+  <AppModal ref="notesDialog" variant="read" size="lg" title="Catatan dan balasan" :subtitle="notesFor?.request_number">
+    <div v-if="notesFor" class="space-y-space-md">
+      <ReplyPicker :url="`/admin/cancellations/${notesFor.id}/reply-templates`" />
+      <FollowUps :url="`/admin/cancellations/${notesFor.id}/follow-ups`" />
+      <CustomerHistory :url="`/admin/cancellations/${notesFor.id}/customer-history`" @navigate="notesDialog.close()" />
+      <AdminComments :url="`/admin/cancellations/${notesFor.id}/comments`" />
+    </div>
+    <template #footer>
+      <button type="button" class="inline-flex min-h-10 items-center rounded-full border border-secondary px-4 text-label-md hover:bg-accent-tint-15" @click="notesDialog.close()">Tutup</button>
+    </template>
+  </AppModal>
 
   <AppModal ref="confirmDialog" variant="update" size="md" :title="pending?.label || 'Konfirmasi'" :subtitle="pending?.item.request_number">
     <template v-if="pending">

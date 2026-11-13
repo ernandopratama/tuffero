@@ -28,7 +28,8 @@ class UserController extends Controller
             ->whereHas('roles')
             ->when($search !== '', fn ($query) => $query->where(fn ($inner) => $inner
                 ->where('name', 'like', "%{$search}%")
-                ->orWhere('email', 'like', "%{$search}%")))
+                ->orWhere('email', 'like', "%{$search}%")
+                ->orWhere('username', 'like', "%{$search}%")))
             ->when($request->query('role'), fn ($query, $role) => $query->whereHas('roles', fn ($r) => $r->where('name', $role)))
             ->when($request->query('is_active') !== null && $request->query('is_active') !== '', fn ($query) => $query->where('is_active', $request->boolean('is_active')))
             ->orderBy('name')
@@ -60,6 +61,13 @@ class UserController extends Controller
         return $this->success('User updated.', $this->present($this->users->update($user, $request->validated(), $request->user())));
     }
 
+    public function destroy(Request $request, User $user): JsonResponse
+    {
+        $this->users->delete($user, $request->user());
+
+        return $this->success('User deleted.');
+    }
+
     public function resetMfa(Request $request, User $user, MfaService $mfa): JsonResponse
     {
         if ($user->is($request->user())) {
@@ -78,6 +86,7 @@ class UserController extends Controller
             'id' => $user->id,
             'name' => $user->name,
             'email' => $user->email,
+            'username' => $user->username,
             'role' => $user->getRoleNames()->first(),
             'is_active' => $user->is_active,
             'mfa_required' => $user->mfa_required,
