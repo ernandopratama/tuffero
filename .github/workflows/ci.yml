@@ -1,5 +1,5 @@
-# DRAFT — CI Tuffero: test + Pint + Larastan (docs/infrastructure/ENVIRONMENT_AND_DEPLOYMENT.md).
-# Belum ada CD; deploy ke VPS CloudPanel ditambahkan setelah server siap.
+# CI Tuffero: test, Pint, Larastan, dan migrasi pada MariaDB 10.6 (server dev) dan MySQL 8.4 (production, D-024).
+# Belum ada CD: deploy dev lewat cPanel (.cpanel.yml), production VPS belum ada.
 name: CI
 
 on:
@@ -79,3 +79,53 @@ jobs:
       # phpunit.xml memakai SQLite :memory:, tanpa secret dan tanpa layanan eksternal.
       - name: Run tests
         run: php artisan test
+
+  # Test memakai SQLite, tetapi dev berjalan di MariaDB dan production di MySQL: perbedaan sintaks (mis. TIMESTAMP tanpa default) baru ketahuan saat deploy.
+  migrate:
+    name: Migrate (${{ matrix.db }})
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        db: ['mariadb:10.6', 'mysql:8.4']
+    services:
+      db:
+        image: ${{ matrix.db }}
+        env:
+          MYSQL_ROOT_PASSWORD: root
+          MYSQL_DATABASE: tuffero
+        ports:
+          - 3306:3306
+        options: >-
+          --health-cmd="mysqladmin ping -h 127.0.0.1 -proot --silent"
+          --health-interval=5s
+          --health-timeout=5s
+          --health-retries=20
+    env:
+      DB_CONNECTION: mysql
+      DB_HOST: 127.0.0.1
+      DB_PORT: 3306
+      DB_DATABASE: tuffero
+      DB_USERNAME: root
+      DB_PASSWORD: root
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: shivammathur/setup-php@v2
+        with:
+          php-version: ${{ env.PHP_VERSION }}
+          extensions: mbstring, intl, gd, zip, pdo_mysql
+          coverage: none
+
+      - name: Install Composer dependencies
+        run: composer install --no-interaction --prefer-dist --no-progress
+
+      - name: Prepare environment
+        run: |
+          cp .env.example .env
+          php artisan key:generate
+
+      - name: Migrate and seed
+        run: |
+          php artisan migrate --force
+          php artisan db:seed --force
