@@ -27,6 +27,8 @@ return Application::configure(basePath: dirname(__DIR__))
     )
     ->withMiddleware(function (Middleware $middleware): void {
         $middleware->append(SecurityHeadersMiddleware::class);
+        // Rute bernama "login" tidak ada (login adalah halaman SPA/toko). Tanpa ini, permintaan /api tanpa header Accept JSON berakhir 500, bukan 401.
+        $middleware->redirectGuestsTo(fn (Request $request) => $request->is('api/*') ? null : '/login');
         // Laravel mengurutkan throttle di depan middleware yang tidak terdaftar; token Hermes harus diperiksa lebih dulu agar permintaan tanpa token tidak memakai kuota.
         $middleware->prependToPriorityList(before: ThrottleRequests::class, prepend: HermesToken::class);
         $middleware->alias([

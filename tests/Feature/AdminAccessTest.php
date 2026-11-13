@@ -65,6 +65,11 @@ class AdminAccessTest extends TestCase
         ];
     }
 
+    public function test_guest_gets_401_on_admin_api_even_without_json_accept_header(): void
+    {
+        $this->get('/api/v1/admin/orders')->assertUnauthorized();
+    }
+
     #[DataProvider('matrixProvider')]
     public function test_role_matrix(string $role, string $permission, bool $allowed): void
     {
