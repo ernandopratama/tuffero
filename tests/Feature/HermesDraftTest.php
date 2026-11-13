@@ -142,4 +142,13 @@ class HermesDraftTest extends TestCase
 
         $this->send($this->report(['external_id' => 'job:11']))->assertStatus(429);
     }
+
+    public function test_requests_without_the_token_do_not_use_up_the_quota(): void
+    {
+        for ($i = 0; $i < 15; $i++) {
+            $this->send($this->report(), 'salah-salah-salah-salah-salah-salah-1')->assertUnauthorized();
+        }
+
+        $this->send($this->report())->assertCreated();
+    }
 }

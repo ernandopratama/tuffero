@@ -2,6 +2,7 @@
 
 use App\Http\Middleware\EnsureMfaEnrolled;
 use App\Http\Middleware\EnsureUserIsActive;
+use App\Http\Middleware\HermesToken;
 use App\Http\Middleware\RedirectForStoreAccount;
 use App\Http\Middleware\SecurityHeadersMiddleware;
 use App\Http\Middleware\SetStoreContext;
@@ -11,6 +12,7 @@ use Illuminate\Foundation\Application;
 use Illuminate\Foundation\Configuration\Exceptions;
 use Illuminate\Foundation\Configuration\Middleware;
 use Illuminate\Http\Request;
+use Illuminate\Routing\Middleware\ThrottleRequests;
 use Spatie\Permission\Exceptions\UnauthorizedException;
 use Spatie\Permission\Middleware\PermissionMiddleware;
 use Spatie\Permission\Middleware\RoleMiddleware;
@@ -25,6 +27,8 @@ return Application::configure(basePath: dirname(__DIR__))
     )
     ->withMiddleware(function (Middleware $middleware): void {
         $middleware->append(SecurityHeadersMiddleware::class);
+        // Laravel mengurutkan throttle di depan middleware yang tidak terdaftar; token Hermes harus diperiksa lebih dulu agar permintaan tanpa token tidak memakai kuota.
+        $middleware->prependToPriorityList(before: ThrottleRequests::class, prepend: HermesToken::class);
         $middleware->alias([
             'role' => RoleMiddleware::class,
             'permission' => PermissionMiddleware::class,

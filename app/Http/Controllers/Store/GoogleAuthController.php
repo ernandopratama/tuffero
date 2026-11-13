@@ -7,6 +7,7 @@ use App\Models\User;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 use Laravel\Socialite\Facades\Socialite;
 use Symfony\Component\HttpFoundation\RedirectResponse as SymfonyRedirect;
@@ -74,7 +75,15 @@ class GoogleAuthController extends Controller
             }
 
             if (! $existing->google_id) {
-                $existing->forceFill(['google_id' => $google->getId(), 'email_verified_at' => $existing->email_verified_at ?? now()])->save();
+                $attributes = ['google_id' => $google->getId(), 'email_verified_at' => $existing->email_verified_at ?? now()];
+
+                // Akun daftar-lewat-WhatsApp belum membuktikan emailnya: kata sandi lama bisa milik orang lain, jadi dibuang saat pemilik email asli masuk dengan Google.
+                if ($existing->email_verified_at === null) {
+                    $attributes += ['password' => Str::random(64), 'remember_token' => Str::random(60)];
+                    DB::table('sessions')->where('user_id', $existing->id)->delete();
+                }
+
+                $existing->forceFill($attributes)->save();
             }
 
             return $existing;

@@ -68,9 +68,9 @@ Route::prefix('v1')->group(function () {
     Route::post('/webhooks/midtrans', MidtransWebhookController::class)->middleware('throttle:120,1');
     Route::post('/webhooks/biteship', BiteshipWebhookController::class)->middleware('throttle:120,1');
     // Laporan riset dari Hermes Agent (D-079): token bersama, bukan sesi. Batas ketat karena hanya jadwal mingguan yang memakainya.
-    Route::post('/integrations/hermes/drafts', HermesDraftController::class)->middleware(['throttle:hermes-ingest', HermesToken::class]);
+    Route::post('/integrations/hermes/drafts', HermesDraftController::class)->middleware([HermesToken::class, 'throttle:hermes-ingest']);
     // Ringkasan pengingat untuk Hermes (hanya baca, tanpa data pelanggan): dasar pesan Telegram yang tahu isi dashboard.
-    Route::get('/integrations/hermes/reminders', HermesReminderController::class)->middleware(['throttle:hermes-ingest', HermesToken::class]);
+    Route::get('/integrations/hermes/reminders', HermesReminderController::class)->middleware([HermesToken::class, 'throttle:hermes-ingest']);
 
     Route::get('/catalog', [CatalogController::class, 'index'])->middleware('throttle:120,1');
     Route::get('/settings/public', [SettingController::class, 'publicSettings'])->middleware('throttle:120,1');

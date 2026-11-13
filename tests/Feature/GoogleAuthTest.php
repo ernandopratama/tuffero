@@ -5,6 +5,8 @@ namespace Tests\Feature;
 use App\Models\User;
 use Database\Seeders\RolePermissionSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Hash;
 use Laravel\Socialite\Contracts\Provider;
 use Laravel\Socialite\Facades\Socialite;
 use Laravel\Socialite\Two\User as SocialiteUser;
@@ -66,6 +68,30 @@ class GoogleAuthTest extends TestCase
         $this->assertSame(1, User::where('email', 'ani@example.com')->count());
         $this->assertSame('g-456', $customer->fresh()->google_id);
         $this->assertAuthenticatedAs($customer, 'web');
+    }
+
+    public function test_linking_an_unverified_account_drops_its_old_password_and_sessions(): void
+    {
+        $squatter = User::factory()->create(['email' => 'korban@example.com', 'password' => 'password-penyerang', 'email_verified_at' => null, 'mfa_required' => false]);
+        DB::table('sessions')->insert(['id' => 'sesi-penyerang', 'user_id' => $squatter->id, 'payload' => '', 'last_activity' => now()->timestamp]);
+        $this->googleReturns('g-789', 'korban@example.com');
+
+        $this->get('/auth/google/callback')->assertRedirect('/akun');
+
+        $squatter->refresh();
+        $this->assertNotNull($squatter->email_verified_at);
+        $this->assertFalse(Hash::check('password-penyerang', $squatter->password));
+        $this->assertDatabaseMissing('sessions', ['id' => 'sesi-penyerang']);
+    }
+
+    public function test_linking_a_verified_account_keeps_its_password(): void
+    {
+        $customer = User::factory()->create(['email' => 'ani2@example.com', 'password' => 'password-ani', 'mfa_required' => false]);
+        $this->googleReturns('g-790', 'ani2@example.com');
+
+        $this->get('/auth/google/callback')->assertRedirect('/akun');
+
+        $this->assertTrue(Hash::check('password-ani', $customer->fresh()->password));
     }
 
     public function test_staff_account_can_never_log_in_through_google(): void
