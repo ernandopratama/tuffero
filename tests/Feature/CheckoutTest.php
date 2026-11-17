@@ -353,6 +353,8 @@ class CheckoutTest extends TestCase
 
     public function test_unpaid_total_from_three_million_waits_for_store_admin_approval(): void
     {
+        // Tanpa kunci, endpoint pembayaran menjawab 503 sebelum memeriksa status (CI tidak punya .env berisi kunci).
+        config(['services.midtrans.server_key' => 'SB-server', 'services.midtrans.client_key' => 'SB-client', 'services.midtrans.is_production' => false]);
         $variant = $this->variant('NAS-01', 100, ['price' => 1000000]);
 
         $this->addToCart('NAS-01', 1);
