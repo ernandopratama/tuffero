@@ -57,6 +57,21 @@ class HermesDraftTest extends TestCase
         $this->assertDatabaseHas('audit_logs', ['action' => 'marketing_draft.created', 'actor_user_id' => null]);
     }
 
+    public function test_calendar_item_keeps_its_date_and_platform_and_needs_no_sources(): void
+    {
+        $item = ['external_id' => 'bed7c0ad3a34:2026-11-16_08-00-30:k1', 'type' => 'caption', 'platform' => 'instagram', 'title' => 'Hampers Natal', 'body' => 'Hook singkat', 'scheduled_on' => '2026-11-17'];
+
+        $this->send($item)->assertCreated();
+
+        $draft = MarketingDraft::firstOrFail();
+        $this->assertSame('2026-11-17', $draft->scheduled_on->toDateString());
+        $this->assertSame('instagram', $draft->platform);
+        $this->assertSame('hermes', $draft->origin);
+        $this->send($item)->assertOk();
+        $this->assertSame(1, MarketingDraft::count());
+        $this->send([...$item, 'external_id' => 'x:2', 'scheduled_on' => '17 Nov 2026'])->assertUnprocessable()->assertJsonValidationErrors('scheduled_on');
+    }
+
     public function test_wrong_missing_or_short_token_is_refused(): void
     {
         $this->send($this->report(), 'salah-salah-salah-salah-salah-salah-1')->assertUnauthorized();

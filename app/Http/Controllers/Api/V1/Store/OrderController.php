@@ -24,7 +24,7 @@ class OrderController extends Controller
 {
     use ApiResponse;
 
-    public function show(Request $request, string $ref): JsonResponse
+    public function show(Request $request, string $ref, CancellationService $cancellations): JsonResponse
     {
         $order = Order::with('items.variant.product.images', 'items.review', 'shipment', 'histories')->where('public_ref', $ref)->first();
 
@@ -33,6 +33,8 @@ class OrderController extends Controller
         }
 
         $cancellation = $order->cancellationRequests()->latest('id')->first();
+        // Belum dibayar: batal langsung tanpa persetujuan (D-138). Bila tidak tersedia (mati atau batas tercapai), jalur pengajuan ke CS tetap.
+        $cancelNow = $cancellations->canCancelUnpaid($order);
 
         return $this->success('Order retrieved.', [
             'order_number' => $order->order_number,
@@ -50,6 +52,8 @@ class OrderController extends Controller
             'voucher_code' => $order->voucher_code,
             'voucher_label' => implode(' + ', array_filter([$order->voucher_code, $order->voucher_code_2])),
             'shipping_fee' => $order->shipping_fee,
+            'shipping_discount' => $order->shipping_discount,
+            'shipping_voucher_code' => $order->shipping_voucher_code,
             'total' => $order->total,
             'expires_at' => $order->expires_at,
             'created_at' => $order->created_at,
@@ -61,7 +65,8 @@ class OrderController extends Controller
                 ->sortBy('id')
                 ->unique('to_status')
                 ->mapWithKeys(fn ($history) => [$history->to_status => $history->created_at]),
-            'can_cancel' => $order->canBeCancelled() && ! $cancellation?->isOpen(),
+            'can_cancel_now' => $cancelNow,
+            'can_cancel' => $order->canBeCancelled() && ! $cancellation?->isOpen() && ! $cancelNow,
             'cancellation' => $cancellation?->only(['request_number', 'status', 'rejection_reason']),
             'items' => $order->items->map(fn (OrderItem $item) => [
                 'sku' => $item->sku_snapshot,
@@ -171,6 +176,20 @@ class OrderController extends Controller
             'request_number' => $cancellation->request_number,
             'contact_url' => $this->contactUrl($cancellation->request_number, $validated['channel']),
         ], 201);
+    }
+
+    /** Pembatalan langsung pesanan yang belum dibayar (D-138). Pesanan dibayar tetap lewat requestCancellation. */
+    public function cancelNow(Request $request, string $ref, CancellationService $cancellations): JsonResponse
+    {
+        $order = Order::where('public_ref', $ref)->first();
+
+        if (! $order || ! $this->canAccess($request, $order)) {
+            return $this->error('Order not found.', [], 404);
+        }
+
+        $cancellations->cancelUnpaid($order);
+
+        return $this->success('Order cancelled.');
     }
 
     public function payment(Request $request, string $ref, MidtransService $midtrans): JsonResponse

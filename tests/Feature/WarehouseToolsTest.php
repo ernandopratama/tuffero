@@ -140,7 +140,7 @@ class WarehouseToolsTest extends TestCase
     {
         $warehouse = $this->staff('warehouse');
 
-        $this->actingAs($warehouse)->getJson('/api/v1/admin/stock')->assertOk()->assertJsonPath('data.items.0.low_stock', 10);
+        $this->actingAs($warehouse)->getJson('/api/v1/admin/stock')->assertOk()->assertJsonPath('data.items.0.low_stock', 30);
 
         $this->variant->update(['low_stock_threshold' => 3]);
         $this->actingAs($warehouse)->getJson('/api/v1/admin/stock')->assertOk()->assertJsonPath('data.items.0.low_stock', 3);
@@ -149,7 +149,7 @@ class WarehouseToolsTest extends TestCase
     public function test_dashboard_uses_the_variant_threshold_over_the_global_one(): void
     {
         $this->adjust(-4, 'Rusak'); // tersedia 6
-        $this->assertSame(1, $this->dashboardKpi('warehouse', 'low_stock')['value'], 'Batas global 10: 6 menipis.');
+        $this->assertSame(1, $this->dashboardKpi('warehouse', 'low_stock')['value'], 'Batas global 30 (D-120): 6 menipis.');
 
         $this->variant->update(['low_stock_threshold' => 3]);
         $this->assertSame(0, $this->dashboardKpi('warehouse', 'low_stock')['value'], 'Batas varian 3: 6 aman.');

@@ -150,6 +150,19 @@ class MarketingDraftTest extends TestCase
         $this->assertNotSame(999, $draft->created_by_user_id);
     }
 
+    public function test_markdown_marks_are_stripped_on_create_and_update(): void
+    {
+        $marketing = $this->staff('marketing');
+        $id = $this->actingAs($marketing)->postJson(self::URL, $this->payload(['title' => '**Judul**', 'body' => "## Tren\n**Tebal** dan __lain__\n* satu\n* dua\n[Tokopedia](https://tokopedia.com/x)"]))->assertCreated()->json('data.id');
+
+        $draft = MarketingDraft::find($id);
+        $this->assertSame('Judul', $draft->title);
+        $this->assertSame("Tren\nTebal dan lain\n- satu\n- dua\nTokopedia (https://tokopedia.com/x)", $draft->body);
+
+        $this->actingAs($marketing)->patchJson(self::URL.'/'.$id, $this->payload(['body' => '**Baru**']))->assertOk();
+        $this->assertSame('Baru', $draft->fresh()->body);
+    }
+
     public function test_frequency_defaults_and_week_progress(): void
     {
         $marketing = $this->staff('marketing');

@@ -40,6 +40,16 @@ class RevenueService
         return $cancelled + $claims;
     }
 
+    /**
+     * Subsidi gratis ongkir (D-126): selisih tarif kurir dan ongkir yang dibayar pelanggan, untuk pesanan yang lunas di periode.
+     *
+     * @param  array{0: CarbonInterface, 1: CarbonInterface}  $range
+     */
+    public function shippingSubsidy(array $range): int
+    {
+        return (int) Order::whereBetween('paid_at', $range)->sum('shipping_discount');
+    }
+
     /** @param  array{0: CarbonInterface, 1: CarbonInterface}  $range */
     public function net(array $range): int
     {

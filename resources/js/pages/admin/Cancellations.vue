@@ -25,11 +25,10 @@ const auth = useAuthStore();
 const NEXT = {
     submitted: { path: 'validate', label: 'Validasi dan Ajukan', permission: 'orders.cancel_request' },
     validated: { path: 'approve', label: 'ACC Admin Toko', permission: 'orders.cancel' },
-    store_approved: { path: 'final-approve', label: 'ACC Pemilik', permission: 'orders.cancel_final' },
 };
-const STATUS_TONE = { submitted: 'warn', validated: 'info', store_approved: 'info', approved: 'ok', rejected: 'bad', refunded: 'neutral' };
+const STATUS_TONE = { submitted: 'warn', validated: 'info', approved: 'ok', rejected: 'bad', refunded: 'neutral' };
 const DOT = { ok: 'bg-success', warn: 'bg-warning', info: 'bg-info', bad: 'bg-error', neutral: 'bg-secondary' };
-const REJECT_PERMISSION = { submitted: 'orders.cancel_request', validated: 'orders.cancel', store_approved: 'orders.cancel_final' };
+const REJECT_PERMISSION = { submitted: 'orders.cancel_request', validated: 'orders.cancel' };
 
 const COLUMNS = [
     { key: 'request_number', label: 'Pengajuan' },
@@ -48,12 +47,10 @@ const busy = ref(false);
 const press = 'transition-[transform,background-color] duration-[160ms] ease-out-strong focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary active:scale-[0.97] disabled:opacity-60 disabled:active:scale-100';
 const toneOf = (item) => STATUS_TONE[item.status] || 'neutral';
 
-// Tahap persetujuan: CS memvalidasi, Admin Toko memberi ACC, Pemilik memberi ACC kedua hanya bila uang sudah masuk, lalu selesai.
-// Pesanan yang belum dibayar selesai setelah ACC Admin Toko (aturan sebenarnya dijaga server; ini hanya gambaran).
-const PAID = ['paid', 'refund_pending', 'refunded'];
-const CURRENT = { submitted: 0, validated: 1, store_approved: 2 };
+// Tahap persetujuan: CS memvalidasi, Admin Toko memberi ACC, lalu selesai (D-123: tanpa ACC Pemilik; aturan sebenarnya dijaga server).
+const CURRENT = { submitted: 0, validated: 1 };
 function stagesOf(item) {
-    const steps = [{ label: 'CS' }, { label: 'Toko' }, ...(PAID.includes(item.payment_status) ? [{ label: 'Pemilik' }] : []), { label: 'Selesai' }];
+    const steps = [{ label: 'CS' }, { label: 'Toko' }, { label: 'Selesai' }];
     const current = item.status in CURRENT ? CURRENT[item.status] : steps.length;
     return steps.map((step, i) => ({ ...step, state: i < current ? 'done' : i === current ? 'now' : 'next' }));
 }
@@ -82,6 +79,10 @@ const nextStep = (item) => {
     return step && auth.can(step.permission) ? step : null;
 };
 const canReject = (item) => !!REJECT_PERMISSION[item.status] && auth.can(REJECT_PERMISSION[item.status]);
+// Order kurir Biteship yang masih aktif: tombol cadangan membatalkannya lebih dulu (Admin Toko dan Super Admin); ACC terakhir juga membatalkannya.
+const canCancelCourier = (item) => item.courier_active && item.status === 'validated' && auth.can('orders.cancel');
+// Refund otomatis Midtrans (D-138 tahap 4, bawaan mati): percobaan eksplisit; hanya kartu dan QRIS, virtual account tetap manual.
+const canAutoRefund = (item) => item.auto_refund_available && auth.can('orders.cancel');
 const canMarkRefunded = (item) => item.status === 'approved' && item.payment_status === 'refund_pending' && auth.can('orders.cancel');
 
 function ask(item, path, label, text) {
@@ -131,7 +132,7 @@ async function submitReject() {
 
 <template>
   <div class="flex flex-wrap items-start justify-between gap-space-md">
-    <PageHeader title="Pembatalan" description="CS memvalidasi, Admin Toko memberi ACC. Pesanan yang sudah dibayar butuh ACC Pemilik. Sistem hanya mengingatkan bila lewat batas, tidak menyetujui apa pun." />
+    <PageHeader title="Pembatalan" description="CS memvalidasi, Admin Toko memberi ACC; Pemilik hanya melihat. Sistem hanya mengingatkan bila lewat batas, tidak menyetujui apa pun." />
   </div>
 
   <div class="mt-space-md flex justify-end">
@@ -164,6 +165,7 @@ async function submitReject() {
       <span class="block whitespace-nowrap font-mono">{{ row.order_number }}</span>
       <span class="block text-label-md">{{ row.customer_name }}</span>
       <span class="block whitespace-nowrap text-body-sm text-secondary"><span class="tabular-nums">{{ rupiah(row.total) }}</span> · {{ PAYMENT_STATUS[row.payment_status] || row.payment_status }}</span>
+      <span v-if="row.courier_active" class="mt-1 inline-flex items-center gap-1 rounded-full bg-warning-surface px-2 py-0.5 text-label-sm text-warning"><AdminIcon name="truck" :size="12" />Order kurir aktif</span>
     </template>
     <template #cell-reason="{ row }">
       <span class="mx-auto block max-w-xs break-words">{{ row.reason }}</span>
@@ -177,6 +179,8 @@ async function submitReject() {
           <i class="size-1.5 rounded-full" :class="DOT[toneOf(row)]" aria-hidden="true"></i>{{ CANCELLATION_STATUS[row.status] || row.status }}
         </span>
         <span v-if="row.is_overdue" class="inline-flex items-center gap-1 whitespace-nowrap text-label-sm text-error"><AdminIcon name="alert" :size="14" />Lewat batas proses</span>
+        <span v-if="row.auto_refund_status === 'done'" class="inline-flex items-center gap-1 whitespace-nowrap text-label-sm text-success"><AdminIcon name="check" :size="14" />Dana dikembalikan otomatis</span>
+        <span v-else-if="row.auto_refund_status === 'failed'" class="block max-w-[14rem] break-words text-center text-label-sm text-error">Refund otomatis gagal: {{ row.auto_refund_error }}</span>
         <ol v-if="row.status !== 'rejected'" class="mt-1 flex items-start" aria-hidden="true">
           <li v-for="(stage, i) in stagesOf(row)" :key="stage.label" class="flex items-start">
             <span class="flex w-11 flex-col items-center gap-1">
@@ -209,7 +213,9 @@ async function submitReject() {
           title="Hubungi pelanggan"
         ><AdminIcon name="mail" :size="18" /></a>
         <IconAction icon="chat" label="Catatan dan balasan" :subject="row.request_number" @click="openNotes(row)" />
-        <IconAction v-if="nextStep(row)" icon="check" tone="primary" :label="nextStep(row).label" :subject="row.request_number" :disabled="busy" @click="ask(row, nextStep(row).path, nextStep(row).label, 'Pengajuan lanjut ke tahap berikutnya dan tercatat atas nama Anda.')" />
+        <IconAction v-if="nextStep(row)" icon="check" tone="primary" :label="nextStep(row).label" :subject="row.request_number" :disabled="busy" @click="ask(row, nextStep(row).path, nextStep(row).label, 'Pengajuan lanjut ke tahap berikutnya dan tercatat atas nama Anda.' + (row.courier_active ? ' Order kurir di Biteship ikut dibatalkan; bila kurir sudah mengambil paket, ACC ditolak.' : ''))" />
+        <IconAction v-if="canCancelCourier(row)" icon="truck" label="Batalkan order kurir (Biteship)" :subject="row.request_number" :disabled="busy" @click="ask(row, 'courier-cancel', 'Batalkan order kurir', 'Order kurir di Biteship dibatalkan lebih dulu. Bila kurir sudah mengambil paket, Biteship menolak dan tidak ada yang berubah. Pesanan baru dibatalkan saat ACC.')" />
+        <IconAction v-if="canAutoRefund(row)" icon="undo" tone="primary" label="Coba refund otomatis" :subject="row.request_number" :disabled="busy" @click="ask(row, 'auto-refund', 'Coba refund otomatis', 'Dana dikembalikan lewat Midtrans ke metode bayar pelanggan, sebesar total pesanan. Jangan dipakai bila dana sudah ditransfer manual.')" />
         <IconAction v-if="canMarkRefunded(row)" icon="wallet" tone="primary" label="Dana sudah dikembalikan" :subject="row.request_number" :disabled="busy" @click="ask(row, 'refunded', 'Dana sudah dikembalikan', 'Tandai hanya bila dana sudah diterima pelanggan.')" />
         <IconAction v-if="canReject(row)" icon="x" tone="danger" label="Tolak pengajuan" :subject="row.request_number" :disabled="busy" @click="openReject(row)" />
       </div>

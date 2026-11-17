@@ -28,6 +28,8 @@ export const voucherPicker = () => ({
     picked: [],
     applied: [],
     voucherTotal: 0,
+    // Potongan gratis ongkir (D-126), terpisah dari voucherTotal yang memotong subtotal.
+    shippingDiscount: 0,
     voucherBusy: false,
     voucherError: '',
     voucherCode: '',
@@ -46,29 +48,42 @@ export const voucherPicker = () => ({
     voucherTitle(item) { return card.title(this.vw, item); },
     voucherMeta(item) { return card.meta(this.vw, item); },
     voucherDescription(item) { return item.description || ''; },
-    appliedLine(item) { return `${this.vw.title} ${item.code}`; },
+    isShippingVoucher(item) { return item.kind === 'shipping'; },
+    appliedLine(item) { return `${this.isShippingVoucher(item) ? this.vw.shippingTag : this.vw.title} ${item.code}`; },
     appliedText(item) { return '-' + rp(item.discount); },
+    // Konteks tambahan untuk pratinjau gratis ongkir (ongkir dan provinsi). Checkout menimpanya; keranjang belum tahu ongkir.
+    voucherContext() { return {}; },
 
     // Status kartu di pilihan: on = terpilih, off = belum memenuhi minimum, full = sudah 2, nostack = tidak bisa digabung, ok = bisa dipilih.
+    // D-126: maksimal 1 gratis ongkir; dua voucher biasa harus sama-sama bisa digabung; gratis ongkir + 1 voucher biasa selalu boleh.
     pickState(item) {
         if (this.picked.includes(item.code)) return 'on';
         if (!item.eligible) return 'off';
         if (this.picked.length >= MAX_VOUCHERS) return 'full';
         const chosen = this.vouchers.filter((other) => this.picked.includes(other.code));
-        if (chosen.length && (!item.stackable || chosen.some((other) => !other.stackable))) return 'nostack';
+        if (this.isShippingVoucher(item)) return chosen.some((other) => this.isShippingVoucher(other)) ? 'oneship' : 'ok';
+        const regular = chosen.filter((other) => !this.isShippingVoucher(other));
+        if (regular.length && (!item.stackable || regular.some((other) => !other.stackable))) return 'nostack';
         return 'ok';
     },
     isPicked(item) { return this.picked.includes(item.code); },
     pickBlocked(item) { return !['on', 'ok'].includes(this.pickState(item)); },
-    pickClass(item) { return `is-${this.pickState(item)}`; },
+    pickClass(item) {
+        const state = this.pickState(item);
+        // Kartu yang terhalang memakai gaya is-nostack yang sudah ada.
+        return [`is-${state === 'oneship' ? 'nostack' : state}`, this.isShippingVoucher(item) ? 'is-shipping' : ''].join(' ');
+    },
     pickNote(item) {
         const state = this.pickState(item);
         if (state === 'off') return this.vw.needMore.replace('{amount}', rp(item.missing));
         if (state === 'nostack') return this.vw.noStack;
+        if (state === 'oneship') return this.vw.oneShipping;
         if (state === 'full') return this.vw.full;
+        // Di keranjang ongkir belum diketahui: potongan pasti dihitung di checkout.
+        if (this.isShippingVoucher(item) && this.voucherContext().shipping_fee === undefined) return this.vw.shippingLater;
         return this.vw.save.replace('{amount}', rp(item.discount));
     },
-    pickNoteClass(item) { return ['off', 'nostack', 'full'].includes(this.pickState(item)) ? 'is-warn' : 'is-ok'; },
+    pickNoteClass(item) { return ['off', 'nostack', 'oneship', 'full'].includes(this.pickState(item)) ? 'is-warn' : 'is-ok'; },
     togglePick(item) {
         this.voucherError = '';
         if (this.picked.includes(item.code)) this.picked = this.picked.filter((code) => code !== item.code);
@@ -77,7 +92,7 @@ export const voucherPicker = () => ({
 
     async loadVoucherList() {
         try {
-            const { data } = await api.get('/vouchers');
+            const { data } = await api.get('/vouchers', { params: this.voucherContext() });
             this.vouchers = data.data.vouchers;
             this.vouchersLoaded = true;
         } catch {
@@ -107,9 +122,10 @@ export const voucherPicker = () => ({
         }
         return this.applyCodes(codes, true);
     },
-    setApplied(rows, total) {
+    setApplied(rows, total, shipping = 0) {
         this.applied = rows;
         this.voucherTotal = total;
+        this.shippingDiscount = shipping;
         writeStored(rows.map((item) => item.code));
     },
     clearVouchers() { this.setApplied([], 0); },
@@ -122,8 +138,8 @@ export const voucherPicker = () => ({
             if (!codes.length) {
                 this.clearVouchers();
             } else {
-                const { data } = await api.post('/vouchers/check', { codes, customer_phone: this.form?.customer_phone || undefined });
-                this.setApplied(data.data.vouchers, data.data.discount);
+                const { data } = await api.post('/vouchers/check', { codes, customer_phone: this.form?.customer_phone || undefined, ...this.voucherContext() });
+                this.setApplied(data.data.vouchers, data.data.discount, data.data.shipping_discount);
                 if (typed) this.voucherCode = '';
             }
             if (this.errors) delete this.errors.voucher_code;
@@ -141,8 +157,8 @@ export const voucherPicker = () => ({
         const codes = this.applied.length ? this.appliedCodes : readStored();
         if (!codes.length) return;
         try {
-            const { data } = await api.post('/vouchers/check', { codes, customer_phone: this.form?.customer_phone || undefined });
-            this.setApplied(data.data.vouchers, data.data.discount);
+            const { data } = await api.post('/vouchers/check', { codes, customer_phone: this.form?.customer_phone || undefined, ...this.voucherContext() });
+            this.setApplied(data.data.vouchers, data.data.discount, data.data.shipping_discount);
         } catch (e) {
             if (e.response?.status === 422) {
                 this.clearVouchers();

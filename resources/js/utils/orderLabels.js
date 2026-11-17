@@ -1,5 +1,7 @@
 // Label status untuk halaman admin (Bahasa Indonesia, D-046).
 export const ORDER_STATUS = {
+    awaiting_approval: 'Menunggu persetujuan',
+    rejected: 'Ditolak admin',
     pending_payment: 'Menunggu bayar',
     paid: 'Dibayar',
     processing: 'Diproses',
@@ -55,7 +57,6 @@ export const TONE_CLASS = {
 export const CANCELLATION_STATUS = {
     submitted: 'Menunggu validasi CS',
     validated: 'Menunggu ACC Admin Toko',
-    store_approved: 'Menunggu ACC Pemilik',
     approved: 'Disetujui',
     rejected: 'Ditolak',
     refunded: 'Dana dikembalikan',
@@ -99,5 +100,5 @@ export function rupiahCompact(n) {
 
 // Nada lencana status pesanan di ringkasan.
 export const ORDER_STATUS_TONE = {
-    pending_payment: 'warn', paid: 'ok', processing: 'neutral', shipped: 'warn', completed: 'ok', expired: 'neutral', cancelled: 'bad', refunded: 'neutral',
+    awaiting_approval: 'bad', rejected: 'neutral', pending_payment: 'warn', paid: 'ok', processing: 'neutral', shipped: 'warn', completed: 'ok', expired: 'neutral', cancelled: 'bad', refunded: 'neutral',
 };

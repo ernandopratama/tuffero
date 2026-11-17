@@ -97,6 +97,7 @@ const avatarTone = (name) => AVATAR_TONES[[...(name || '')].reduce((sum, ch) => 
       <template v-if="row.phone">
         <span class="block whitespace-nowrap font-mono">{{ row.phone }}</span>
         <span class="block text-label-sm" :class="row.phone_verified ? 'text-success' : 'text-secondary'">{{ row.phone_verified ? 'Terverifikasi' : 'Belum verifikasi' }}</span>
+        <span v-if="row.repeat_order" class="mt-1 inline-flex items-center gap-1 whitespace-nowrap rounded-full bg-success-surface px-2 py-0.5 text-label-sm text-success" :title="`${row.completed_orders} pesanan selesai atas nomor WhatsApp ini`"><AdminIcon name="sparkles" :size="12" />Repeat order</span>
       </template>
       <span v-else class="text-secondary">Belum diisi</span>
     </template>

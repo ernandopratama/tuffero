@@ -23,6 +23,8 @@ function notifySuccess(response) {
     toast.success(custom || (method === 'delete' ? 'Data dihapus.' : 'Perubahan tersimpan.'));
 }
 
+let lastPermissionSync = 0;
+
 // Response Interceptor
 api.interceptors.response.use(
     (response) => {
@@ -34,6 +36,11 @@ api.interceptors.response.use(
         // /auth/user dipanggil penjaga rute untuk memeriksa sesi; penjaga itu yang memutuskan arah. Mengalihkan di sini membuat perulangan tanpa henti.
         if (error.response && error.response.status === 401 && error.config?.url !== '/auth/user' && router.currentRoute.value.meta.requiresAuth) {
             router.push({ name: 'Login' });
+        }
+        // 403 di admin bisa berarti izin baru saja diubah Super Admin (D-129): muat ulang izin supaya menu ikut menyesuaikan. Paling sering tiap 30 detik.
+        if (error.response?.status === 403 && error.config?.url?.startsWith('/admin/') && Date.now() - lastPermissionSync > 30000) {
+            lastPermissionSync = Date.now();
+            import('../stores/auth').then(({ useAuthStore }) => useAuthStore().loadUser());
         }
         return Promise.reject(error);
     }

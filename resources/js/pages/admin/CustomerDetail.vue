@@ -28,6 +28,8 @@ const stats = computed(() => customer.value && [
     { icon: 'receipt', label: 'Total pesanan', value: customer.value.orders_count },
     { icon: 'clock', label: 'Pesanan terakhir', value: customer.value.orders[0] ? date(customer.value.orders[0].created_at) : 'Belum ada' },
     { icon: 'pin', label: 'Alamat tersimpan', value: customer.value.addresses.length },
+    // D-135: dihitung per nomor WhatsApp, termasuk pesanan tamu; pesanan dengan retur atau refund disetujui tidak dihitung.
+    { icon: 'sparkles', label: 'Pesanan selesai (repeat order)', value: customer.value.repeat_order ? `${customer.value.completed_orders} · Repeat order` : customer.value.completed_orders },
 ]);
 
 const contacts = computed(() => customer.value && [

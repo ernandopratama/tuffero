@@ -80,7 +80,7 @@ class ProductStockAdminTest extends TestCase
             'pemilik tidak ubah stok' => ['owner', 'postJson', '/api/v1/admin/stock/adjust', 403],
             'cs tidak ubah stok' => ['customer-service', 'postJson', '/api/v1/admin/stock/adjust', 403],
             'admin toko lihat stok' => ['store-admin', 'getJson', '/api/v1/admin/stock', 200],
-            'admin toko tidak ubah stok' => ['store-admin', 'postJson', '/api/v1/admin/stock/adjust', 403],
+            'admin toko ubah stok (D-134)' => ['store-admin', 'postJson', '/api/v1/admin/stock/adjust', 422],
         ];
     }
 

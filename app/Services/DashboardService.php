@@ -31,8 +31,12 @@ use Illuminate\Support\Facades\DB;
  */
 class DashboardService
 {
-    /** PROPOSED (OQ-26): batas stok tersedia di bawah angka ini dianggap menipis. Belum diputuskan tim. */
-    public const LOW_STOCK = 10;
+    /**
+     * Batas bawaan stok menipis: tersedia di bawah angka ini = menipis (D-120, rapat 14 Nov 2026; menggantikan 10 di D-055).
+     * Urutan yang dipakai di mana pun: batas varian (`product_variants.low_stock_threshold`) bila diisi, lalu Pengaturan
+     * `inventory.low_stock_threshold`, lalu konstanta ini. Angka 30 sementara; Super Admin mengubahnya di Pengaturan.
+     */
+    public const LOW_STOCK = 30;
 
     /** Kunci cache ringkasan pemeriksaan Super Admin; dibuang oleh Cek ke API dan Tandai sudah ditangani. */
     public const HEALTH_CACHE_KEY = 'dashboard:health:v2';
@@ -44,12 +48,15 @@ class DashboardService
     /** @var array<string, array{kpis: list<string>, chart: string, gauge: string, lists: list<string>}> */
     private const LAYOUT = [
         'super-admin' => ['kpis' => ['orders_today', 'staff_active', 'attention_total'], 'chart' => 'orders_monthly', 'gauge' => 'mfa', 'lists' => ['audit_recent', 'attention', 'integrations', 'top_products']],
-        'owner' => ['kpis' => ['revenue_month', 'orders_month', 'cancel_final_pending', 'attention_total'], 'chart' => 'revenue_monthly', 'gauge' => 'cancel_on_time', 'lists' => ['cancel_final_queue', 'refund_decide_queue', 'draft_review_queue', 'attention', 'top_products', 'stock_alerts', 'audit_recent']],
+        'owner' => ['kpis' => ['revenue_month', 'orders_month', 'cancel_open', 'attention_total'], 'chart' => 'revenue_monthly', 'gauge' => 'cancel_on_time', 'lists' => ['cancel_decided', 'refund_decide_queue', 'draft_review_queue', 'attention', 'top_products', 'stock_alerts', 'audit_recent']],
         'store-admin' => ['kpis' => ['to_process', 'low_stock', 'vouchers_active', 'attention_total'], 'chart' => 'orders_daily', 'gauge' => 'shipped_today', 'lists' => ['cancel_acc_queue', 'stock_alerts', 'top_products']],
         'customer-service' => ['kpis' => ['cancel_validate_pending', 'refund_pending', 'cancel_overdue', 'attention_total'], 'chart' => 'cancel_weekly', 'gauge' => 'cancel_on_time', 'lists' => ['cancel_validate_queue', 'refund_queue', 'followup_due', 'shipment_problems', 'low_reviews', 'orders_recent']],
         'warehouse' => ['kpis' => ['to_pack', 'awaiting_waybill', 'low_stock', 'attention_total'], 'chart' => 'stock_monthly', 'gauge' => 'packed_today', 'lists' => ['pack_queue', 'stock_alerts', 'stock_activity']],
         'marketing' => ['kpis' => ['vouchers_active', 'content_published', 'products_published', 'attention_total'], 'chart' => 'sales_summary', 'gauge' => 'voucher_quota', 'lists' => ['vouchers', 'contents', 'top_products']],
     ];
+
+    /** Role kustom buatan Super Admin (D-129): tampilan umum. Grafik dan daftar hanya muncul bila izinnya dimiliki. */
+    private const CUSTOM_LAYOUT = ['kpis' => ['attention_total'], 'chart' => 'orders_monthly', 'gauge' => 'mfa', 'lists' => ['attention']];
 
     private CarbonImmutable $now;
 
@@ -100,6 +107,10 @@ class DashboardService
         // Akun dengan banyak role memakai role pertama menurut urutan LAYOUT (super-admin paling atas), bukan urutan acak dari database.
         $role = collect(array_keys(self::LAYOUT))->first(fn (string $name) => $user->hasRole($name));
         $layout = $role ? self::LAYOUT[$role] : null;
+
+        if (! $layout && ($custom = $user->getRoleNames()->first())) {
+            [$role, $layout] = [$custom, self::CUSTOM_LAYOUT];
+        }
 
         if (! $layout) {
             return null;
@@ -189,8 +200,15 @@ class DashboardService
             }
         };
 
-        // Gudang juga boleh mengubah status, tetapi ringkasannya sudah dihitung sebagai antrean kemas.
-        if ($user->can('orders.update_status') && ! $user->can('orders.view_fulfillment')) {
+        // Tinjauan pesanan (D-132): menunggu persetujuan belum bisa dibayar; pesanan Rp1 juta ke atas cukup ditandai.
+        if ($user->can('orders.review_alert')) {
+            $add('order_approval', Order::where('status', Order::AWAITING_APPROVAL)->count(), ':n pesanan menunggu persetujuan sebelum bisa dibayar', 'bad', 'AdminOrders');
+            $add('order_review', Order::awaitingReview()->where('status', '!=', Order::AWAITING_APPROVAL)->count(), ':n pesanan Rp1 juta ke atas belum ditinjau', 'warn', 'AdminOrders');
+        }
+
+        // Gudang (tanpa `orders.view`) cukup melihat antrean kemas. Admin Toko yang juga memegang antrean kemas (D-134) tetap melihat
+        // "perlu diproses" untuk KPI-nya; barisnya sudah termasuk antrean kemas, jadi ditandai tumpang tindih (lihat covered()).
+        if ($user->can('orders.update_status') && ($user->can('orders.view') || ! $user->can('orders.view_fulfillment'))) {
             $add('to_process', Order::where('status', Order::PAID)->count(), ':n pesanan terbayar perlu diproses', 'warn', 'AdminOrders');
         }
 
@@ -231,15 +249,11 @@ class DashboardService
         }
 
         // Pemilik hanya memantau (menandai dikembalikan tetap hak `orders.cancel`), tetapi uang pelanggan ini harus terlihat olehnya.
-        if ($user->canAny(['orders.cancel', 'orders.cancel_final']) && $user->can('payments.view')) {
+        if ($user->canAny(['orders.cancel', 'cancellations.view']) && $user->can('payments.view')) {
             $add('late_payment_refund', Order::latePaymentClosed()->count(), ':n dana masuk untuk pesanan yang sudah ditutup perlu dikembalikan', 'bad', 'AdminPayments');
         }
 
-        if ($user->can('orders.cancel_final')) {
-            $add('cancel_final', $this->cancelCount(OrderCancellationRequest::STORE_APPROVED), ':n pembatalan menunggu ACC Anda', 'warn', 'AdminCancellations');
-        }
-
-        if ($user->canAny(['orders.cancel_request', 'orders.cancel', 'orders.cancel_final'])) {
+        if ($user->canAny(['orders.cancel_request', 'orders.cancel', 'cancellations.view'])) {
             $add('cancel_overdue', $this->overdueQuery()->count(), ':n pengajuan pembatalan lewat batas proses', 'bad', 'AdminCancellations');
         }
 
@@ -304,6 +318,8 @@ class DashboardService
         return match ($key) {
             // Resi menunggu (diproses, tanpa resi) selalu bagian dari antrean kemas (dibayar atau diproses).
             'awaiting_waybill' => $shown('to_pack') ? $this->awaitingWaybillCount() : 0,
+            // Pesanan dibayar yang belum diproses juga bagian dari antrean kemas (dibayar atau diproses).
+            'to_process' => $shown('to_pack') ? Order::where('status', Order::PAID)->count() : 0,
             'cancel_overdue' => $this->coveredOverdueCancellations($shown),
             'refund_overdue' => $this->coveredOverdueRefunds($shown),
             // Pesanan macet (Super Admin): tiga dari lima pemeriksaannya adalah himpunan bagian peringatan lain.
@@ -316,13 +332,12 @@ class DashboardService
         };
     }
 
-    /** Pengajuan pembatalan yang lewat batas dan tahapnya tampil di antrean akun ini (validasi, ACC, ACC Pemilik, atau tandai dana). */
+    /** Pengajuan pembatalan yang lewat batas dan tahapnya tampil di antrean akun ini (validasi, ACC, atau tandai dana). */
     private function coveredOverdueCancellations(callable $shown): int
     {
         $statuses = array_values(array_filter([
             $shown('cancel_validate') ? OrderCancellationRequest::SUBMITTED : null,
             $shown('cancel_acc') ? OrderCancellationRequest::VALIDATED : null,
-            $shown('cancel_final') ? OrderCancellationRequest::STORE_APPROVED : null,
         ]));
         $refundMark = $shown('refund_mark');
 
@@ -381,9 +396,9 @@ class DashboardService
                 'key' => $key, 'label' => 'Pesanan bulan ini', 'value' => Order::whereBetween('paid_at', $this->monthRange(0))->count(), 'format' => 'number', 'icon' => 'receipt', 'tone' => 'neutral',
                 'delta' => null, 'foot' => Order::whereBetween('cancelled_at', $this->monthRange(0))->count().' dibatalkan', 'spark' => null,
             ] : null,
-            'cancel_final_pending' => $user->can('orders.cancel_final') ? [
-                'key' => $key, 'label' => 'Menunggu ACC Anda', 'value' => $this->cancelCount(OrderCancellationRequest::STORE_APPROVED), 'format' => 'number', 'icon' => 'check', 'tone' => 'bad',
-                'delta' => null, 'foot' => 'Pesanan sudah dibayar', 'spark' => null,
+            'cancel_open' => $user->can('cancellations.view') ? [
+                'key' => $key, 'label' => 'Pembatalan berjalan', 'value' => OrderCancellationRequest::whereIn('status', OrderCancellationRequest::OPEN)->count(), 'format' => 'number', 'icon' => 'x', 'tone' => 'neutral',
+                'delta' => null, 'foot' => 'Menunggu CS atau Admin Toko', 'spark' => null,
             ] : null,
             'staff_active' => $user->can('users.manage') ? [
                 'key' => $key, 'label' => 'Akun staf aktif', 'value' => $this->staff()->count(), 'format' => 'number', 'icon' => 'user', 'tone' => 'neutral', 'delta' => null,
@@ -413,7 +428,7 @@ class DashboardService
                 'key' => $key, 'label' => 'Refund perlu diproses', 'value' => $this->refundToProcessQuery()->count(), 'format' => 'number', 'icon' => 'undo', 'tone' => 'bad', 'delta' => null,
                 'foot' => Refund::where('status', Refund::APPROVED)->count().' dana menunggu dikembalikan', 'spark' => null,
             ] : null,
-            'cancel_overdue' => $user->canAny(['orders.cancel_request', 'orders.cancel', 'orders.cancel_final']) ? [
+            'cancel_overdue' => $user->canAny(['orders.cancel_request', 'orders.cancel', 'cancellations.view']) ? [
                 'key' => $key, 'label' => 'Lewat batas proses', 'value' => $this->overdueQuery()->count(), 'format' => 'number', 'icon' => 'clock', 'tone' => 'bad', 'delta' => null,
                 'foot' => 'Sistem hanya mengingatkan', 'spark' => null,
             ] : null,
@@ -490,7 +505,7 @@ class DashboardService
                 ['key' => 'paid', 'name' => 'Dibayar', 'tone' => 'success', 'values' => $this->daily(fn ($r) => Order::whereBetween('paid_at', $r)->count())],
                 ['key' => 'shipped', 'name' => 'Dikirim', 'tone' => 'accent', 'values' => $this->daily(fn ($r) => Shipment::whereBetween('shipped_at', $r)->count())],
             ]) : null,
-            'cancel_weekly' => $user->canAny(['orders.cancel_request', 'orders.cancel', 'orders.cancel_final']) ? $this->chartData('Pengajuan pembatalan per minggu', '8 minggu', 'number', $this->weekLabels(), [
+            'cancel_weekly' => $user->canAny(['orders.cancel_request', 'orders.cancel', 'cancellations.view']) ? $this->chartData('Pengajuan pembatalan per minggu', '8 minggu', 'number', $this->weekLabels(), [
                 ['key' => 'incoming', 'name' => 'Masuk', 'tone' => 'accent', 'values' => $this->weekly(fn ($r) => OrderCancellationRequest::whereBetween('created_at', $r)->count())],
                 ['key' => 'done', 'name' => 'Selesai', 'tone' => 'success', 'values' => $this->weekly(fn ($r) => OrderCancellationRequest::whereIn('status', [OrderCancellationRequest::APPROVED, OrderCancellationRequest::REJECTED, OrderCancellationRequest::REFUNDED])->whereBetween('updated_at', $r)->count())],
             ]) : null,
@@ -575,7 +590,7 @@ class DashboardService
 
                 return $this->gaugeData('Keamanan akun', 'Akun staf dengan MFA', $total > 0 ? (int) round($with / $total * 100) : null, [['Akun dengan MFA', "$with dari $total"], ['Belum aktif', ($total - $with).' akun']], ($total - $with).' akun belum aktif MFA');
             case 'cancel_on_time':
-                if (! $user->canAny(['orders.cancel_request', 'orders.cancel', 'orders.cancel_final'])) {
+                if (! $user->canAny(['orders.cancel_request', 'orders.cancel', 'cancellations.view'])) {
                     return null;
                 }
                 $finished = OrderCancellationRequest::whereIn('status', [OrderCancellationRequest::APPROVED, OrderCancellationRequest::REJECTED, OrderCancellationRequest::REFUNDED])
@@ -640,7 +655,7 @@ class DashboardService
             ])->all(), 'Tidak ada yang perlu ditindaklanjuti.'),
             'integrations' => $user->can('settings.manage') ? $this->integrationList($key) : null,
             'top_products' => $user->canAny(['orders.view', 'reports.view_summary']) ? $this->topProducts($user) : null,
-            'cancel_final_queue' => $user->can('orders.cancel_final') ? $this->cancelQueue($key, 'Menunggu keputusan Anda', OrderCancellationRequest::STORE_APPROVED, 'ACC Pemilik') : null,
+            'cancel_decided' => $user->can('cancellations.view') ? $this->cancelDecided($key) : null,
             'refund_decide_queue' => $user->can('refunds.decide') ? $this->refundDecideQueue($key) : null,
             'draft_review_queue' => $user->can('marketing_drafts.approve') ? $this->draftReviewQueue($key) : null,
             'cancel_acc_queue' => $user->can('orders.cancel') ? $this->cancelQueue($key, 'Antrean ACC pembatalan', OrderCancellationRequest::VALIDATED, 'Divalidasi CS') : null,
@@ -649,7 +664,7 @@ class DashboardService
             'followup_due' => $user->can('followups.manage') ? $this->followUpList($key) : null,
             'shipment_problems' => $user->can('shipments.view') && $user->can('followups.manage') ? $this->shipmentProblemList($key) : null,
             'low_reviews' => $user->can('product_reviews.view') && $user->can('followups.manage') ? $this->lowReviewList($key) : null,
-            'cancel_overdue_list' => $user->canAny(['orders.cancel_request', 'orders.cancel', 'orders.cancel_final']) ? $this->listData($key, 'Lewat batas proses', null, $this->overdueQuery()->with('order:id,order_number,total')->orderBy('due_at')->limit(3)->get()->map(fn (OrderCancellationRequest $r) => [
+            'cancel_overdue_list' => $user->canAny(['orders.cancel_request', 'orders.cancel', 'cancellations.view']) ? $this->listData($key, 'Lewat batas proses', null, $this->overdueQuery()->with('order:id,order_number,total')->orderBy('due_at')->limit(3)->get()->map(fn (OrderCancellationRequest $r) => [
                 'kind' => 'alert', 'icon' => 'clock', 'tone' => 'bad', 'title' => $r->request_number.' lewat batas', 'subtitle' => 'Pesanan '.$r->order->order_number.'. Pantau sampai selesai.', 'to' => 'AdminCancellations',
             ])->all(), 'Tidak ada pengajuan yang lewat batas.') : null,
             'orders_recent' => $user->can('orders.view') ? $this->listData($key, 'Pesanan terbaru', null, Order::latest('id')->limit(3)->get()->map(fn (Order $o) => [
@@ -798,6 +813,19 @@ class DashboardService
         ])->all();
 
         return $this->listData($key, $title, null, $rows, 'Tidak ada pengajuan yang menunggu.');
+    }
+
+    /** Keputusan pembatalan terbaru (hanya baca) untuk Pemilik: apa yang diputuskan Admin Toko dan siapa yang menandai dana kembali. */
+    private function cancelDecided(string $key): array
+    {
+        $labels = [OrderCancellationRequest::APPROVED => 'Disetujui', OrderCancellationRequest::REJECTED => 'Ditolak', OrderCancellationRequest::REFUNDED => 'Dana dikembalikan'];
+
+        $rows = OrderCancellationRequest::with('order:id,order_number')->whereIn('status', array_keys($labels))->latest('updated_at')->limit(3)->get()->map(fn (OrderCancellationRequest $r) => [
+            'icon' => 'x', 'tone' => $r->status === OrderCancellationRequest::REJECTED ? 'bad' : 'ok', 'title' => $r->request_number, 'subtitle' => $r->order->order_number,
+            'chip' => ['text' => $labels[$r->status], 'tone' => $r->status === OrderCancellationRequest::REJECTED ? 'bad' : 'ok'], 'at' => $r->updated_at?->toIso8601String(), 'to' => 'AdminCancellations',
+        ])->all();
+
+        return $this->listData($key, 'Keputusan pembatalan terbaru', 'Dari Admin Toko', $rows, 'Belum ada keputusan.', ['label' => 'Buka pembatalan', 'to' => 'AdminCancellations']);
     }
 
     /** @return array<string, mixed> */

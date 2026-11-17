@@ -298,7 +298,7 @@ class AdminManagementTest extends TestCase
         $this->assertTrue($keys->every(fn (string $key) => str_starts_with($key, 'contact.') || str_starts_with($key, 'reviews.') || str_starts_with($key, 'discount.')));
         $this->assertContains('contact.whatsapp_number', $keys->all());
 
-        $this->patchJson('/api/v1/admin/settings/contact.whatsapp_number', ['value' => '+6281231481755'])->assertOk();
+        $this->patchJson('/api/v1/admin/settings/contact.whatsapp_number', ['value' => '+6281252507880'])->assertOk();
         $this->patchJson('/api/v1/admin/settings/contact.whatsapp_number', ['value' => '0812345'])->assertUnprocessable();
         $this->patchJson('/api/v1/admin/settings/checkout.reservation_minutes', ['value' => 30])->assertForbidden();
         $this->patchJson('/api/v1/admin/settings/refund.claim_window_hours', ['value' => 24])->assertForbidden();
@@ -308,7 +308,7 @@ class AdminManagementTest extends TestCase
     {
         $settings = $this->getJson('/api/v1/settings/public')->assertOk()->json('data.settings');
 
-        $this->assertSame('+6281231481755', $settings['contact.whatsapp_number']);
+        $this->assertSame('+6281252507880', $settings['contact.whatsapp_number']);
         $this->assertArrayHasKey('contact.admin_email', $settings);
         $this->assertArrayNotHasKey('checkout.reservation_minutes', $settings);
         $this->assertArrayNotHasKey('refund.claim_window_hours', $settings);

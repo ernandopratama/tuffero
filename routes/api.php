@@ -9,6 +9,7 @@ use App\Http\Controllers\Api\V1\Admin\CancellationController;
 use App\Http\Controllers\Api\V1\Admin\CategoryController;
 use App\Http\Controllers\Api\V1\Admin\ChatFaqController;
 use App\Http\Controllers\Api\V1\Admin\CommentController;
+use App\Http\Controllers\Api\V1\Admin\CustomerBlockController;
 use App\Http\Controllers\Api\V1\Admin\CustomerController;
 use App\Http\Controllers\Api\V1\Admin\CustomerEmailController;
 use App\Http\Controllers\Api\V1\Admin\CustomerHistoryController;
@@ -21,6 +22,7 @@ use App\Http\Controllers\Api\V1\Admin\MarketingDraftController;
 use App\Http\Controllers\Api\V1\Admin\NewsItemController;
 use App\Http\Controllers\Api\V1\Admin\NotificationController as AdminNotificationController;
 use App\Http\Controllers\Api\V1\Admin\OrderController as AdminOrderController;
+use App\Http\Controllers\Api\V1\Admin\OrderReviewController;
 use App\Http\Controllers\Api\V1\Admin\ProductController;
 use App\Http\Controllers\Api\V1\Admin\ProductReviewController;
 use App\Http\Controllers\Api\V1\Admin\ProfileController;
@@ -29,7 +31,9 @@ use App\Http\Controllers\Api\V1\Admin\QuickSearchController;
 use App\Http\Controllers\Api\V1\Admin\RefundController as AdminRefundController;
 use App\Http\Controllers\Api\V1\Admin\ReplyTemplateController;
 use App\Http\Controllers\Api\V1\Admin\ReportController;
+use App\Http\Controllers\Api\V1\Admin\ReturnBlockRuleController;
 use App\Http\Controllers\Api\V1\Admin\ReviewController;
+use App\Http\Controllers\Api\V1\Admin\RoleController;
 use App\Http\Controllers\Api\V1\Admin\SettingController;
 use App\Http\Controllers\Api\V1\Admin\StockController;
 use App\Http\Controllers\Api\V1\Admin\SystemHealthController;
@@ -109,6 +113,7 @@ Route::prefix('v1')->group(function () {
         Route::post('/orders/{ref}/payment', [OrderController::class, 'payment'])->whereUuid('ref')->middleware('throttle:checkout');
         Route::post('/orders/{ref}/payment/sync', [OrderController::class, 'syncPayment'])->whereUuid('ref')->middleware('throttle:60,1');
         Route::post('/orders/{ref}/cancellation', [OrderController::class, 'requestCancellation'])->whereUuid('ref')->middleware('throttle:checkout');
+        Route::post('/orders/{ref}/cancel', [OrderController::class, 'cancelNow'])->whereUuid('ref')->middleware('throttle:checkout');
         Route::post('/orders/{ref}/reviews', [OrderController::class, 'review'])->whereUuid('ref')->middleware('throttle:checkout');
     });
 
@@ -189,10 +194,33 @@ Route::prefix('v1')->group(function () {
         Route::delete('/profile/sessions', [ProfileController::class, 'revokeOtherSessions'])->middleware(['throttle:profile', 'mfa.enrolled']);
         Route::delete('/profile/sessions/{token}', [ProfileController::class, 'revokeSession'])->where('token', '[a-f0-9]{32}')->middleware(['throttle:profile', 'mfa.enrolled']);
 
+        // D-122: daftar pelanggan yang diblokir otomatis (retur berturut-turut); mencabut hanya dengan izin customers.block.
+        Route::get('/customer-blocks', [CustomerBlockController::class, 'index'])->middleware('permission:customer_blocks.view');
+        Route::post('/customer-blocks', [CustomerBlockController::class, 'store'])->middleware(['permission:customer_blocks.manage', 'mfa.enrolled', 'throttle:30,1']);
+        Route::patch('/customer-blocks/{block}', [CustomerBlockController::class, 'update'])->middleware(['permission:customer_blocks.manage', 'mfa.enrolled']);
+        Route::post('/customer-blocks/{block}/release', [CustomerBlockController::class, 'release'])->middleware(['permission:customer_blocks.manage', 'mfa.enrolled']);
+
+        // D-133: menyalakan blokir otomatis diajukan (Super Admin, Admin Toko) dan disetujui Pemilik; mematikan langsung dengan catatan.
+        Route::get('/customer-blocks/rule', [ReturnBlockRuleController::class, 'show'])->middleware('permission:customer_blocks.view');
+        Route::post('/customer-blocks/rule/request', [ReturnBlockRuleController::class, 'request'])->middleware(['permission:customer_blocks.manage', 'mfa.enrolled', 'throttle:10,1']);
+        Route::post('/customer-blocks/rule/disable', [ReturnBlockRuleController::class, 'disable'])->middleware(['permission:customer_blocks.manage', 'mfa.enrolled', 'throttle:10,1']);
+        Route::post('/customer-blocks/rule/requests/{ruleRequest}/decide', [ReturnBlockRuleController::class, 'decide'])->whereNumber('ruleRequest')->middleware(['permission:customer_blocks.approve', 'mfa.enrolled', 'throttle:10,1']);
+
         Route::get('/customers', [CustomerController::class, 'index'])->middleware('permission:customers.view');
         Route::get('/customers/{user}', [CustomerController::class, 'show'])->middleware('permission:customers.view');
         Route::patch('/customers/{user}', [CustomerController::class, 'update'])->middleware(['permission:customers.deactivate', 'mfa.enrolled']);
         Route::delete('/customers/{user}', [CustomerController::class, 'destroy'])->middleware(['permission:users.manage', 'mfa.enrolled']);
+
+        // Role dan izin (D-129): hanya Super Admin; perubahan wajib MFA dan konfirmasi kata sandi.
+        Route::get('/access', [RoleController::class, 'index'])->middleware('permission:roles.manage');
+        Route::middleware(['permission:roles.manage', 'mfa.enrolled', 'throttle:20,1'])->group(function () {
+            Route::post('/roles', [RoleController::class, 'storeRole']);
+            Route::patch('/roles/{role}', [RoleController::class, 'updateRole'])->whereNumber('role');
+            Route::delete('/roles/{role}', [RoleController::class, 'destroyRole'])->whereNumber('role');
+            Route::post('/permissions', [RoleController::class, 'storePermission']);
+            Route::patch('/permissions/{permission}', [RoleController::class, 'updatePermission'])->whereNumber('permission');
+            Route::delete('/permissions/{permission}', [RoleController::class, 'destroyPermission'])->whereNumber('permission');
+        });
 
         Route::get('/users', [UserController::class, 'index'])->middleware('permission:users.manage');
         Route::post('/users', [UserController::class, 'store'])->middleware(['permission:users.manage', 'mfa.enrolled']);
@@ -231,7 +259,7 @@ Route::prefix('v1')->group(function () {
             Route::get('/reply-templates', [ReplyTemplateController::class, 'index']);
             Route::get('/orders/{order}/reply-templates', [ReplyTemplateController::class, 'forOrder'])->middleware('permission:orders.view');
             Route::get('/refunds/{refund}/reply-templates', [ReplyTemplateController::class, 'forRefund'])->middleware('permission:refunds.view');
-            Route::get('/cancellations/{cancellation}/reply-templates', [ReplyTemplateController::class, 'forCancellation'])->middleware('permission:orders.cancel_request|orders.cancel|orders.cancel_final');
+            Route::get('/cancellations/{cancellation}/reply-templates', [ReplyTemplateController::class, 'forCancellation'])->middleware('permission:orders.cancel_request|orders.cancel');
             Route::middleware('mfa.enrolled')->group(function () {
                 Route::post('/reply-templates', [ReplyTemplateController::class, 'store']);
                 Route::patch('/reply-templates/{template}', [ReplyTemplateController::class, 'update']);
@@ -243,11 +271,11 @@ Route::prefix('v1')->group(function () {
         Route::middleware('permission:followups.manage')->group(function () {
             Route::get('/orders/{order}/follow-ups', [FollowUpController::class, 'index'])->middleware('permission:orders.view');
             Route::get('/refunds/{refund}/follow-ups', [FollowUpController::class, 'index'])->middleware('permission:refunds.view');
-            Route::get('/cancellations/{cancellation}/follow-ups', [FollowUpController::class, 'index'])->middleware('permission:orders.cancel_request|orders.cancel|orders.cancel_final');
+            Route::get('/cancellations/{cancellation}/follow-ups', [FollowUpController::class, 'index'])->middleware('permission:orders.cancel_request|orders.cancel');
             Route::middleware(['mfa.enrolled', 'throttle:60,1'])->group(function () {
                 Route::post('/orders/{order}/follow-ups', [FollowUpController::class, 'store'])->middleware('permission:orders.view');
                 Route::post('/refunds/{refund}/follow-ups', [FollowUpController::class, 'store'])->middleware('permission:refunds.view');
-                Route::post('/cancellations/{cancellation}/follow-ups', [FollowUpController::class, 'store'])->middleware('permission:orders.cancel_request|orders.cancel|orders.cancel_final');
+                Route::post('/cancellations/{cancellation}/follow-ups', [FollowUpController::class, 'store'])->middleware('permission:orders.cancel_request|orders.cancel');
                 Route::post('/follow-ups/{followUp}/done', [FollowUpController::class, 'complete']);
             });
         });
@@ -256,16 +284,16 @@ Route::prefix('v1')->group(function () {
         Route::middleware('permission:search.quick')->group(function () {
             Route::get('/orders/{order}/customer-history', [CustomerHistoryController::class, 'forOrder'])->middleware('permission:orders.view');
             Route::get('/refunds/{refund}/customer-history', [CustomerHistoryController::class, 'forRefund'])->middleware('permission:refunds.view');
-            Route::get('/cancellations/{cancellation}/customer-history', [CustomerHistoryController::class, 'forCancellation'])->middleware('permission:orders.cancel_request|orders.cancel|orders.cancel_final');
+            Route::get('/cancellations/{cancellation}/customer-history', [CustomerHistoryController::class, 'forCancellation'])->middleware('permission:orders.cancel_request|orders.cancel');
         });
         Route::middleware('permission:emails.send')->group(function () {
             Route::get('/orders/{order}/customer-emails', [CustomerEmailController::class, 'index'])->middleware('permission:orders.view');
             Route::get('/refunds/{refund}/customer-emails', [CustomerEmailController::class, 'index'])->middleware('permission:refunds.view');
-            Route::get('/cancellations/{cancellation}/customer-emails', [CustomerEmailController::class, 'index'])->middleware('permission:orders.cancel_request|orders.cancel|orders.cancel_final');
+            Route::get('/cancellations/{cancellation}/customer-emails', [CustomerEmailController::class, 'index'])->middleware('permission:orders.cancel_request|orders.cancel');
             Route::middleware(['mfa.enrolled', 'throttle:10,1'])->group(function () {
                 Route::post('/orders/{order}/customer-emails', [CustomerEmailController::class, 'store'])->middleware('permission:orders.view');
                 Route::post('/refunds/{refund}/customer-emails', [CustomerEmailController::class, 'store'])->middleware('permission:refunds.view');
-                Route::post('/cancellations/{cancellation}/customer-emails', [CustomerEmailController::class, 'store'])->middleware('permission:orders.cancel_request|orders.cancel|orders.cancel_final');
+                Route::post('/cancellations/{cancellation}/customer-emails', [CustomerEmailController::class, 'store'])->middleware('permission:orders.cancel_request|orders.cancel');
             });
         });
 
@@ -324,6 +352,11 @@ Route::prefix('v1')->group(function () {
         Route::patch('/warehouses/{warehouse}', [WarehouseController::class, 'update'])->middleware(['permission:warehouses.manage', 'mfa.enrolled']);
 
         Route::get('/orders', [AdminOrderController::class, 'index'])->middleware('permission:orders.view');
+        // Tinjauan pesanan (D-132). Didaftarkan sebelum /orders/{order} supaya "review-queue" tidak dibaca sebagai id.
+        Route::get('/orders/review-queue', [OrderReviewController::class, 'queue'])->middleware(['permission:orders.review_alert', 'throttle:120,1']);
+        Route::post('/orders/{order}/approve', [OrderReviewController::class, 'approve'])->middleware(['permission:orders.review', 'mfa.enrolled', 'throttle:30,1']);
+        Route::post('/orders/{order}/reject', [OrderReviewController::class, 'reject'])->middleware(['permission:orders.review', 'mfa.enrolled', 'throttle:30,1']);
+        Route::post('/orders/{order}/reviewed', [OrderReviewController::class, 'reviewed'])->middleware(['permission:orders.review', 'mfa.enrolled', 'throttle:30,1']);
         Route::get('/orders/{order}', [AdminOrderController::class, 'show'])->middleware('permission:orders.view');
         Route::get('/fulfillment', [AdminOrderController::class, 'fulfillment'])->middleware('permission:orders.view_fulfillment');
         Route::get('/fulfillment/pick-list', [AdminOrderController::class, 'pickList'])->middleware(['permission:orders.view_fulfillment', 'throttle:30,1']);
@@ -335,24 +368,25 @@ Route::prefix('v1')->group(function () {
         Route::post('/orders/{order}/mark-shipped', [AdminOrderController::class, 'markShipped'])->middleware(['permission:shipments.manage', 'mfa.enrolled']);
         Route::get('/orders/{order}/label', [AdminOrderController::class, 'label'])->middleware('permission:shipments.manage');
         Route::post('/orders/{order}/late-payment-refunded', [AdminOrderController::class, 'markLateRefunded'])->middleware(['permission:orders.cancel', 'mfa.enrolled', 'throttle:30,1']);
-        Route::post('/orders/{order}/complete', [AdminOrderController::class, 'complete'])->middleware(['permission:orders.update_status', 'mfa.enrolled']);
+        Route::post('/orders/{order}/complete', [AdminOrderController::class, 'complete'])->middleware(['permission:orders.complete', 'mfa.enrolled']);
 
         Route::middleware('permission:orders.view|orders.view_fulfillment')->group(function () {
             Route::get('/orders/{order}/comments', [CommentController::class, 'index']);
             Route::post('/orders/{order}/comments', [CommentController::class, 'store'])->middleware(['permission:comments.create', 'mfa.enrolled']);
         });
 
-        Route::get('/cancellations', [CancellationController::class, 'index'])->middleware('permission:orders.cancel_request|orders.cancel|orders.cancel_final');
-        Route::middleware('permission:orders.cancel_request|orders.cancel|orders.cancel_final')->group(function () {
+        Route::get('/cancellations', [CancellationController::class, 'index'])->middleware('permission:orders.cancel_request|orders.cancel|cancellations.view');
+        Route::middleware('permission:orders.cancel_request|orders.cancel|cancellations.view')->group(function () {
             Route::get('/cancellations/{cancellation}/comments', [CommentController::class, 'index']);
             Route::post('/cancellations/{cancellation}/comments', [CommentController::class, 'store'])->middleware(['permission:comments.create', 'mfa.enrolled']);
         });
         Route::middleware('mfa.enrolled')->prefix('cancellations/{cancellation}')->group(function () {
             Route::post('/validate', [CancellationController::class, 'validateRequest'])->middleware('permission:orders.cancel_request');
             Route::post('/approve', [CancellationController::class, 'approveByStore'])->middleware('permission:orders.cancel');
-            Route::post('/final-approve', [CancellationController::class, 'approveByOwner'])->middleware('permission:orders.cancel_final');
+            Route::post('/courier-cancel', [CancellationController::class, 'cancelCourierOrder'])->middleware('permission:orders.cancel');
+            Route::post('/auto-refund', [CancellationController::class, 'autoRefund'])->middleware(['permission:orders.cancel', 'throttle:10,1']);
             Route::post('/refunded', [CancellationController::class, 'markRefunded'])->middleware('permission:orders.cancel');
-            Route::post('/reject', [CancellationController::class, 'reject'])->middleware('permission:orders.cancel_request|orders.cancel|orders.cancel_final');
+            Route::post('/reject', [CancellationController::class, 'reject'])->middleware('permission:orders.cancel_request|orders.cancel');
         });
 
         Route::middleware(['permission:terms.manage', 'throttle:60,1'])->prefix('terms')->group(function () {

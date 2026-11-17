@@ -65,12 +65,13 @@ class RefundController extends Controller
             'decided_by' => $refund->decidedBy?->name,
             'terms_version' => $refund->terms_version,
             'received_at' => $this->refunds->receivedAt($refund->order)?->toIso8601String(),
-            'order_shipping_fee' => (int) $refund->order->shipping_fee,
+            // Ongkir yang dibayar pelanggan (tarif penuh dikurangi potongan gratis ongkir, D-126).
+            'order_shipping_fee' => (int) $refund->order->shipping_fee - (int) $refund->order->shipping_discount,
             // Ongkir bisa ikut hanya untuk salah kirim atau barang kurang, dan sekali per pesanan; server memeriksa ulang saat menyetujui.
             'shipping_eligible' => $refund->status === Refund::UNDER_REVIEW
                 && $refund->customer_choice === 'refund'
                 && in_array($refund->reason_type, Refund::SHIPPING_REASONS, true)
-                && $refund->order->shipping_fee > 0
+                && $refund->order->shipping_fee - $refund->order->shipping_discount > 0
                 && ! Refund::where('order_id', $refund->order_id)->whereKeyNot($refund->id)->whereIn('status', Refund::CLAIMING)->where('shipping_amount', '>', 0)->exists(),
             'payment_status' => $refund->order->payment_status,
             'items' => $refund->items->map(fn ($line) => [

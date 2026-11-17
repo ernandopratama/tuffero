@@ -2,6 +2,7 @@
 
 namespace App\Http\Requests\Admin;
 
+use App\Models\Voucher;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
 
@@ -17,14 +18,32 @@ class VoucherRequest extends FormRequest
         if (is_string($this->input('code'))) {
             $this->merge(['code' => strtoupper(trim($this->input('code')))]);
         }
+
+        // D-126: gratis ongkir = potongan tetap, khusus member. Hadiah pendaftaran selalu lewat klaim otomatis dan tidak tampil di daftar umum.
+        if ($this->input('kind') === Voucher::KIND_SHIPPING) {
+            $this->merge(['type' => 'fixed', 'audience' => 'member', 'max_discount' => null]);
+        } else {
+            $this->merge(['provinces' => null, 'budget' => null, 'signup_grant' => false, 'claim_valid_days' => null]);
+        }
+        if ($this->boolean('signup_grant')) {
+            $this->merge(['requires_claim' => true, 'is_listed' => false]);
+        }
     }
 
     /** @return array<string, mixed> */
     public function rules(): array
     {
         $isPercent = $this->input('type') === 'percent';
+        $isShipping = $this->input('kind') === Voucher::KIND_SHIPPING;
 
         return [
+            'kind' => ['sometimes', Rule::in([Voucher::KIND_ORDER, Voucher::KIND_SHIPPING])],
+            'provinces' => ['nullable', 'array', 'max:40'],
+            'provinces.*' => ['string', 'max:100', 'distinct'],
+            'budget' => ['nullable', 'integer', 'min:1000', 'max:10000000000'],
+            'limit_period' => ['sometimes', 'nullable', Rule::in(['month'])],
+            'signup_grant' => ['sometimes', 'boolean'],
+            'claim_valid_days' => [$this->boolean('signup_grant') ? 'required' : 'nullable', 'integer', 'min:1', 'max:365'],
             'code' => ['required', 'string', 'regex:/^[A-Z0-9_-]{3,40}$/', Rule::unique('vouchers', 'code')->ignore($this->route('voucher'))],
             'description' => ['sometimes', 'nullable', 'string', 'max:150'],
             'type' => ['required', Rule::in(['fixed', 'percent'])],
@@ -38,9 +57,11 @@ class VoucherRequest extends FormRequest
             // Voucher kampanye hanya berlaku selama kampanyenya berjalan (D-073).
             'campaign_id' => ['sometimes', 'nullable', 'integer', 'exists:campaigns,id'],
             'per_customer_limit' => ['sometimes', 'nullable', 'integer', 'min:1', 'max:100'],
-            'value' => ['required', 'integer', 'min:1', $isPercent ? 'max:100' : 'max:1000000000'],
+            'value' => $isShipping
+                ? ['required', 'integer', 'min:'.Voucher::SHIPPING_MIN, 'max:'.Voucher::SHIPPING_MAX]
+                : ['required', 'integer', 'min:1', $isPercent ? 'max:100' : 'max:1000000000'],
             'min_subtotal' => ['required', 'integer', 'min:0', 'max:1000000000'],
-            'max_discount' => [$isPercent ? 'nullable' : 'prohibited', 'integer', 'min:1', 'max:1000000000'],
+            'max_discount' => $isPercent ? ['nullable', 'integer', 'min:1', 'max:1000000000'] : ['nullable', 'prohibited', 'integer', 'min:1', 'max:1000000000'],
             // Kuota tidak boleh lebih kecil dari jumlah yang sudah terpakai.
             'quota' => ['nullable', 'integer', 'min:'.max(1, $this->route('voucher')->used_count ?? 1), 'max:100000000'],
             'starts_at' => ['nullable', 'date'],
@@ -58,8 +79,11 @@ class VoucherRequest extends FormRequest
             'code.regex' => 'Kode 3 sampai 40 karakter: huruf, angka, tanda hubung, atau garis bawah.',
             'code.unique' => 'Kode ini sudah dipakai.',
             'value.required' => 'Nilai diskon wajib diisi.',
-            'value.min' => 'Nilai diskon harus lebih dari 0.',
-            'value.max' => 'Nilai diskon terlalu besar. Persen maksimal 100.',
+            'value.min' => $this->input('kind') === Voucher::KIND_SHIPPING ? 'Potongan gratis ongkir minimal Rp1.000.' : 'Nilai diskon harus lebih dari 0.',
+            'value.max' => $this->input('kind') === Voucher::KIND_SHIPPING ? 'Potongan gratis ongkir maksimal Rp25.000.' : 'Nilai diskon terlalu besar. Persen maksimal 100.',
+            'budget.min' => 'Anggaran minimal Rp1.000.',
+            'claim_valid_days.required' => 'Isi masa berlaku (hari) untuk voucher hadiah pendaftaran.',
+            'provinces.*.distinct' => 'Provinsi tidak boleh dobel.',
             'min_subtotal.required' => 'Minimum belanja wajib diisi. Isi 0 bila tidak ada.',
             'max_discount.prohibited' => 'Batas diskon hanya untuk voucher persen.',
             'quota.min' => 'Kuota tidak boleh lebih kecil dari jumlah yang sudah terpakai.',

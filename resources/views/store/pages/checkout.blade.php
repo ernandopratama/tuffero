@@ -264,8 +264,8 @@
 								<template x-if="hasSaving"><div class="is-note"><dt>{{ $c['saving'] }}</dt><dd x-text="savingText"></dd></div></template>
 								<div><dt x-text="shippingText"></dt><dd x-text="feeText"></dd></div>
 								<template x-for="a in applied" :key="a.code">
-									<div class="is-minus">
-										<dt>{{ $site->lineIcon('gift', 14) }} <span x-text="appliedLine(a)"></span> <button type="button" class="tf-co-inline" @click="removeVoucher(a)">{{ $c['voucher']['remove'] }}</button></dt>
+									<div class="is-minus" :class="isShippingVoucher(a) && 'is-ship'">
+										<dt><template x-if="isShippingVoucher(a)"><span>{{ $site->lineIcon('truck', 14) }}</span></template><template x-if="!isShippingVoucher(a)"><span>{{ $site->lineIcon('gift', 14) }}</span></template> <span x-text="appliedLine(a)"></span> <button type="button" class="tf-co-inline" @click="removeVoucher(a)">{{ $c['voucher']['remove'] }}</button></dt>
 										<dd x-text="appliedText(a)"></dd>
 									</div>
 								</template>

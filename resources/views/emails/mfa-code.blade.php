@@ -5,7 +5,7 @@
 	<meta name="viewport" content="width=device-width, initial-scale=1">
 	<meta name="color-scheme" content="light dark">
 	<meta name="supported-color-schemes" content="light dark">
-	<title>Kode verifikasi login Tuffero</title>
+	<title>Kode OTP login Tuffero</title>
 	<style>
 		/* Gaya dasar ada inline (klien email tidak semuanya membaca <style>); blok ini hanya untuk HP dan mode gelap. */
 		@media only screen and (max-width: 520px) {
@@ -18,14 +18,14 @@
 			.tf-ink { color: #F6F0E5 !important; }
 			.tf-text { color: #D9C9B5 !important; }
 			.tf-muted { color: #A8937E !important; }
-			.tf-codebox { background-color: #3A2A1F !important; border-color: #C6A15B !important; }
+			.tf-codebox { background-color: #3A2A1F !important; border-color: #3E2D23 !important; }
 			.tf-notice { background-color: #33241B !important; color: #D9C9B5 !important; }
 		}
 	</style>
 </head>
 <body class="tf-bg" style="margin:0; padding:0; background-color:#F6F0E5; -webkit-text-size-adjust:100%;">
 	{{-- Pratinjau di daftar kotak masuk: kodenya langsung terlihat tanpa membuka email. --}}
-	<div style="display:none; max-height:0; overflow:hidden; opacity:0; mso-hide:all;">Kode Anda {{ $code }}. Berlaku {{ $minutes }} menit.&#847;&zwnj;&nbsp;&#847;&zwnj;&nbsp;&#847;&zwnj;&nbsp;&#847;&zwnj;&nbsp;</div>
+	<div style="display:none; max-height:0; overflow:hidden; opacity:0; mso-hide:all;">Kode OTP Anda {{ $code }}. Berlaku {{ $minutes }} menit.&#847;&zwnj;&nbsp;&#847;&zwnj;&nbsp;&#847;&zwnj;&nbsp;&#847;&zwnj;&nbsp;</div>
 
 	<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" class="tf-bg" style="background-color:#F6F0E5;">
 		<tr>
@@ -38,19 +38,21 @@
 					</tr>
 					<tr>
 						<td class="tf-card" style="background-color:#FFFFFF; border:1px solid #E3D5C0; border-radius:24px; padding:36px 36px 32px;">
-							<p class="tf-muted" style="margin:0 0 6px; font-family:Arial,Helvetica,sans-serif; font-size:12px; font-weight:700; letter-spacing:1.6px; text-transform:uppercase; color:#6D4C3D;">Verifikasi dua langkah</p>
-							<h1 class="tf-ink" style="margin:0 0 16px; font-family:Georgia,'Times New Roman',serif; font-size:26px; line-height:1.25; font-weight:normal; color:#2B1B14;">Halo {{ $name }},</h1>
-							<p class="tf-text" style="margin:0 0 24px; font-family:Arial,Helvetica,sans-serif; font-size:15px; line-height:1.6; color:#6D4C3D;">Gunakan kode di bawah untuk menyelesaikan masuk ke dashboard Tuffero.</p>
+							<p class="tf-muted" style="margin:0 0 12px; font-family:Arial,Helvetica,sans-serif; font-size:12px; font-weight:700; letter-spacing:1.6px; text-transform:uppercase; color:#6D4C3D;">Kode OTP login</p>
 
 							<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0">
 								<tr>
-									<td align="center" class="tf-codebox" style="background-color:#FBF4E2; border:1px dashed #C6A15B; border-radius:18px; padding:22px 12px;">
-										<span class="tf-code tf-ink" style="font-family:'SFMono-Regular',Consolas,'Liberation Mono',Menlo,monospace; font-size:38px; font-weight:bold; letter-spacing:12px; color:#2B1B14; padding-left:12px;">{{ $code }}</span>
+									<td align="center" class="tf-codebox" style="background-color:#FBF4E2; border:1px solid #E3D5C0; border-radius:18px; padding:24px 12px;">
+										{{-- Satu teks utuh (bukan sel per digit) supaya terpilih dan tersalin sekaligus; user-select:all untuk klien yang mendukung. --}}
+										<span class="tf-code tf-ink" style="font-family:'SFMono-Regular',Consolas,'Liberation Mono',Menlo,monospace; font-size:40px; font-weight:bold; letter-spacing:12px; color:#2B1B14; padding-left:12px; -webkit-user-select:all; user-select:all;">{{ $code }}</span>
 									</td>
 								</tr>
 							</table>
 
-							<p class="tf-text" style="margin:16px 0 0; text-align:center; font-family:Arial,Helvetica,sans-serif; font-size:14px; line-height:1.5; color:#6D4C3D;">Berlaku <strong class="tf-ink" style="color:#2B1B14;">{{ $minutes }} menit</strong> dan hanya bisa dipakai sekali.</p>
+							<p class="tf-text" style="margin:14px 0 0; text-align:center; font-family:Arial,Helvetica,sans-serif; font-size:14px; line-height:1.5; color:#6D4C3D;">Berlaku <strong class="tf-ink" style="color:#2B1B14;">{{ $minutes }} menit</strong> dan hanya bisa dipakai sekali.</p>
+
+							<h1 class="tf-ink" style="margin:28px 0 8px; font-family:Georgia,'Times New Roman',serif; font-size:22px; line-height:1.3; font-weight:normal; color:#2B1B14;">Halo {{ $name }},</h1>
+							<p class="tf-text" style="margin:0; font-family:Arial,Helvetica,sans-serif; font-size:15px; line-height:1.6; color:#6D4C3D;">Masukkan kode One-Time Password (OTP) di atas untuk menyelesaikan masuk ke dashboard Tuffero.</p>
 
 							<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="margin-top:28px;">
 								<tr>

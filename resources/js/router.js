@@ -94,6 +94,12 @@ const routes = [
                 meta: { permission: 'stock.view', menu: 'AdminStock', crumb: ['Katalog dan Promo', 'Riwayat Stok'] },
             },
             {
+                path: 'pelanggan-diblokir',
+                name: 'AdminCustomerBlocks',
+                component: () => import('./pages/admin/CustomerBlocks.vue'),
+                meta: { permission: 'customer_blocks.view' },
+            },
+            {
                 path: 'gudang',
                 name: 'AdminWarehouses',
                 component: () => import('./pages/admin/Warehouses.vue'),
@@ -127,7 +133,7 @@ const routes = [
                 path: 'pembatalan',
                 name: 'AdminCancellations',
                 component: () => import('./pages/admin/Cancellations.vue'),
-                meta: { anyPermission: ['orders.cancel_request', 'orders.cancel', 'orders.cancel_final'] },
+                meta: { anyPermission: ['orders.cancel_request', 'orders.cancel', 'cancellations.view'] },
             },
             {
                 path: 'syarat-ketentuan',
@@ -194,6 +200,12 @@ const routes = [
                 name: 'AdminUsers',
                 component: () => import('./pages/admin/Users.vue'),
                 meta: { permission: 'users.manage' },
+            },
+            {
+                path: 'role-izin',
+                name: 'AdminRoles',
+                component: () => import('./pages/admin/Roles.vue'),
+                meta: { permission: 'roles.manage' },
             },
             {
                 path: 'pengaturan',

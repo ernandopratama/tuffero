@@ -82,6 +82,8 @@ export const customerService = {
             payBefore: 'Bayar sebelum :time WIB.',
             couriers: { jnt: 'J&T', sicepat: 'SiCepat' },
             status: {
+                awaiting_approval: 'sedang dicek admin toko sebelum pembayaran dibuka.',
+                rejected: 'ditolak oleh admin toko.',
                 pending_payment: 'menunggu pembayaran.',
                 paid: 'pembayaran diterima, segera diproses.',
                 processing: 'sedang disiapkan di gudang Malang.',
@@ -151,6 +153,8 @@ export const customerService = {
             payBefore: 'Pay before :time WIB.',
             couriers: { jnt: 'J&T', sicepat: 'SiCepat' },
             status: {
+                awaiting_approval: 'being checked by our store admin before payment opens.',
+                rejected: 'declined by our store admin.',
                 pending_payment: 'awaiting payment.',
                 paid: 'payment received, processing soon.',
                 processing: 'being prepared at our Malang warehouse.',

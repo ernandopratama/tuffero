@@ -2143,6 +2143,32 @@ html:has(.tf-co-dialog[open]){ overflow: hidden; }
 .tf-od-ghost{ display: inline-flex; align-items: center; justify-content: center; gap: 8px; min-width: 220px; height: 44px; padding: 0 24px; border: 0; border-radius: 4px; background: transparent; font: 600 14px/17px var(--tf-sans); letter-spacing: 0.02em; color: var(--tf-ink) !important; text-decoration: underline; text-underline-offset: 3px; cursor: pointer; transition: background-color 150ms ease, transform 160ms var(--tf-ease-out); }
 .tf-od-ghost.is-block{ width: 100%; border: 1px solid var(--tf-ink); text-decoration: none; }
 .tf-od-ghost:active, .tf-od-link:active{ transform: scale(0.97); }
+/* Tombol geser (diadaptasi dari Uiverse.io, cssbuttons-io): kotak ikon di kanan; saat hover, latar tinta menutup tombol dan ikon bergeser ke tengah.
+   Hanya transform, opacity, dan clip-path yang dianimasikan. Teks tetap di DOM untuk pembaca layar. Dipakai untuk "Salin tautan" dan "Hubungi bantuan". */
+.tf-slide-btn{ --slide-box: 44px; position: relative; display: inline-flex; align-items: center; width: fit-content; height: 44px; padding: 0 calc(var(--slide-box) + 16px) 0 20px; overflow: hidden; border: 1px solid var(--tf-ink); border-radius: 4px; background: transparent; font: 600 14px/17px var(--tf-sans); letter-spacing: 0.02em; color: var(--tf-ink) !important; text-decoration: none !important; white-space: nowrap; cursor: pointer; -webkit-tap-highlight-color: transparent; user-select: none; transition: transform 160ms var(--tf-ease-out); }
+.tf-slide-btn-text{ position: relative; transition: opacity 200ms ease; }
+.tf-slide-btn-fill{ position: absolute; inset: 0; background: var(--tf-ink); clip-path: inset(0 0 0 calc(100% - var(--slide-box))); transition: clip-path 240ms var(--tf-ease-out); }
+.tf-slide-btn-icon{ position: absolute; inset: 0; display: grid; place-items: center; color: var(--tf-ivory); transform: translateX(calc(50% - var(--slide-box) / 2)); transition: transform 240ms var(--tf-ease-out); }
+.tf-slide-btn-icon svg{ transition: transform 160ms var(--tf-ease-out); }
+.tf-slide-btn:active{ transform: scale(0.97); }
+.tf-slide-btn:active .tf-slide-btn-icon svg{ transform: scale(0.85); }
+.tf-slide-btn:focus-visible{ outline: 2px solid var(--tf-gold); outline-offset: 2px; }
+@media (hover: hover) and (pointer: fine){
+	.tf-slide-btn:hover .tf-slide-btn-fill{ clip-path: inset(0); }
+	.tf-slide-btn:hover .tf-slide-btn-icon{ transform: translateX(0); }
+	.tf-slide-btn:hover .tf-slide-btn-text{ opacity: 0; }
+}
+@media (prefers-reduced-motion: reduce){
+	.tf-slide-btn, .tf-slide-btn-icon, .tf-slide-btn-icon svg{ transition: none; }
+	.tf-slide-btn:active, .tf-slide-btn:active .tf-slide-btn-icon svg{ transform: none; }
+	.tf-slide-btn:hover .tf-slide-btn-icon{ transform: translateX(calc(50% - var(--slide-box) / 2)); }
+	.tf-slide-btn:hover .tf-slide-btn-text{ opacity: 1; }
+	.tf-slide-btn:hover .tf-slide-btn-fill{ clip-path: inset(0 0 0 calc(100% - var(--slide-box))); }
+}
+.tf .tf-auth-link.tf-slide-btn{ display: flex; margin: 20px auto 0; }
+/* Baris Bagikan di halaman produk: tinggi 40px sama dengan tombol WhatsApp di sebelahnya; menimpa gaya pil `.tf-pd-share button`. */
+.tf-pd-share .tf-slide-btn{ --slide-box: 40px; display: inline-flex; gap: 0; height: 40px; min-height: 40px; padding: 0 calc(var(--slide-box) + 14px) 0 16px; border: 1px solid var(--tf-ink); border-radius: 4px; background: transparent; font: 600 13px/20px var(--tf-sans); }
+@media (hover: hover) and (pointer: fine){ .tf-pd-share .tf-slide-btn:hover{ background: transparent; border-color: var(--tf-ink); } }
 .tf-od-link{ display: inline-flex; align-items: center; justify-content: center; gap: 6px; min-height: 36px; padding: 0; border: 0; background: none; font: 600 14px/20px var(--tf-sans); color: var(--tf-ink) !important; text-decoration: underline; text-underline-offset: 3px; cursor: pointer; transition: transform 160ms var(--tf-ease-out); }
 .tf-od-summary{ position: sticky; top: 104px; display: grid; gap: 14px; }
 .tf .tf-od-rows{ display: grid; gap: 14px; margin: 0; }
@@ -2405,6 +2431,13 @@ button.tf-cartp-voucher{ width: 100%; border: 0; border-bottom: 1px solid var(--
 .tf-vpick-text em.is-warn{ color: #9B2C2C; }
 .tf-vpick-tag{ padding: 0 8px; border-radius: 999px; background: #4F7A3A1F; color: #3F6630; font: 600 11px/18px var(--tf-sans); white-space: nowrap; }
 .tf-vpick-tag[hidden]{ display: none; }
+/* D-126: voucher Gratis Ongkir hijau (token success #2E6B3E / #DCEFE0), ditambah ikon truk dan label supaya tidak hanya dibedakan dari warna. */
+.tf-ship-badge{ display: inline-flex; align-items: center; gap: 4px; width: max-content; padding: 0 8px; border-radius: 999px; background: #2E6B3E; color: #fff; font: 600 11px/18px var(--tf-sans); }
+.tf-voucher-list li.is-shipping{ border-color: #2E6B3E; background: #DCEFE0; }
+.tf-voucher-list li.is-shipping.is-off{ border-color: var(--tf-line); background: #F6F0E5; }
+.tf-vpick-list li.is-shipping label{ border-left: 4px solid #2E6B3E; }
+.tf-vpick-list li.is-shipping.is-on label{ border-color: #2E6B3E; background: #DCEFE0; }
+.tf-co-rows .is-ship dt, .tf-co-rows .is-ship dd, .tf-od-rows .is-ship dt, .tf-od-rows .is-ship dd{ color: #2E6B3E; }
 .tf-vpick-sheet > footer{ display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 12px 20px; border-top: 1px solid var(--tf-line); background: var(--tf-ivory); }
 .tf-vpick-sheet > footer .tf-btn{ height: 40px; padding: 0 20px; }
 @media (hover: hover) and (pointer: fine){ .tf-vpick-list li:not(.is-off):not(.is-nostack):not(.is-full) label:hover{ border-color: var(--tf-gold); } }

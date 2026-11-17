@@ -44,6 +44,8 @@ class CheckoutController extends Controller
         $user = $request->user();
         // Hanya dari session, tidak pernah dari body. Pesanan staf bukan pesanan pelanggan.
         $data['user_id'] = $user?->getRoleNames()->isEmpty() ? $user->id : null;
+        // Bukti untuk D-122 (tidak dipakai menolak): IP dari koneksi, bukan dari isian pembeli.
+        $data['ip_address'] = $request->ip();
 
         if ($data['user_id'] === null && config('services.whatsapp.otp_required')) {
             $otp->assertGuestMayCheckout($request->cookie(PhoneOtpService::DEVICE_COOKIE), $data['customer_phone']);

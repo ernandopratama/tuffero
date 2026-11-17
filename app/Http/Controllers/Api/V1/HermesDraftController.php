@@ -28,6 +28,7 @@ class HermesDraftController extends Controller
             'body' => ['required', 'string', 'max:5000'],
             'sources' => [Rule::requiredIf($trend), 'nullable', 'string', 'max:1000'],
             'source_period' => [Rule::requiredIf($trend), 'nullable', 'string', 'max:100'],
+            'scheduled_on' => ['nullable', 'date_format:Y-m-d'],
         ]);
 
         $existing = MarketingDraft::withTrashed()->where('external_id', $data['external_id'])->first();

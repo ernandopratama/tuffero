@@ -78,7 +78,7 @@ class StorefrontController extends Controller
             'name' => $words[0],
             'initials' => collect($words)->take(2)->map(fn (string $w) => mb_strtoupper(mb_substr($w, 0, 1)))->implode(''),
             'order' => $user->orders()
-                ->whereIn('status', [Order::PENDING_PAYMENT, Order::PAID, Order::PROCESSING, Order::SHIPPED])
+                ->whereIn('status', [Order::AWAITING_APPROVAL, Order::PENDING_PAYMENT, Order::PAID, Order::PROCESSING, Order::SHIPPED])
                 ->latest('id')
                 ->first(['public_ref', 'order_number', 'status']),
         ];

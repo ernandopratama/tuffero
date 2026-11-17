@@ -32,7 +32,7 @@ class RegistrationService
 
     private const MAX_SENDS_PER_IP_HOUR = 10;
 
-    public function __construct(private PhoneOtpService $phoneOtp) {}
+    public function __construct(private PhoneOtpService $phoneOtp, private VoucherService $vouchers) {}
 
     /** Email dan nomor yang sudah dipakai ditolak sebelum kode apa pun dikirim (kode berbiaya). */
     public function assertAvailable(string $email, ?string $phone): void
@@ -88,6 +88,9 @@ class RegistrationService
         } catch (UniqueConstraintViolationException) {
             throw $this->rejected('email', 'email_taken', 422);
         }
+
+        // D-126: voucher hadiah pendaftaran (gratis ongkir) masuk ke Voucher Saya, berlaku sejak hari daftar.
+        $this->vouchers->grantSignup($user);
 
         return $user;
     }

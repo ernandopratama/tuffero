@@ -57,7 +57,7 @@ class CustomerHistoryController extends Controller
             $groups[] = ['key' => 'refunds', 'label' => 'Refund', 'route' => 'AdminRefunds', 'rows' => $rows];
         }
 
-        if ($user->canAny(['orders.cancel_request', 'orders.cancel', 'orders.cancel_final'])) {
+        if ($user->canAny(['orders.cancel_request', 'orders.cancel'])) {
             $rows = OrderCancellationRequest::with('order:id,order_number')->when($cancellation, fn ($q) => $q->where('id', '!=', $cancellation->id))
                 ->whereHas('order', fn ($o) => $this->sameContact($o, $order, 'customer_phone', 'customer_email'))
                 ->latest('id')->limit(self::LIMIT)->get()

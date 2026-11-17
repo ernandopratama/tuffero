@@ -57,9 +57,7 @@
 						<a href="{{ $waHref }}" target="_blank" rel="noopener noreferrer" aria-label="{{ $p['shareWa'] }} ({{ $newTab }})">
 							<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M7.9 20A9 9 0 1 0 4 16.1L2 22Z"></path></svg>WhatsApp
 						</a>
-						<button type="button" @click="copyLink">
-							<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"></path><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"></path></svg>{{ $p['copyLink'] }}
-						</button>
+						@include('store.partials.slide-button', ['label' => $p['copyLink'], 'copyText' => false])
 					</div>
 				</div>
 

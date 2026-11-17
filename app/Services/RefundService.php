@@ -30,7 +30,7 @@ class RefundService
 
     private const DEFAULT_PAYOUT_DAYS = 7;
 
-    public function __construct(private StaffNotifier $notifier) {}
+    public function __construct(private StaffNotifier $notifier, private CustomerBlockService $blocks) {}
 
     // ---------- pelanggan ----------
 
@@ -173,12 +173,15 @@ class RefundService
                     throw ValidationException::withMessages(['include_shipping' => $problem]);
                 }
 
-                $shipping = (int) $locked->order->shipping_fee;
+                // Hanya ongkir yang dibayar pelanggan; subsidi gratis ongkir tidak ikut dikembalikan (D-126).
+                $shipping = (int) $locked->order->shipping_fee - (int) $locked->order->shipping_discount;
             }
 
             $locked->forceFill(['status' => Refund::APPROVED, 'approved_amount' => $amount, 'shipping_amount' => $shipping, 'decided_by_user_id' => $actor->id, 'decided_at' => now(), 'admin_note' => $note ?: $locked->admin_note])->save();
             $this->history($locked, Refund::UNDER_REVIEW, Refund::APPROVED, 'admin', $actor->id, trim(($shipping ? 'Termasuk ongkir. ' : '').($note ?? '')));
             $this->notify(['customer-service'], 'refund_approved', $locked, "Refund {$locked->refund_number} disetujui, dana menunggu dikembalikan", 'Hubungi pelanggan untuk data rekening, lalu transfer manual');
+            // D-122: retur produk utuh yang disetujui bisa melengkapi hitungan berturut-turut dan memblokir pembelian baru.
+            $this->blocks->evaluate($locked);
         });
     }
 
@@ -269,7 +272,7 @@ class RefundService
         return match (true) {
             $refund->customer_choice !== 'refund' => 'Ongkir hanya untuk pengembalian dana, bukan kirim ulang atau voucher.',
             ! in_array($refund->reason_type, Refund::SHIPPING_REASONS, true) => 'Ongkir hanya dikembalikan bila kesalahan ada di Tuffero (salah kirim atau barang kurang).',
-            $order->shipping_fee < 1 => 'Pesanan ini tidak punya ongkir.',
+            $order->shipping_fee - $order->shipping_discount < 1 => 'Pesanan ini tidak punya ongkir yang dibayar pelanggan.',
             Refund::where('order_id', $order->id)->whereKeyNot($refund->id)->whereIn('status', Refund::CLAIMING)->where('shipping_amount', '>', 0)->exists() => 'Ongkir pesanan ini sudah dikembalikan di pengajuan lain.',
             default => null,
         };

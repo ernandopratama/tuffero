@@ -11,7 +11,7 @@ export const MAP_LNG = 112.5846427;
 export const MAPS_DIRECTIONS_URL = `https://www.google.com/maps/dir/?api=1&destination=${MAP_LAT},${MAP_LNG}`;
 export const MAPS_EMBED_URL = 'https://www.google.com/maps?q=-7.9266161,112.5846427&z=16&output=embed';
 // Satu nomor untuk telepon dan WhatsApp (OQ-24). Nilai awal sama dengan seeder; loadContact() menimpanya dengan contact.whatsapp_number dari dashboard.
-export const contact = reactive({ whatsapp: '+6281231481755', email: '' });
+export const contact = reactive({ whatsapp: '+6281252507880', email: '' });
 const waDigits = () => contact.whatsapp.replace(/\D/g, '');
 export const phoneDisplay = () => (contact.whatsapp.startsWith('+62') ? `0${waDigits().slice(2)}`.replace(/(\d{4})(?=\d)/g, '$1-') : contact.whatsapp);
 export const phoneHref = () => `tel:+${waDigits()}`;

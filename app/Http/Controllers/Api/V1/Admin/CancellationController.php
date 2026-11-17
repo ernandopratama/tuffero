@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Api\V1\Admin;
 use App\Http\Controllers\Controller;
 use App\Models\OrderCancellationRequest;
 use App\Services\CancellationService;
+use App\Services\PaymentRefundService;
 use App\Traits\ApiResponse;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -15,12 +16,12 @@ class CancellationController extends Controller
 
     public function __construct(private CancellationService $cancellations) {}
 
-    public function index(Request $request): JsonResponse
+    public function index(Request $request, PaymentRefundService $refunds): JsonResponse
     {
         $search = $request->string('search')->trim()->toString();
         $status = $request->string('status')->trim()->toString();
 
-        $page = OrderCancellationRequest::with('order:id,order_number,customer_name,customer_phone,status,payment_status,total')
+        $page = OrderCancellationRequest::with(['order:id,order_number,customer_name,customer_phone,status,payment_status,total', 'order.shipment:id,order_id,provider,status'])
             ->when($status !== '', fn ($query) => $query->where('status', $status))
             ->when($search !== '', fn ($query) => $query->where(fn ($inner) => $inner
                 ->where('request_number', 'like', "%{$search}%")
@@ -40,6 +41,12 @@ class CancellationController extends Controller
                 'order_status' => $request->order->status,
                 'payment_status' => $request->order->payment_status,
                 'total' => $request->order->total,
+                // Order kurir Biteship yang belum dibatalkan: ACC terakhir ikut membatalkannya, dan tombol "Batalkan order kurir" tampil.
+                // Refund otomatis Midtrans (D-138 tahap 4): hasil percobaan terakhir dan apakah tombol coba lagi berlaku.
+                'auto_refund_status' => $request->auto_refund_status,
+                'auto_refund_error' => $request->auto_refund_error,
+                'auto_refund_available' => $refunds->available($request, $request->order),
+                'courier_active' => $request->order->shipment?->provider === 'biteship' && $request->order->shipment->status !== 'cancelled',
                 // Hanya penanda untuk pengingat; sistem tidak mengubah apa pun saat lewat batas.
                 'is_overdue' => in_array($request->status, [...OrderCancellationRequest::OPEN, OrderCancellationRequest::APPROVED], true)
                     && $request->order->payment_status !== 'cancelled'
@@ -63,11 +70,18 @@ class CancellationController extends Controller
         return $this->success('Request updated.');
     }
 
-    public function approveByOwner(Request $request, OrderCancellationRequest $cancellation): JsonResponse
+    public function cancelCourierOrder(Request $request, OrderCancellationRequest $cancellation): JsonResponse
     {
-        $this->cancellations->approveByOwner($cancellation, $request->user());
+        $this->cancellations->cancelCourierOrder($cancellation, $request->user());
 
-        return $this->success('Request updated.');
+        return $this->success('Courier order cancelled.');
+    }
+
+    public function autoRefund(Request $request, OrderCancellationRequest $cancellation): JsonResponse
+    {
+        $this->cancellations->retryAutoRefund($cancellation, $request->user());
+
+        return $this->success('Refund processed.');
     }
 
     public function markRefunded(Request $request, OrderCancellationRequest $cancellation): JsonResponse

@@ -22,7 +22,7 @@ class MfaEmailCode extends Notification
     {
         // Tampilan HTML buatan sendiri (resources/views/emails) dan versi teks biasa untuk klien email yang tidak menampilkan HTML.
         return (new MailMessage)
-            ->subject('Kode verifikasi login Tuffero')
+            ->subject('Kode OTP login Tuffero')
             ->view(['emails.mfa-code', 'emails.mfa-code-text'], ['name' => $notifiable->name, 'code' => $this->code, 'minutes' => $this->minutes]);
     }
 }

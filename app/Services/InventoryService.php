@@ -109,7 +109,7 @@ class InventoryService
      */
     private function warnIfLow(InventoryStock $stock, int $availableBefore, ?User $except = null): void
     {
-        // Bawaan sama dengan label "menipis" di dashboard (D-055): tersedia di bawah 10.
+        // Sama dengan label "menipis" di dashboard dan daftar Stok (D-120): batas varian, jika tidak batas bawaan Pengaturan (30).
         $limit = ProductVariant::whereKey($stock->product_variant_id)->value('low_stock_threshold') ?? DashboardService::lowStockLimit();
         $available = $stock->quantity - $stock->reserved;
 

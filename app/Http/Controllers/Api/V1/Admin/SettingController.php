@@ -6,10 +6,12 @@ use App\Http\Controllers\Controller;
 use App\Http\Requests\Admin\UpdateSettingRequest;
 use App\Models\AuditLog;
 use App\Models\Setting;
+use App\Services\ReturnBlockRuleService;
 use App\Traits\ApiResponse;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Validation\ValidationException;
 
 class SettingController extends Controller
 {
@@ -42,6 +44,11 @@ class SettingController extends Controller
         $old = $setting->value;
         $new = $request->validated('value');
         $new = $new === null ? null : (string) $new;
+
+        // D-133: blokir otomatis retur hanya menyala lewat pengajuan yang disetujui Pemilik, bukan lewat Pengaturan.
+        if ($setting->key === ReturnBlockRuleService::KEY && $new === '1' && $old !== '1') {
+            throw ValidationException::withMessages(['value' => 'Blokir otomatis dinyalakan lewat halaman Pelanggan Diblokir dan butuh persetujuan Pemilik.']);
+        }
 
         if ($old !== $new) {
             DB::transaction(function () use ($setting, $old, $new, $request) {

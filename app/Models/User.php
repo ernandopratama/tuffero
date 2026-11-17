@@ -3,6 +3,7 @@
 namespace App\Models;
 
 // use Illuminate\Contracts\Auth\MustVerifyEmail;
+use App\Services\RoleService;
 use Database\Factories\UserFactory;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Attributes\Hidden;
@@ -74,6 +75,8 @@ class User extends Authenticatable
             'email' => $this->email,
             'avatar_url' => $this->avatarUrl(),
             'role' => $roles->first(),
+            // Nama tampilan role, termasuk role kustom buatan Super Admin (D-129).
+            'role_label' => RoleService::roleLabel($this->roles->first()),
             'roles' => $roles,
             'permissions' => $this->getAllPermissions()->pluck('name')->sort()->values(),
         ];

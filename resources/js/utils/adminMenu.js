@@ -7,6 +7,9 @@ export const ROLE_LABELS = {
     marketing: 'Marketing',
 };
 
+// Nama tampilan role; role kustom buatan Super Admin (D-129) memakai label dari server.
+export const roleLabel = (name, label) => ROLE_LABELS[name] || label || name || 'Tanpa role';
+
 // `short`: label pendek untuk tab navbar bawah smartphone.
 // Menu tanpa `to` belum dibangun dan tampil sebagai "Segera". Ini hanya tampilan; izin sebenarnya dijaga di server.
 const MENU = [
@@ -19,7 +22,8 @@ const MENU = [
             { label: 'Gudang', icon: 'warehouse', any: ['warehouses.view'], to: { name: 'AdminWarehouses' } },
             { label: 'Pembayaran', icon: 'wallet', any: ['payments.view'], to: { name: 'AdminPayments' } },
             { label: 'Pelanggan', icon: 'user', any: ['customers.view'], to: { name: 'AdminCustomers' } },
-            { label: 'Pembatalan', icon: 'x', any: ['orders.cancel_request', 'orders.cancel', 'orders.cancel_final'], to: { name: 'AdminCancellations' } },
+            { label: 'Pelanggan Diblokir', short: 'Blokir', icon: 'shield', any: ['customer_blocks.view'], to: { name: 'AdminCustomerBlocks' } },
+            { label: 'Pembatalan', icon: 'x', any: ['orders.cancel_request', 'orders.cancel', 'cancellations.view'], to: { name: 'AdminCancellations' } },
             { label: 'Refund', icon: 'undo', any: ['refunds.view'], to: { name: 'AdminRefunds' } },
             { label: 'FAQ Chat', icon: 'chat', any: ['faqs.manage'], to: { name: 'AdminFaqs' } },
             { label: 'Template Balasan', short: 'Template', icon: 'mail', any: ['templates.manage'], to: { name: 'AdminReplyTemplates' } },
@@ -51,7 +55,8 @@ const MENU = [
     {
         label: 'Sistem',
         items: [
-            { label: 'Pengguna dan Role', short: 'Pengguna', icon: 'users', any: ['users.manage'], to: { name: 'AdminUsers' } },
+            { label: 'Pengguna', icon: 'users', any: ['users.manage'], to: { name: 'AdminUsers' } },
+            { label: 'Role dan Izin', short: 'Role', icon: 'shield', any: ['roles.manage'], to: { name: 'AdminRoles' } },
             { label: 'Syarat dan Ketentuan', short: 'S&K', icon: 'document', any: ['terms.manage'], to: { name: 'AdminTerms' } },
             { label: 'Pengaturan', icon: 'sliders', any: ['settings.manage', 'settings.manage_contact'], to: { name: 'AdminSettings' } },
         ],

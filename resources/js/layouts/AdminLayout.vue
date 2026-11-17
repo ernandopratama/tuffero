@@ -7,9 +7,10 @@ import AdminBottomNav from '../components/AdminBottomNav.vue';
 import NotificationBell from '../components/NotificationBell.vue';
 import QuickSearch from '../components/QuickSearch.vue';
 import { useAuthStore } from '../stores/auth';
-import { menuFor, OVERVIEW, ROLE_LABELS } from '../utils/adminMenu';
+import { menuFor, OVERVIEW, roleLabel as labelOf } from '../utils/adminMenu';
 
 // Widget CS hanya untuk Pemilik dan Super Admin. Dimuat terpisah supaya role lain tidak mengunduhnya.
+const ReviewAlert = defineAsyncComponent(() => import('../components/ReviewAlert.vue'));
 const CustomerServiceWidget = defineAsyncComponent(() => import('../components/customer-service/CustomerServiceWidget.vue'));
 const CS_WIDGET_ROLES = ['owner', 'super-admin'];
 
@@ -27,7 +28,7 @@ const profileWrap = ref(null);
 const profileButton = ref(null);
 
 const menu = computed(() => menuFor(auth.permissions));
-const roleLabel = computed(() => ROLE_LABELS[auth.activeRole] || 'Tanpa role');
+const roleLabel = computed(() => labelOf(auth.activeRole, auth.user?.role_label));
 // Dock hanya berisi tautan; menu yang belum dibangun tampil sebagai "Segera" di panel menu.
 const railItems = computed(() => [OVERVIEW, ...menu.value.flatMap((group) => group.items)].filter((item) => item.to));
 
@@ -498,5 +499,6 @@ const initials = computed(() => (auth.user?.name || '?').split(/\s+/).slice(0, 2
     <AdminBottomNav :menu="menu" :is-active="isActive" />
     <ActionTooltip />
     <CustomerServiceWidget v-if="CS_WIDGET_ROLES.includes(auth.activeRole)" />
+    <ReviewAlert v-if="auth.can('orders.review_alert')" />
   </div>
 </template>

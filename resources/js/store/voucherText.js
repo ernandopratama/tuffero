@@ -4,6 +4,7 @@ const dateText = (iso) => new Date(iso).toLocaleDateString(document.documentElem
 
 export const card = {
     title(words, item) {
+        if (item.kind === 'shipping') return words.shippingOff.replace('{value}', money(item.value));
         return item.type === 'percent' ? words.off.replace('{value}', item.value + '%') : words.offFixed.replace('{value}', money(item.value));
     },
     meta(words, item) {

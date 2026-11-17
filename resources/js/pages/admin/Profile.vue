@@ -10,7 +10,7 @@ import SessionsCard from '../../components/SessionsCard.vue';
 import { useAuthStore } from '../../stores/auth';
 import api from '../../utils/api';
 import { apiError } from '../../utils/apiError';
-import { ROLE_LABELS } from '../../utils/adminMenu';
+import { roleLabel } from '../../utils/adminMenu';
 
 const auth = useAuthStore();
 
@@ -155,7 +155,7 @@ onMounted(load);
           <h1 class="truncate font-heading text-headline-md">{{ profile.name }}</h1>
           <p class="truncate text-body-sm text-secondary">{{ profile.email }}</p>
           <p class="mt-2 flex flex-wrap items-center gap-2 text-label-md">
-            <span class="rounded-full bg-accent-tint-20 px-3 py-1">{{ ROLE_LABELS[profile.role] || 'Tanpa role' }}</span>
+            <span class="rounded-full bg-accent-tint-20 px-3 py-1">{{ roleLabel(profile.role, profile.role_label || auth.user?.role_label) }}</span>
             <span v-if="since" class="text-secondary">Akun sejak {{ since }}</span>
           </p>
         </div>

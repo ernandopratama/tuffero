@@ -9,6 +9,7 @@ use App\Models\OrderStatusHistory;
 use App\Models\Warehouse;
 use App\Services\CancellationService;
 use App\Services\OrderStatusService;
+use App\Services\RepeatOrderService;
 use App\Traits\ApiResponse;
 use BaconQrCode\Common\ErrorCorrectionLevel;
 use BaconQrCode\Encoder\Encoder;
@@ -33,9 +34,11 @@ class OrderController extends Controller
         $search = $request->string('search')->trim()->toString();
         $status = $request->string('status')->trim()->toString();
         $payment = $request->string('payment_status')->trim()->toString();
+        $review = $request->user()->can('orders.review_alert');
 
-        $page = Order::with('shipment:id,order_id,provider,status,waybill_id')
+        $page = Order::with('shipment:id,order_id,provider,status,waybill_id', 'reviewer:id,name')
             ->when($status !== '', fn ($query) => $query->where('status', $status))
+            ->when($review && $request->query('review') === 'pending', fn ($query) => $query->awaitingReview())
             ->when($payment !== '', fn ($query) => $query->where('payment_status', $payment))
             ->when($search !== '', fn ($query) => $query->where(fn ($inner) => $inner
                 ->where('order_number', 'like', "%{$search}%")
@@ -44,24 +47,49 @@ class OrderController extends Controller
                 ->orWhere('customer_phone', 'like', "%{$search}%")))
             ->orderByDesc('id')
             ->paginate($this->perPage($request));
+        $repeat = RepeatOrderService::counts($page->getCollection()->pluck('customer_phone'));
 
         return $this->paged('Orders retrieved.', $page, fn (Order $order) => [
             ...$order->only(['id', 'order_number', 'customer_name', 'status', 'payment_status', 'shipping_status', 'total', 'created_at']),
+            ...RepeatOrderService::present($order->customer_phone, $repeat),
             // Status paket dari Biteship (webhook); null bila belum ada pengiriman atau resi manual.
             'carrier_status' => $order->shipment?->provider === 'biteship' ? $order->shipment->status : null,
             // Tombol Cetak Resi di daftar: hanya tampil bila resi sudah ada.
             'waybill_id' => $order->shipment?->waybill_id,
+            ...$this->presentReview($order, $review),
         ]);
     }
 
-    public function show(Order $order): JsonResponse
+    /**
+     * Tanda tinjau (D-132) hanya untuk Admin Toko, Pemilik, dan Super Admin (`orders.review_alert`).
+     *
+     * @return array<string, mixed>
+     */
+    private function presentReview(Order $order, bool $visible): array
     {
-        $order->load(['items', 'shipment', 'histories.actor:id,name', 'cancellationRequests']);
+        if (! $visible || $order->review_due_at === null) {
+            return [];
+        }
+
+        return [
+            'review' => [
+                'due_at' => $order->review_due_at,
+                'reviewed_at' => $order->reviewed_at,
+                'reviewer' => $order->reviewed_at ? $order->reviewer?->name : null,
+                'note' => $order->review_note,
+                'pending' => $order->reviewed_at === null && ! in_array($order->status, [Order::EXPIRED, Order::CANCELLED, Order::REJECTED, Order::REFUNDED], true),
+            ],
+        ];
+    }
+
+    public function show(Request $request, Order $order): JsonResponse
+    {
+        $order->load(['items', 'shipment', 'histories.actor:id,name', 'cancellationRequests', 'reviewer:id,name']);
 
         return $this->success('Order retrieved.', [
             ...$order->only([
                 'id', 'order_number', 'status', 'payment_status', 'shipping_status', 'customer_name', 'customer_email', 'customer_phone',
-                'shipping_address', 'shipping_courier', 'shipping_service', 'subtotal', 'discount_total', 'shipping_fee', 'total',
+                'shipping_address', 'shipping_courier', 'shipping_service', 'subtotal', 'discount_total', 'shipping_fee', 'shipping_discount', 'shipping_voucher_code', 'total',
                 'expires_at', 'paid_at', 'cancelled_at', 'created_at',
             ]),
             'items' => $order->items->map($this->presentItem(...)),
@@ -77,6 +105,8 @@ class OrderController extends Controller
                 'created_at' => $history->created_at,
             ]),
             'cancellations' => $order->cancellationRequests->map->only(['request_number', 'status', 'reason', 'created_at']),
+            ...RepeatOrderService::present($order->customer_phone, RepeatOrderService::counts([$order->customer_phone])),
+            ...$this->presentReview($order, $request->user()->can('orders.review_alert')),
         ]);
     }
 

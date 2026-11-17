@@ -29,7 +29,7 @@ class QuickSearchController extends Controller
 
         $orders = $user->can('orders.view') ? $this->orders($terms) : [];
         $refunds = $user->can('refunds.view') ? $this->refunds($terms) : [];
-        $cancellations = $user->canAny(['orders.cancel_request', 'orders.cancel', 'orders.cancel_final']) ? $this->cancellations($terms) : [];
+        $cancellations = $user->canAny(['orders.cancel_request', 'orders.cancel']) ? $this->cancellations($terms) : [];
 
         return $this->success('Search results.', ['groups' => array_values(array_filter([
             $orders ? ['key' => 'orders', 'label' => 'Pesanan', 'route' => 'AdminOrders', 'rows' => $orders] : null,

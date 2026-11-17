@@ -1,6 +1,6 @@
 <script setup>
-import { computed, nextTick, ref } from 'vue';
-import { useRouter } from 'vue-router';
+import { computed, nextTick, ref, watch } from 'vue';
+import { useRoute, useRouter } from 'vue-router';
 import AdminComments from '../../components/AdminComments.vue';
 import CustomerHistory from '../../components/CustomerHistory.vue';
 import FollowUps from '../../components/FollowUps.vue';
@@ -8,6 +8,7 @@ import ReplyPicker from '../../components/ReplyPicker.vue';
 import { customerWaLink } from '../../utils/whatsapp';
 import AdminIcon from '../../components/AdminIcon.vue';
 import OrderActions from '../../components/OrderActions.vue';
+import OrderReviewCard from '../../components/OrderReviewCard.vue';
 import AppModal from '../../components/ui/AppModal.vue';
 import IconAction from '../../components/ui/IconAction.vue';
 import DataTable from '../../components/ui/DataTable.vue';
@@ -34,7 +35,12 @@ const COLUMNS = [
     { key: 'actions', label: 'Aksi' },
 ];
 
-const { rows, meta, page, perPage, search, filter, loading, error, load } = useDataTable('/admin/orders', { filters: { status: '', payment_status: '' } });
+// ?review=pending (dari peringatan tinjau) membuka daftar pesanan yang belum ditinjau (D-132).
+const route = useRoute();
+const { rows, meta, page, perPage, search, filter, loading, error, load } = useDataTable('/admin/orders', { filters: { status: '', payment_status: '', review: route.query.review === 'pending' ? 'pending' : '' } });
+watch(() => route.query.review, (value) => { filter.review = value === 'pending' ? 'pending' : ''; });
+const REVIEW_FILTER = { pending: 'Belum ditinjau' };
+const reviewOverdue = (row) => !!row.review?.pending && new Date(row.review.due_at) <= new Date();
 
 // Cetak Resi: resi sudah ada dan paket belum sampai (Diproses/Dikirim). Selesai/dibatalkan tidak perlu label baru.
 const PRINTABLE = ['processing', 'shipped'];
@@ -146,6 +152,7 @@ async function refresh() {
     <TableToolbar v-model="search" placeholder="Cari nomor, nama, email, atau HP">
       <FilterSelect v-model="filter.status" label="Status" :options="ORDER_STATUS" />
       <FilterSelect v-model="filter.payment_status" label="Pembayaran" :options="PAYMENT_STATUS" />
+      <FilterSelect v-if="auth.can('orders.review_alert')" v-model="filter.review" label="Tinjauan" :options="REVIEW_FILTER" />
     </TableToolbar>
   </div>
 
@@ -163,7 +170,17 @@ async function refresh() {
     @retry="load"
   >
     <template #cell-order_number="{ row }"><span class="whitespace-nowrap font-mono">{{ row.order_number }}</span></template>
-    <template #cell-total="{ row }"><span class="whitespace-nowrap">{{ rupiah(row.total) }}</span></template>
+    <template #cell-customer_name="{ row }">
+      <span class="block">{{ row.customer_name }}</span>
+      <span v-if="row.repeat_order" class="mt-1 inline-flex items-center gap-1 whitespace-nowrap rounded-full bg-success-surface px-2 py-0.5 text-label-sm text-success" :title="`${row.completed_orders} pesanan selesai atas nomor WhatsApp ini`"><AdminIcon name="sparkles" :size="12" />Repeat order</span>
+    </template>
+    <template #cell-total="{ row }">
+      <span class="whitespace-nowrap">{{ rupiah(row.total) }}</span>
+      <!-- Penanda Rp1 juta ke atas yang belum ditinjau (D-132); merah dan teks berbeda bila lewat tenggat. -->
+      <span v-if="row.review?.pending" class="mt-1 flex items-center justify-center gap-1 whitespace-nowrap text-label-sm" :class="reviewOverdue(row) ? 'text-error' : 'text-warning'" :title="`Tenggat tinjau ${formatDate(row.review.due_at)}`">
+        <AdminIcon name="alert" :size="14" />{{ reviewOverdue(row) ? 'Lewat tenggat' : 'Perlu ditinjau' }}
+      </span>
+    </template>
     <template #cell-status="{ row }">
       <span class="inline-flex rounded-full px-2.5 py-1 text-label-sm" :class="TONE_CLASS[orderTone(row.status)]">{{ ORDER_STATUS[row.status] || row.status }}</span>
       <span v-if="carrierOf(row.carrier_status)" class="mt-1 flex items-center justify-center gap-1.5 text-label-sm text-secondary" title="Status paket dari Biteship">
@@ -197,6 +214,8 @@ async function refresh() {
         </div>
       </dl>
 
+      <OrderReviewCard v-if="detail.review" :order="detail" @updated="refresh" />
+
       <!-- Kartu pengiriman: kurir, resi, waktu, lalu aksi -->
       <section class="rounded-2xl border border-border p-4" aria-labelledby="od-ship">
         <div class="flex flex-wrap items-center justify-between gap-2">
@@ -224,6 +243,7 @@ async function refresh() {
         <div>
           <h3 class="font-heading text-headline-sm">Pemesan</h3>
           <p class="mt-1 text-label-md">{{ detail.customer_name }}</p>
+          <span v-if="detail.repeat_order" class="mt-1 inline-flex items-center gap-1 whitespace-nowrap rounded-full bg-success-surface px-2 py-0.5 text-label-sm text-success" :title="`${detail.completed_orders} pesanan selesai atas nomor WhatsApp ini`"><AdminIcon name="sparkles" :size="12" />Repeat order</span>
           <p>{{ detail.customer_phone }}</p>
           <p class="break-all text-secondary">{{ detail.customer_email }}</p>
           <a
@@ -253,6 +273,7 @@ async function refresh() {
           <div class="flex justify-between"><dt class="text-secondary">Subtotal</dt><dd>{{ rupiah(detail.subtotal) }}</dd></div>
           <div v-if="detail.discount_total" class="flex justify-between"><dt class="text-secondary">Diskon</dt><dd>-{{ rupiah(detail.discount_total) }}</dd></div>
           <div class="flex justify-between"><dt class="text-secondary">Ongkir</dt><dd>{{ rupiah(detail.shipping_fee) }}</dd></div>
+          <div v-if="detail.shipping_discount" class="flex justify-between text-success"><dt>Diskon ongkir <span class="font-mono">{{ detail.shipping_voucher_code }}</span></dt><dd>-{{ rupiah(detail.shipping_discount) }}</dd></div>
           <div class="flex justify-between text-label-md"><dt>Total</dt><dd>{{ rupiah(detail.total) }}</dd></div>
         </dl>
       </section>

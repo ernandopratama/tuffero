@@ -4,6 +4,7 @@ namespace App\Models;
 
 use Carbon\CarbonInterface;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
+use Illuminate\Database\Eloquent\Casts\Attribute;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\SoftDeletes;
@@ -50,6 +51,29 @@ class MarketingDraft extends Model
     protected function casts(): array
     {
         return ['scheduled_on' => 'date', 'submitted_at' => 'datetime', 'reviewed_at' => 'datetime', 'posted_at' => 'datetime'];
+    }
+
+    /** Draf ditempel manual ke Instagram/TikTok yang tidak membaca Markdown, jadi tandanya dibuang saat disimpan. */
+    public static function plain(?string $text): ?string
+    {
+        if ($text === null) {
+            return null;
+        }
+        $text = preg_replace(['/\[([^\]\n]+)\]\((https?:\/\/[^)\s]+)\)/', '/\*\*|__/', '/^#{1,6}\s+/m', '/^(\s*)\*\s+/m'], ['$1 ($2)', '', '', '$1- '], $text);
+
+        return $text;
+    }
+
+    /** @return Attribute<string, string|null> */
+    protected function title(): Attribute
+    {
+        return Attribute::set(fn (?string $value) => self::plain($value));
+    }
+
+    /** @return Attribute<string, string|null> */
+    protected function body(): Attribute
+    {
+        return Attribute::set(fn (?string $value) => self::plain($value));
     }
 
     /** @return BelongsTo<User, $this> */

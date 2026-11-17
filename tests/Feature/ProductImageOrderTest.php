@@ -10,7 +10,7 @@ use Illuminate\Foundation\Testing\RefreshDatabase;
 use PHPUnit\Framework\Attributes\DataProvider;
 use Tests\TestCase;
 
-/** Urutan foto produk dan foto utama (D-091): foto pertama menjadi foto utama. */
+/** Urutan foto produk dan foto utama (D-113): foto pertama menjadi foto utama. */
 class ProductImageOrderTest extends TestCase
 {
     use RefreshDatabase;

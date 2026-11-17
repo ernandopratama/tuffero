@@ -4,7 +4,7 @@
      menunggu bayar = FigCraft "11 Pembayaran" (Snap, D-096), Snap gagal = "11c", kedaluwarsa = "11b",
      dibayar/diproses/dikirim = "05 Status Pesanan", selesai = "06 Pesanan Selesai". --}}
 @section('content')
-	<script type="application/json" id="tf-order-data">{{ $site->json(['ref' => $ref, 'words' => ['status' => $c['status'], 'cancelStatus' => $c['cancel']['status'], 'cancelErrors' => $c['cancel']['errors'], 'tooMany' => $c['cancel']['tooMany'], 'review' => $c['review'], 'cancelFailed' => $c['cancel']['failed'], 'payFailed' => $c['payFailed'], 'payExpired' => $c['payExpired'], ...\Illuminate\Support\Arr::only($c, ['payEyebrow', 'payBefore', 'how', 'products', 'shippingWith', 'expiredText', 'failedText', 'heading', 'carrierHeading', 'carrierStage', 'carrierEnd', 'thanks', 'stageLabel', 'stageState', 'itemsCount', 'doneTitle', 'itemsBadge', 'stillPending', 'checking', 'paidCheck', 'copy', 'copied', 'stages']), 'track' => $c['track']], 'pay' => $pay]) }}</script>
+	<script type="application/json" id="tf-order-data">{{ $site->json(['ref' => $ref, 'words' => ['status' => $c['status'], 'cancelStatus' => $c['cancel']['status'], 'cancelErrors' => $c['cancel']['errors'], 'tooMany' => $c['cancel']['tooMany'], 'review' => $c['review'], 'cancelFailed' => $c['cancel']['failed'], 'cancelNowErrors' => $c['cancel']['now']['errors'], 'cancelNowFailed' => $c['cancel']['now']['failed'], 'payFailed' => $c['payFailed'], 'payExpired' => $c['payExpired'], ...\Illuminate\Support\Arr::only($c, ['payEyebrow', 'payBefore', 'reviewDue', 'how', 'products', 'shippingWith', 'expiredText', 'failedText', 'heading', 'carrierHeading', 'carrierStage', 'carrierEnd', 'thanks', 'stageLabel', 'stageState', 'itemsCount', 'doneTitle', 'itemsBadge', 'stillPending', 'checking', 'paidCheck', 'copy', 'copied', 'stages']), 'track' => $c['track']], 'pay' => $pay]) }}</script>
 	<main class="tf-co tf-od" x-data="orderPage">
 		<template x-if="showFlow">
 			<div>@include('store.partials.flow-steps', ['steps' => $c['flow'], 'label' => $c['flowLabel'], 'variant' => 'inline'])</div>
@@ -80,6 +80,7 @@
 							<div class="tf-od-actions is-start">
 								<template x-if="payStarted"><button type="button" class="tf-btn tf-od-wide" @click="checkPaid" :disabled="checking" x-text="checkText"></button></template>
 								<template x-if="order.can_cancel">@include('store.partials.order-cancel-button')</template>
+								@include('store.partials.order-cancel-now')
 							</div>
 							<template x-if="stillPending"><p class="tf-od-muted" role="status">{{ $c['stillPending'] }}</p></template>
 							@include('store.partials.order-cancel', ['withForm' => false])
@@ -99,7 +100,59 @@
 								<div><strong>{{ $c['verifiedTitle'] }}</strong><p>{{ $c['verifiedText'] }}</p></div>
 							</div>
 							<p class="tf-od-muted">{{ $c['saveLink'] }}</p>
-							<button type="button" class="tf-od-link" @click="copyLink" x-text="copyText"></button>
+							@include('store.partials.slide-button', ['label' => $c['copy'], 'block' => true])
+						</aside>
+					</div>
+				</div>
+			</template>
+
+			{{-- Menunggu persetujuan Admin Toko (D-132): pesanan sudah bernomor, pembayaran belum dibuka. --}}
+			<template x-if="view === 'review'">
+				<div class="tf-od-pay tf-od-enter">
+					<div class="tf-od-intro">
+						<p class="tf-od-eyebrow" x-text="payEyebrow"></p>
+						<h1 class="tf-od-title">{{ $c['reviewTitle'] }}</h1>
+						<p class="tf-od-lead">{{ $c['reviewLead'] }}</p>
+					</div>
+					<div class="tf-od-cols">
+						<div class="tf-od-left">
+							<div class="tf-od-card tf-od-deadline" role="status">
+								<span class="tf-od-deadline-icon">{{ $site->lineIcon('clock', 20) }}</span>
+								<div>
+									<p class="tf-od-strong" x-text="reviewDueText"></p>
+									<p class="tf-od-muted">{{ $c['reviewHold'] }}</p>
+								</div>
+							</div>
+
+							<div class="tf-od-card">
+								<h2 class="tf-od-h2">{{ $c['reviewStepsTitle'] }}</h2>
+								<ol class="tf-od-how">
+									@foreach ($c['reviewSteps'] as $i => $step)
+										<li><span>{{ $i + 1 }}</span><p>{{ $step }}</p></li>
+									@endforeach
+								</ol>
+								<p class="tf-od-muted">{{ $c['reviewCheck'] }}</p>
+							</div>
+
+							<div class="tf-od-actions is-start">
+								@include('store.partials.slide-button', ['href' => $site->route('contact'), 'label' => $c['help']])
+								<template x-if="order.can_cancel">@include('store.partials.order-cancel-button')</template>
+								@include('store.partials.order-cancel-now')
+							</div>
+							@include('store.partials.order-cancel', ['withForm' => false])
+							@include('store.partials.order-cancel-modal')
+						</div>
+
+						<aside class="tf-od-card tf-od-summary">
+							<h2 class="tf-od-h2">{{ $c['summaryTitle'] }}</h2>
+							<dl class="tf-od-rows">
+								<div><dt x-text="productsText"></dt><dd x-text="rupiah(order.subtotal)"></dd></div>
+								<div><dt x-text="shippingWithText"></dt><dd x-text="rupiah(order.shipping_fee)"></dd></div>
+								<template x-if="hasDiscount"><div><dt>{{ $c['discount'] }} <small x-text="order.voucher_label"></small></dt><dd x-text="discountText"></dd></div></template>
+							</dl>
+							<div class="tf-od-sum-total"><span>{{ $c['total'] }}</span><strong x-text="rupiah(order.total)"></strong></div>
+							<p class="tf-od-muted">{{ $c['saveLink'] }}</p>
+							@include('store.partials.slide-button', ['label' => $c['copy'], 'block' => true])
 						</aside>
 					</div>
 				</div>
@@ -113,7 +166,7 @@
 					<p x-text="failedText"></p>
 					<div class="tf-od-actions">
 						<button type="button" class="tf-btn tf-od-wide" @click="retryPay" :disabled="payBusy">{{ $c['tryAgain'] }}</button>
-						<a href="{{ $site->route('contact') }}" class="tf-od-ghost">{{ $c['help'] }}</a>
+						@include('store.partials.slide-button', ['href' => $site->route('contact'), 'label' => $c['help']])
 					</div>
 				</div>
 			</template>
@@ -126,7 +179,7 @@
 					<p x-text="expiredText"></p>
 					<div class="tf-od-actions">
 						<a href="{{ $site->route('products') }}" class="tf-btn tf-od-wide">{{ $c['shopAgain'] }}</a>
-						<a href="{{ $site->route('contact') }}" class="tf-od-ghost">{{ $c['help'] }}</a>
+						@include('store.partials.slide-button', ['href' => $site->route('contact'), 'label' => $c['help']])
 					</div>
 				</div>
 			</template>
@@ -142,7 +195,7 @@
 					</template>
 					<div class="tf-od-actions">
 						<a href="{{ $site->route('products') }}" class="tf-btn tf-od-wide">{{ $c['shop'] }}</a>
-						<a href="{{ $site->route('contact') }}" class="tf-od-ghost">{{ $c['help'] }}</a>
+						@include('store.partials.slide-button', ['href' => $site->route('contact'), 'label' => $c['help']])
 					</div>
 				</div>
 			</template>
@@ -266,7 +319,7 @@
 							@include('store.partials.order-totals', ['totalLabel' => $c['totalPaid']])
 							<div class="tf-od-stack">
 								<a href="{{ $site->route('contact') }}" class="tf-od-ghost is-block">{{ $site->lineIcon('headset', 18) }} {{ $c['contactUs'] }}</a>
-								<button type="button" class="tf-od-link" @click="copyLink" x-text="copyText"></button>
+								@include('store.partials.slide-button', ['label' => $c['copy'], 'block' => true])
 								<a href="/" class="tf-od-link">{{ $site->lineIcon('arrowLeft', 14) }} {{ $c['home'] }}</a>
 							</div>
 						</aside>

@@ -23,7 +23,7 @@ class CheckoutVoucherController extends Controller
     public function index(Request $request): JsonResponse
     {
         return $this->success('Vouchers retrieved.', [
-            'vouchers' => $this->vouchers->listFor($this->cart->summary()['subtotal'], $this->memberId($request), $this->phone($request)),
+            'vouchers' => $this->vouchers->listFor($this->cart->summary()['subtotal'], $this->memberId($request), $this->phone($request), ...$this->shipping($request)),
         ]);
     }
 
@@ -54,7 +54,26 @@ class CheckoutVoucherController extends Controller
             $this->cart->summary()['subtotal'],
             $this->memberId($request),
             $this->phone($request),
+            ...$this->shipping($request),
         ));
+    }
+
+    /**
+     * Ongkir dan provinsi pilihan pelanggan, hanya untuk pratinjau potongan gratis ongkir. Checkout menghitung ulang dari Biteship.
+     *
+     * @return array{shippingFee: int|null, province: string|null}
+     */
+    private function shipping(Request $request): array
+    {
+        $request->validate([
+            'shipping_fee' => ['nullable', 'integer', 'min:0', 'max:100000000'],
+            'province' => ['nullable', 'string', 'max:100'],
+        ]);
+
+        return [
+            'shippingFee' => $request->filled('shipping_fee') ? (int) $request->input('shipping_fee') : null,
+            'province' => $request->filled('province') ? (string) $request->input('province') : null,
+        ];
     }
 
     // Member = pelanggan yang login. Akun staf tidak dihitung pelanggan.

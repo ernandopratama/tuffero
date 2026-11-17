@@ -18,7 +18,7 @@ use Illuminate\Support\Facades\DB;
 class ReplyTemplateService
 {
     private const ORDER_STATUS = [
-        'pending_payment' => 'menunggu pembayaran', 'paid' => 'sudah dibayar', 'processing' => 'sedang diproses', 'shipped' => 'sedang dikirim',
+        'awaiting_approval' => 'sedang dicek admin toko', 'rejected' => 'ditolak oleh admin toko', 'pending_payment' => 'menunggu pembayaran', 'paid' => 'sudah dibayar', 'processing' => 'sedang diproses', 'shipped' => 'sedang dikirim',
         'completed' => 'selesai', 'expired' => 'kedaluwarsa', 'cancelled' => 'dibatalkan', 'refunded' => 'dana sudah dikembalikan',
     ];
 

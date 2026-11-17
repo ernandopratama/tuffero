@@ -175,7 +175,7 @@ class AdminDashboardTest extends TestCase
         $this->assertIsInt($store['rows'][0]['amount']);
     }
 
-    public function test_cancellation_queues_follow_the_two_approval_flow(): void
+    public function test_cancellation_queues_follow_the_approval_flow(): void
     {
         $order = $this->paidOrder();
         $this->withSession(["order_access.{$order->public_ref}" => true])
@@ -186,11 +186,18 @@ class AdminDashboardTest extends TestCase
         $this->assertSame(1, $this->kpi($cs, 'cancel_validate_pending')['value']);
         $this->assertSame($number, collect($cs['lists'])->firstWhere('key', 'cancel_validate_queue')['rows'][0]['title']);
 
-        $this->assertNull(collect($this->dashboard('owner')['lists'])->firstWhere('key', 'cancel_final_queue')['rows'][0] ?? null);
+        // Pemilik hanya melihat (D-123): jumlah yang berjalan dan keputusan terbaru, tanpa antrean ACC.
+        $owner = $this->dashboard('owner');
+        $this->assertSame(1, $this->kpi($owner, 'cancel_open')['value']);
+        $this->assertNull(collect($owner['lists'])->firstWhere('key', 'cancel_decided')['rows'][0] ?? null);
+        $this->assertNull(collect($owner['lists'])->firstWhere('key', 'cancel_final_queue'));
 
-        OrderCancellationRequest::query()->update(['status' => OrderCancellationRequest::STORE_APPROVED]);
-        $this->assertSame(1, $this->kpi($this->dashboard('owner'), 'cancel_final_pending')['value']);
-        $this->assertSame($number, collect($this->dashboard('owner')['lists'])->firstWhere('key', 'cancel_final_queue')['rows'][0]['title']);
+        OrderCancellationRequest::query()->update(['status' => OrderCancellationRequest::APPROVED]);
+        $owner = $this->dashboard('owner');
+        $this->assertSame(0, $this->kpi($owner, 'cancel_open')['value']);
+        $decided = collect($owner['lists'])->firstWhere('key', 'cancel_decided')['rows'][0];
+        $this->assertSame($number, $decided['title']);
+        $this->assertSame('Disetujui', $decided['chip']['text']);
     }
 
     public function test_owner_sees_content_drafts_waiting_for_a_decision_and_others_do_not(): void
@@ -402,7 +409,7 @@ class AdminDashboardTest extends TestCase
 
     public function test_low_and_out_of_stock_are_reported_with_the_proposed_threshold(): void
     {
-        $this->assertSame(10, DashboardService::LOW_STOCK);
+        $this->assertSame(30, DashboardService::LOW_STOCK);
 
         $this->paidOrder(2);
         $data = $this->dashboard('warehouse');
@@ -490,17 +497,16 @@ class AdminDashboardTest extends TestCase
         $b = $this->paidOrder();
         $this->withSession(["order_access.{$b->public_ref}" => true])->postJson("/api/v1/orders/{$b->public_ref}/cancellation", ['reason' => 'Salah pesan', 'channel' => 'email'])->assertCreated();
 
-        // Satu STORE_APPROVED segar, satu SUBMITTED lewat batas. Pemilik hanya melihat tahap STORE_APPROVED.
+        // Satu VALIDATED segar, satu SUBMITTED lewat batas. Pemilik tidak punya antrean tahap (hanya melihat), jadi tidak ada yang ditutupi.
         [$first, $second] = OrderCancellationRequest::orderBy('id')->get()->all();
-        $first->forceFill(['status' => OrderCancellationRequest::STORE_APPROVED, 'due_at' => now()->addDay()])->save();
+        $first->forceFill(['status' => OrderCancellationRequest::VALIDATED, 'due_at' => now()->addDay()])->save();
         $second->forceFill(['status' => OrderCancellationRequest::SUBMITTED, 'due_at' => now()->subDay()])->save();
 
         $owner = $this->dashboard('owner');
         $counts = collect($owner['attention'])->keyBy('key');
-        $this->assertSame(1, $counts['cancel_final']['count']);
+        $this->assertFalse($counts->has('cancel_final'));
         $this->assertSame(1, $counts['cancel_overdue']['count']);
         $this->assertFalse($counts['cancel_overdue']['overlap']);
-        // Dua pembatalan berbeda, bukan satu: pengajuan lewat batas itu tidak tampil di tahap Pemilik, jadi tidak ditutupi.
         $this->assertSame(0, $counts['cancel_overdue']['covered']);
         $this->assertSame($counts->sum('count'), $this->kpi($owner, 'attention_total')['value']);
 
@@ -523,7 +529,9 @@ class AdminDashboardTest extends TestCase
         $this->assertSame(1, $counts['stuck_orders']['count']);
         $this->assertSame(1, $counts['stuck_orders']['covered']);
         $this->assertTrue($counts['stuck_orders']['overlap']);
-        $this->assertSame($counts->sum('count') - 1, $this->kpi($data, 'attention_total')['value']);
+        // "Perlu diproses" (D-134) juga sudah termasuk antrean kemas, jadi ikut ditutupi.
+        $this->assertTrue($counts['to_process']['overlap']);
+        $this->assertSame($counts->sum('count') - $counts->sum('covered'), $this->kpi($data, 'attention_total')['value']);
     }
 
     #[DataProvider('roles')]
@@ -566,9 +574,12 @@ class AdminDashboardTest extends TestCase
         $this->assertFalse($items['to_pack']['overlap']);
         $this->assertSame($items['to_pack']['count'] + $items['stock_low']['count'], $this->kpi($warehouse, 'attention_total')['value']);
 
-        // Admin Toko tidak melihat antrean kemas, jadi resi menunggu dihitung penuh.
-        $store = collect($this->dashboard('store-admin')['attention'])->keyBy('key');
-        $this->assertFalse($store['awaiting_waybill']['overlap']);
+        // Admin Toko juga memegang antrean kemas (D-134): resi menunggu dan "perlu diproses" sudah termasuk di dalamnya, jadi tidak dijumlah dua kali.
+        $storeData = $this->dashboard('store-admin');
+        $store = collect($storeData['attention'])->keyBy('key');
+        $this->assertTrue($store['awaiting_waybill']['overlap']);
+        $this->assertFalse($store['to_pack']['overlap']);
+        $this->assertSame($store->where('overlap', false)->sum(fn (array $i) => $i['count'] - $i['covered']), $this->kpi($storeData, 'attention_total')['value']);
     }
 
     public function test_attention_card_is_calm_when_nothing_needs_action(): void

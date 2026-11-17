@@ -4,10 +4,12 @@ namespace App\Services;
 
 use App\Models\InventoryStock;
 use App\Models\Order;
-use App\Models\Setting;
 use App\Models\Warehouse;
+use App\Notifications\StaffEvent;
 use App\Services\Shipping\ShippingProvider;
+use Illuminate\Contracts\Cache\LockTimeoutException;
 use Illuminate\Database\UniqueConstraintViolationException;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
@@ -22,6 +24,8 @@ class CheckoutService
         private ShippingProvider $shipping,
         private InventoryService $inventory,
         private VoucherService $vouchers,
+        private OrderReviewService $review,
+        private StaffNotifier $notifier,
     ) {}
 
     /**
@@ -35,8 +39,6 @@ class CheckoutService
         if ($existing) {
             return ['order' => $existing, 'token' => null];
         }
-
-        $this->guardAgainstAbuse($data['customer_phone']);
 
         $summary = $this->cart->summary();
 
@@ -57,7 +59,14 @@ class CheckoutService
         $token = bin2hex(random_bytes(32));
 
         try {
-            $order = DB::transaction(fn () => $this->createOrder($data, $summary, $rate, $idempotencyKey, $token), 3);
+            // Satu checkout per nomor HP sekaligus, supaya total belum dibayar (D-132) tidak bisa dilewati dengan kiriman bersamaan.
+            $order = Cache::lock('checkout-phone:'.sha1($data['customer_phone']), 30)->block(10, function () use ($data, $summary, $rate, $idempotencyKey, $token) {
+                $this->guardAgainstAbuse($data['customer_phone'], $data['address']);
+
+                return DB::transaction(fn () => $this->createOrder($data, $summary, $rate, $idempotencyKey, $token), 3);
+            });
+        } catch (LockTimeoutException) {
+            throw ValidationException::withMessages(['customer_phone' => 'try_again']);
         } catch (UniqueConstraintViolationException $e) {
             // Dua kiriman bersamaan: pemenang sudah menyimpan pesanan.
             $order = Order::where('idempotency_key', $idempotencyKey)->first();
@@ -77,22 +86,23 @@ class CheckoutService
     }
 
     /**
-     * Anti-fraud tahap keras (OQ-07): batas pesanan belum dibayar dan pesanan per 24 jam untuk satu nomor HP.
-     * Pesanan belum dibayar menahan stok (D-050), jadi tanpa batas ini stok bisa ditimbun.
+     * Anti-fraud tahap keras (OQ-07, D-132): satu pesanan menunggu persetujuan per nomor HP, dan batas pesanan per 24 jam.
+     * Batas nominal belum dibayar tidak menolak checkout; pesanannya menunggu persetujuan Admin Toko (lihat createOrder).
      */
-    private function guardAgainstAbuse(string $phone): void
+    private function guardAgainstAbuse(string $phone, array $address): void
     {
-        $limit = fn (string $key, int $default) => (int) Setting::where('key', $key)->value('value') ?: $default;
+        // D-122: nomor atau alamat yang diblokir karena retur berturut-turut tidak bisa membuat pesanan baru.
+        if (CustomerBlockService::blocks($phone, $address)) {
+            throw ValidationException::withMessages(['customer_phone' => 'customer_blocked']);
+        }
 
-        $unpaid = Order::where('customer_phone', $phone)->where('status', Order::PENDING_PAYMENT)->count();
-
-        if ($unpaid >= $limit('antifraud.max_unpaid_orders', 3)) {
-            throw ValidationException::withMessages(['customer_phone' => 'too_many_unpaid_orders']);
+        if (Order::where('customer_phone', $phone)->where('status', Order::AWAITING_APPROVAL)->exists()) {
+            throw ValidationException::withMessages(['customer_phone' => 'approval_pending']);
         }
 
         $today = Order::where('customer_phone', $phone)->where('created_at', '>=', now()->subDay())->count();
 
-        if ($today >= $limit('antifraud.max_orders_per_day', 5)) {
+        if ($today >= OrderReviewService::setting('antifraud.max_orders_per_day', 5)) {
             throw ValidationException::withMessages(['customer_phone' => 'daily_order_limit']);
         }
     }
@@ -105,15 +115,26 @@ class CheckoutService
     private function createOrder(array $data, array $summary, array $rate, string $idempotencyKey, string $token): Order
     {
         $warehouse = $this->allocateWarehouse($summary['items']);
-        $minutes = (int) Setting::where('key', 'checkout.reservation_minutes')->value('value') ?: 60;
-        $expiresAt = now()->addMinutes($minutes);
 
         // Voucher dikunci dan dihitung di dalam transaksi ini; kode salah menggagalkan seluruh checkout.
         $codes = array_values(array_filter([...($data['voucher_codes'] ?? []), $data['voucher_code'] ?? null], 'filled'));
         $applied = $codes
-            ? $this->vouchers->redeem($codes, $summary['subtotal'], $data['user_id'] ?? null, $data['customer_phone'])
+            ? $this->vouchers->redeem($codes, $summary['subtotal'], $data['user_id'] ?? null, $data['customer_phone'], $rate['fee'], $data['address']['province'])
             : [];
-        $discount = array_sum(array_column($applied, 'discount'));
+        // Voucher gratis ongkir memotong ongkir, bukan subtotal; shipping_fee tetap tarif penuh dari kurir (D-126).
+        $shippingRow = collect($applied)->first(fn (array $row) => $row['voucher']->isShipping());
+        $regular = array_values(array_filter($applied, fn (array $row) => ! $row['voucher']->isShipping()));
+        $discount = array_sum(array_column($regular, 'discount'));
+        $shippingDiscount = $shippingRow['discount'] ?? 0;
+        $total = $summary['subtotal'] - $discount + $rate['fee'] - $shippingDiscount;
+
+        // D-132: total Rp1 juta ke atas ditandai untuk ditinjau. Bila total belum dibayar nomor HP ini (pesanan yang masih bisa
+        // dibayar, ditambah pesanan ini) mencapai batas, pesanan menunggu persetujuan dan stok ditahan sampai tenggat tinjau.
+        $unpaid = (int) Order::where('customer_phone', $data['customer_phone'])->where('status', Order::PENDING_PAYMENT)->where('expires_at', '>', now())->sum('total');
+        $needsApproval = $unpaid + $total >= OrderReviewService::setting('antifraud.approval_min_unpaid', 3000000);
+        $reviewDueAt = $needsApproval || $total >= OrderReviewService::setting('antifraud.review_min_total', 1000000) ? $this->review->dueAt(now()) : null;
+        $status = $needsApproval ? Order::AWAITING_APPROVAL : Order::PENDING_PAYMENT;
+        $expiresAt = $needsApproval ? $reviewDueAt : now()->addMinutes(OrderReviewService::setting('checkout.reservation_minutes', 60));
 
         $order = Order::create([
             'user_id' => $data['user_id'] ?? null,
@@ -126,18 +147,22 @@ class CheckoutService
             'customer_email' => $data['customer_email'],
             'customer_phone' => $data['customer_phone'],
             'shipping_address' => $data['address'],
+            'ip_address' => $data['ip_address'] ?? null,
             'shipping_courier' => $rate['courier'],
             'shipping_service' => $rate['service'],
-            'status' => Order::PENDING_PAYMENT,
+            'status' => $status,
             'payment_status' => 'pending',
             'shipping_status' => 'pending',
             'subtotal' => $summary['subtotal'],
             'discount_total' => $discount,
-            'voucher_code' => $applied[0]['voucher']->code ?? null,
-            'voucher_code_2' => $applied[1]['voucher']->code ?? null,
+            'voucher_code' => $regular[0]['voucher']->code ?? null,
+            'voucher_code_2' => $regular[1]['voucher']->code ?? null,
+            'shipping_voucher_code' => $shippingRow['voucher']->code ?? null,
             'shipping_fee' => $rate['fee'],
-            'total' => $summary['subtotal'] - $discount + $rate['fee'],
+            'shipping_discount' => $shippingDiscount,
+            'total' => $total,
             'expires_at' => $expiresAt,
+            'review_due_at' => $reviewDueAt,
         ]);
 
         foreach ($applied as $row) {
@@ -162,7 +187,14 @@ class CheckoutService
             $this->inventory->reserve($order, $item['variant_id'], $item['quantity'], $expiresAt);
         }
 
-        $order->histories()->create(['status_type' => 'order', 'to_status' => Order::PENDING_PAYMENT, 'source' => 'checkout']);
+        $order->histories()->create(['status_type' => 'order', 'to_status' => $status, 'source' => 'checkout']);
+
+        if ($reviewDueAt) {
+            $amount = 'Rp'.number_format($total, 0, ',', '.');
+            $this->notifier->toRoles(['store-admin', 'owner'], $needsApproval
+                ? new StaffEvent('order_approval', 'order', $order->order_number, "Pesanan {$order->order_number} ({$amount}) menunggu persetujuan", 'Belum bisa dibayar sampai disetujui Admin Toko')
+                : new StaffEvent('order_review', 'order', $order->order_number, "Pesanan {$order->order_number} ({$amount}) perlu ditinjau", 'Total Rp1 juta ke atas'));
+        }
 
         return $order;
     }

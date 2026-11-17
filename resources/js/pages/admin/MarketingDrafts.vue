@@ -1,17 +1,21 @@
 <script setup>
 import { computed, onMounted, reactive, ref } from 'vue';
+import { useRoute, useRouter } from 'vue-router';
 import AdminIcon from '../../components/AdminIcon.vue';
 import AddButton from '../../components/ui/AddButton.vue';
 import AppModal from '../../components/ui/AppModal.vue';
 import IconAction from '../../components/ui/IconAction.vue';
 import PageHeader from '../../components/ui/PageHeader.vue';
 import api from '../../utils/api';
+import { sourceLinks } from '../../utils/sourceLinks';
 import { apiError } from '../../utils/apiError';
 import { useAuthStore } from '../../stores/auth';
 
 // Draf konten AI Marketing (D-062, D-079). Marketing menyusun dan mengajukan; Pemilik atau Super Admin memutuskan; memposting tetap manual (BR-19).
 // Izin sebenarnya dijaga server; tombol di sini hanya mengikuti izin supaya tidak membingungkan.
 const auth = useAuthStore();
+const route = useRoute();
+const router = useRouter();
 const canManage = computed(() => auth.can('marketing_drafts.manage'));
 const canApprove = computed(() => auth.can('marketing_drafts.approve'));
 
@@ -96,6 +100,10 @@ const editable = (row) => ['draft', 'rejected'].includes(row.status);
 // Formulir terkunci bagi akun tanpa izin menyusun, dan bagi draf yang sedang ditinjau atau sudah disetujui.
 const readOnly = computed(() => !canManage.value || (editing.value && !editable(editing.value)));
 const isTrend = computed(() => form.type === 'trend_report');
+// Mode lihat: draf ditampilkan sebagai bacaan, bukan formulir terkunci.
+const viewing = computed(() => Boolean(editing.value) && readOnly.value);
+const dayLabel = (value) => day.format(new Date(`${value}T00:00:00`));
+const sourceLinksList = computed(() => sourceLinks(form.sources));
 
 async function load() {
     loading.value = true;
@@ -106,6 +114,12 @@ async function load() {
         frequency.value = data.data.frequency;
         aiEnabled.value = data.data.ai_enabled;
         week.value = data.data.week;
+        // Tautan "Buka" dari kalender Ringkasan: ?draf=ID membuka draf itu sekali, lalu parameternya dibuang.
+        const target = items.value.find((row) => String(row.id) === String(route.query.draf));
+        if (target) {
+            router.replace({ query: {} });
+            open(target);
+        }
     } catch (e) {
         loadError.value = apiError(e).message;
     } finally {
@@ -286,7 +300,42 @@ onMounted(load);
   </template>
 
   <AppModal ref="dialog" :variant="editing ? (readOnly ? 'read' : 'update') : 'create'" size="2xl" :title="editing ? (readOnly ? 'Lihat draf' : 'Ubah draf') : 'Tambah draf'" :subtitle="editing?.title">
-    <form id="draft-form" class="space-y-space-md" @submit.prevent="save">
+    <article v-if="viewing" class="space-y-space-md" aria-label="Isi draf">
+      <div class="flex flex-wrap items-center gap-2">
+        <span class="rounded-full px-2.5 py-1 text-label-sm" :class="STATUS[editing.status].cls">{{ STATUS[editing.status].label }}</span>
+        <span class="rounded-full bg-secondary-tint-12 px-2.5 py-1 text-label-sm">{{ TYPES[editing.type] }}</span>
+        <span v-if="editing.platform" class="rounded-full bg-secondary-tint-12 px-2.5 py-1 text-label-sm">{{ PLATFORMS[editing.platform] }}</span>
+        <span v-if="ORIGINS[editing.origin]" class="inline-flex items-center gap-1 rounded-full bg-accent-tint-15 px-2.5 py-1 text-label-sm text-primary"><AdminIcon name="sparkles" :size="12" />{{ ORIGINS[editing.origin] }}</span>
+      </div>
+
+      <h3 class="font-heading text-headline-md leading-tight">{{ form.title }}</h3>
+
+      <ul class="flex flex-wrap gap-x-space-lg gap-y-2 text-body-sm text-secondary">
+        <li v-if="form.scheduled_on" class="flex items-center gap-1.5"><AdminIcon name="clock" :size="16" class="shrink-0" />Jadwal {{ dayLabel(form.scheduled_on) }}</li>
+        <li class="flex items-center gap-1.5"><AdminIcon name="user" :size="16" class="shrink-0" />{{ editing.origin === 'hermes' ? 'Dikirim Hermes (riset terjadwal)' : `Disusun ${editing.creator || 'akun yang sudah dihapus'}` }}</li>
+      </ul>
+
+      <p v-if="editing.review_note" class="flex gap-2 rounded-2xl bg-secondary-tint-12 px-4 py-3 text-body-sm"><AdminIcon name="info" :size="18" class="mt-0.5 shrink-0" /><span>Catatan {{ editing.reviewer || 'peninjau' }}: {{ editing.review_note }}</span></p>
+
+      <section aria-label="Isi" class="rounded-3xl border border-border bg-accent-tint-12 p-space-md">
+        <p class="max-w-prose whitespace-pre-line break-words text-body-md leading-relaxed">{{ form.body }}</p>
+      </section>
+
+      <section v-if="sourceLinksList.length || form.source_period" aria-label="Sumber" class="space-y-2">
+        <h4 class="flex items-center gap-1.5 text-label-md"><AdminIcon name="document" :size="16" />Sumber<span v-if="form.source_period" class="font-normal text-secondary">· data {{ form.source_period }}</span></h4>
+        <ul v-if="sourceLinksList.length" class="divide-y divide-border overflow-hidden rounded-2xl border border-border">
+          <li v-for="(source, index) in sourceLinksList" :key="index">
+            <a v-if="source.url" :href="source.url" target="_blank" rel="noopener noreferrer" class="flex min-h-11 flex-col justify-center px-4 py-2 transition-colors duration-200 hover:bg-accent-tint-15 focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-primary">
+              <span class="break-words text-body-sm text-primary underline-offset-2 hover:underline">{{ source.label }}</span>
+              <span v-if="source.host && source.host !== source.label" class="break-all text-label-sm text-secondary">{{ source.host }}</span>
+            </a>
+            <p v-else class="px-4 py-2 text-body-sm">{{ source.label }}</p>
+          </li>
+        </ul>
+      </section>
+    </article>
+
+    <form v-else id="draft-form" class="space-y-space-md" @submit.prevent="save">
       <p v-if="formError" role="alert" class="rounded-2xl bg-error-surface px-4 py-3 text-body-sm text-on-error-surface">{{ formError }}</p>
       <fieldset :disabled="readOnly" class="space-y-space-md">
         <div class="grid gap-space-md sm:grid-cols-3">
@@ -316,12 +365,13 @@ onMounted(load);
         </label>
         <div class="grid gap-space-md sm:grid-cols-2">
           <label class="block text-label-md">
-            Sumber <span class="font-normal text-secondary">{{ isTrend ? '(wajib untuk riset tren)' : '(opsional)' }}</span>
-            <textarea v-model="form.sources" rows="3" maxlength="1000" :required="isTrend" :class="`${field} resize-none`"></textarea>
+            Tautan sumber <span class="font-normal text-secondary">{{ isTrend ? '(wajib untuk riset tren)' : '(opsional)' }}</span>
+            <textarea v-model="form.sources" rows="5" maxlength="1000" :required="isTrend" placeholder="Satu tautan per baris, contoh: https://contoh.com/artikel" :class="`${field} resize-y break-all text-body-sm`"></textarea>
+            <span class="mt-1 block text-label-sm font-normal text-secondary">Satu tautan per baris. Maksimal 1000 karakter.</span>
             <span v-if="fieldErrors.sources" class="block text-body-sm font-normal text-error">{{ fieldErrors.sources[0] }}</span>
           </label>
           <label class="block text-label-md">
-            Periode sumber <span class="font-normal text-secondary">{{ isTrend ? '(wajib)' : '(opsional)' }}</span>
+            Periode data sumber <span class="font-normal text-secondary">{{ isTrend ? '(wajib)' : '(opsional)' }}</span>
             <input v-model="form.source_period" maxlength="100" :required="isTrend" placeholder="Contoh: 1 sampai 7 November 2026" :class="field">
             <span v-if="fieldErrors.source_period" class="mt-1 block text-body-sm font-normal text-error">{{ fieldErrors.source_period[0] }}</span>
           </label>

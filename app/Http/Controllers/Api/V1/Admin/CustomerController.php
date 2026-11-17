@@ -7,6 +7,7 @@ use App\Models\AuditLog;
 use App\Models\CustomerAddress;
 use App\Models\Order;
 use App\Models\User;
+use App\Services\RepeatOrderService;
 use App\Services\UserManagementService;
 use App\Traits\ApiResponse;
 use Illuminate\Http\JsonResponse;
@@ -35,9 +36,10 @@ class CustomerController extends Controller
                 ->orWhere('phone', 'like', "%{$search}%")))
             ->latest('id')
             ->paginate($this->perPage($request));
+        $repeat = RepeatOrderService::counts($page->getCollection()->pluck('phone'));
 
         return $this->success('Customers retrieved.', [
-            'items' => $page->getCollection()->map($this->present(...))->values(),
+            'items' => $page->getCollection()->map(fn (User $user) => $this->present($user, $repeat))->values(),
             'meta' => ['current_page' => $page->currentPage(), 'last_page' => $page->lastPage(), 'total' => $page->total()],
         ]);
     }
@@ -50,7 +52,7 @@ class CustomerController extends Controller
         AuditLog::record('customer.viewed', $customer, [], $request->user()->id);
 
         return $this->success('Customer retrieved.', [
-            ...$this->present($customer),
+            ...$this->present($customer, RepeatOrderService::counts([$customer->phone])),
             'addresses' => $customer->addresses()->orderByDesc('is_default')->oldest('id')->get()
                 ->map(fn (CustomerAddress $address) => $address->only(['label', 'recipient_name', 'phone', 'street', 'district', 'city', 'province', 'postal_code', 'is_default'])),
             'orders' => $customer->orders()->latest('id')->limit(10)->get()
@@ -71,7 +73,9 @@ class CustomerController extends Controller
         // Lewat layanan yang sama dengan akun staf: tercatat di audit log dan session berakhir saat dinonaktifkan.
         $this->users->update($customer, ['is_active' => $request->boolean('is_active')], $request->user());
 
-        return $this->success('Customer updated.', $this->present($customer->fresh()->loadCount('orders')));
+        $customer = $customer->fresh()->loadCount('orders');
+
+        return $this->success('Customer updated.', $this->present($customer, RepeatOrderService::counts([$customer->phone])));
     }
 
     public function destroy(Request $request, User $user): JsonResponse
@@ -88,8 +92,11 @@ class CustomerController extends Controller
         return $user;
     }
 
-    /** @return array<string, mixed> */
-    private function present(User $user): array
+    /**
+     * @param  array<string, int>  $repeat  hasil RepeatOrderService::counts()
+     * @return array<string, mixed>
+     */
+    private function present(User $user, array $repeat): array
     {
         return [
             'id' => $user->id,
@@ -100,6 +107,8 @@ class CustomerController extends Controller
             'phone_verified' => $user->phone_verified_at !== null,
             'is_active' => $user->is_active,
             'orders_count' => $user->orders_count,
+            // Tag repeat order dihitung per nomor WhatsApp, termasuk pesanan tamu dengan nomor yang sama (D-135).
+            ...RepeatOrderService::present($user->phone, $repeat),
             'created_at' => $user->created_at,
         ];
     }

@@ -9,8 +9,9 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 /**
  * @property CarbonInterface $claimed_at
+ * @property CarbonInterface|null $expires_at
  */
-#[Fillable(['voucher_id', 'user_id'])]
+#[Fillable(['voucher_id', 'user_id', 'expires_at'])]
 class VoucherClaim extends Model
 {
     public $timestamps = false;
@@ -22,7 +23,7 @@ class VoucherClaim extends Model
      */
     protected function casts(): array
     {
-        return ['claimed_at' => 'datetime'];
+        return ['claimed_at' => 'datetime', 'expires_at' => 'datetime'];
     }
 
     /** @return BelongsTo<Voucher, $this> */

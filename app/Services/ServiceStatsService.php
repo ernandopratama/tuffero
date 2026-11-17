@@ -70,7 +70,7 @@ class ServiceStatsService
             $tiles[] = $this->tile('refund_on_time', 'Refund tepat waktu', $this->onTimePercent($done), 'dari '.$done->count().' yang selesai');
         }
 
-        if ($user->canAny(['orders.cancel_request', 'orders.cancel', 'orders.cancel_final'])) {
+        if ($user->canAny(['orders.cancel_request', 'orders.cancel'])) {
             $validated = OrderCancellationRequest::whereNotNull('validated_at')->where('validated_at', '>=', $since)->get(['created_at', 'validated_at']);
             $done = OrderCancellationRequest::whereIn('status', [OrderCancellationRequest::APPROVED, OrderCancellationRequest::REJECTED, OrderCancellationRequest::REFUNDED])->get()
                 ->map(fn (OrderCancellationRequest $r) => ['at' => $r->refunded_at ?? $r->rejected_at ?? $r->owner_approved_at ?? $r->store_approved_at ?? $r->updated_at, 'from' => $r->created_at, 'due' => $r->due_at])

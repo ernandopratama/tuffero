@@ -65,10 +65,11 @@ defineProps({
     transition: opacity 200ms ease;
 }
 
-/* Jarak teks ke titik di ujung kanan sama dengan jarak ke titik kiri. */
+/* Kolom ikon di kiri selebar --size dengan titik --edge dari tepi; kolom kosong di kanan dibuat selebar sama,
+   supaya jarak teks ke titik kanan sama dengan jarak teks ke titik kiri. */
 .add-txt-inner {
     display: block;
-    padding-right: calc(var(--size) / 2 + var(--edge) / 2);
+    padding-right: var(--size);
 }
 
 /* Dua lengan horizontal, dan dua separuh batang vertikal di dalam .add-icon: bersama-sama membentuk plus. */

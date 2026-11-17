@@ -99,6 +99,52 @@ class BiteshipShipmentService
     }
 
     /**
+     * Membatalkan order kurir di Biteship (POST /v1/orders/{id}/cancel). Idempoten: order yang sudah dibatalkan dianggap berhasil.
+     * Dipanggil di dalam transaksi + kunci baris pesanan. Gagal (Biteship menolak karena kurir sudah mengambil, atau tak terjangkau)
+     * = ValidationException tanpa mengubah apa pun. Status kurir mana yang masih bisa dibatalkan tidak didokumentasikan Biteship;
+     * penolakannya (galat 40002053) diteruskan apa adanya.
+     */
+    public function cancelOrder(Shipment $shipment, string $reason): void
+    {
+        if ($shipment->provider !== 'biteship' || $shipment->status === 'cancelled') {
+            return;
+        }
+
+        if (! $this->enabled()) {
+            throw ValidationException::withMessages(['status' => 'Kunci Biteship belum diisi, jadi order kurir tidak bisa dibatalkan otomatis. Batalkan di dashboard Biteship, lalu hubungi Super Admin.']);
+        }
+
+        try {
+            $response = Http::baseUrl((string) config('services.biteship.base_url'))
+                ->withHeaders(['Authorization' => (string) config('services.biteship.key')])
+                ->acceptJson()
+                ->timeout(20)
+                ->connectTimeout(5)
+                ->post('/v1/orders/'.rawurlencode((string) $shipment->provider_order_id).'/cancel', [
+                    'cancellation_reason_code' => 'others',
+                    'cancellation_reason' => mb_substr($reason, 0, 100),
+                ]);
+        } catch (Throwable $e) {
+            Log::warning('Biteship cancel request failed.', ['shipment' => $shipment->id, 'error' => $e->getMessage()]);
+
+            throw ValidationException::withMessages(['status' => 'Biteship tidak dapat dihubungi. Coba lagi sebentar.']);
+        }
+
+        $error = (string) $response->json('error', '');
+        // 40002053: "Cannot cancel order because order already {status}". Bila status itu sudah "cancelled", tujuan tercapai.
+        $alreadyCancelled = (int) $response->json('code') === 40002053 && str_contains(strtolower($error), 'cancelled');
+
+        if (! ($response->successful() && $response->json('success')) && ! $alreadyCancelled) {
+            Log::warning('Biteship cancel rejected.', ['shipment' => $shipment->id, 'status' => $response->status(), 'code' => $response->json('code'), 'error' => $error]);
+
+            throw ValidationException::withMessages(['status' => 'Biteship tidak bisa membatalkan order kurir ('.mb_substr($error !== '' ? $error : 'alasan tidak diketahui', 0, 160).'). Pesanan yang sudah diambil kurir tidak bisa dibatalkan.']);
+        }
+
+        $shipment->update(['status' => 'cancelled']);
+        Cache::forget("biteship:tracking:{$shipment->courier_code}:{$shipment->waybill_id}");
+    }
+
+    /**
      * Webhook Biteship. Mengembalikan false hanya untuk rahasia salah (403). Event tak dikenal atau paket tak ada: true (200) supaya Biteship tidak mengulang.
      *
      * @param  array<string, mixed>  $payload

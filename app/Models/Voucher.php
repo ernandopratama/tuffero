@@ -12,11 +12,26 @@ use Illuminate\Database\Eloquent\Relations\MorphMany;
 /**
  * @property CarbonInterface|null $starts_at
  * @property CarbonInterface|null $ends_at
+ * @property list<string>|null $provinces
  */
 // used_count tidak fillable: hanya boleh berubah lewat penukaran voucher saat checkout.
-#[Fillable(['code', 'description', 'type', 'audience', 'value', 'min_subtotal', 'max_discount', 'quota', 'per_customer_limit', 'starts_at', 'ends_at', 'is_active', 'is_listed', 'requires_claim', 'stackable', 'campaign_id'])]
+#[Fillable(['code', 'description', 'type', 'kind', 'audience', 'value', 'min_subtotal', 'max_discount', 'quota', 'per_customer_limit', 'limit_period', 'starts_at', 'ends_at', 'is_active', 'is_listed', 'requires_claim', 'stackable', 'provinces', 'budget', 'signup_grant', 'claim_valid_days', 'campaign_id'])]
 class Voucher extends Model
 {
+    public const KIND_ORDER = 'order';
+
+    public const KIND_SHIPPING = 'shipping';
+
+    // D-126: nilai potongan voucher gratis ongkir yang boleh diisi Admin.
+    public const SHIPPING_MIN = 1000;
+
+    public const SHIPPING_MAX = 25000;
+
+    public function isShipping(): bool
+    {
+        return $this->kind === self::KIND_SHIPPING;
+    }
+
     /**
      * Get the attributes that should be cast.
      *
@@ -31,6 +46,8 @@ class Voucher extends Model
             'is_listed' => 'boolean',
             'requires_claim' => 'boolean',
             'stackable' => 'boolean',
+            'provinces' => 'array',
+            'signup_grant' => 'boolean',
         ];
     }
 

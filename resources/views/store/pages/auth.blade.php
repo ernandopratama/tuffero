@@ -137,7 +137,7 @@
 					</div>
 					<button type="submit" class="tf-btn tf-btn-block" :disabled="busy || locked" x-text="submitOtpText"></button>
 				</form>
-				<template x-if="locked"><a href="{{ $site->route('contact') }}" class="tf-auth-link">{{ $a['otp']['help'] }}</a></template>
+				<template x-if="locked">@include('store.partials.slide-button', ['href' => $site->route('contact'), 'label' => $a['otp']['help'], 'class' => 'tf-auth-link'])</template>
 				<template x-if="!locked"><p class="tf-auth-terms" x-text="channelWords.noCode"></p></template>
 			</div>
 		</template>

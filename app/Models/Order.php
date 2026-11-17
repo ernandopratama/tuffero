@@ -7,6 +7,7 @@ use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Attributes\Hidden;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\HasOne;
 use Illuminate\Database\Eloquent\Relations\MorphMany;
@@ -18,13 +19,19 @@ use Illuminate\Support\Facades\DB;
  */
 #[Fillable([
     'user_id', 'public_ref', 'order_number', 'access_token_hash', 'idempotency_key', 'warehouse_id',
-    'customer_name', 'customer_email', 'customer_phone', 'shipping_address', 'shipping_courier', 'shipping_service',
-    'status', 'payment_status', 'shipping_status', 'subtotal', 'discount_total', 'voucher_code', 'voucher_code_2', 'shipping_fee', 'total', 'expires_at',
+    'customer_name', 'customer_email', 'customer_phone', 'shipping_address', 'ip_address', 'shipping_courier', 'shipping_service',
+    'status', 'payment_status', 'shipping_status', 'subtotal', 'discount_total', 'voucher_code', 'voucher_code_2', 'shipping_voucher_code', 'shipping_fee', 'shipping_discount', 'total', 'expires_at',
+    'review_due_at', 'reviewed_at', 'reviewed_by', 'review_note',
 ])]
 #[Hidden(['access_token_hash', 'idempotency_key'])]
 class Order extends Model
 {
     public const PENDING_PAYMENT = 'pending_payment';
+
+    /** Total belum dibayar satu nomor HP mencapai batas: menunggu persetujuan Admin Toko sebelum bisa dibayar (D-132). */
+    public const AWAITING_APPROVAL = 'awaiting_approval';
+
+    public const REJECTED = 'rejected';
 
     public const EXPIRED = 'expired';
 
@@ -52,7 +59,21 @@ class Order extends Model
             'expires_at' => 'datetime',
             'paid_at' => 'datetime',
             'cancelled_at' => 'datetime',
+            'review_due_at' => 'datetime',
+            'reviewed_at' => 'datetime',
         ];
+    }
+
+    /**
+     * Pesanan bertanda tinjau (total Rp1 juta ke atas, D-132) yang belum ditinjau Admin Toko dan belum ditutup.
+     *
+     * @param  Builder<Order>  $query
+     * @return Builder<Order>
+     */
+    public function scopeAwaitingReview(Builder $query): Builder
+    {
+        return $query->whereNotNull('review_due_at')->whereNull('reviewed_at')
+            ->whereNotIn('status', [self::EXPIRED, self::CANCELLED, self::REJECTED, self::REFUNDED]);
     }
 
     /**
@@ -72,6 +93,12 @@ class Order extends Model
                 ->whereIn('payment_events.transaction_status', ['settlement', 'capture']));
     }
 
+    /** @return BelongsTo<User, $this> */
+    public function reviewer(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'reviewed_by');
+    }
+
     /** @return HasOne<Shipment, $this> */
     public function shipment(): HasOne
     {
@@ -82,6 +109,12 @@ class Order extends Model
     public function cancellationRequests(): HasMany
     {
         return $this->hasMany(OrderCancellationRequest::class);
+    }
+
+    /** @return HasMany<Refund, $this> */
+    public function refunds(): HasMany
+    {
+        return $this->hasMany(Refund::class);
     }
 
     /** @return MorphMany<AdminComment, $this> */
@@ -103,9 +136,15 @@ class Order extends Model
     }
 
     /** Pembatalan hanya sebelum pesanan diserahkan ke kurir (D-043). */
+    /** Belum dibayar: pelanggan boleh membatalkan sendiri tanpa persetujuan (D-138). */
+    public function isUnpaid(): bool
+    {
+        return in_array($this->status, [self::AWAITING_APPROVAL, self::PENDING_PAYMENT], true);
+    }
+
     public function canBeCancelled(): bool
     {
-        return in_array($this->status, [self::PENDING_PAYMENT, self::PAID, self::PROCESSING], true);
+        return in_array($this->status, [self::AWAITING_APPROVAL, self::PENDING_PAYMENT, self::PAID, self::PROCESSING], true);
     }
 
     /**

@@ -257,6 +257,12 @@ class OrderStatusService
                 $order->forceFill(['status' => Order::SHIPPED, 'shipping_status' => 'shipped'])->save();
                 $order->histories()->create(['status_type' => 'order', 'from_status' => Order::PROCESSING, 'to_status' => Order::SHIPPED, 'source' => 'biteship_webhook']);
                 $order->histories()->create(['status_type' => 'shipping', 'from_status' => $from, 'to_status' => 'shipped', 'source' => 'biteship_webhook']);
+
+                // Kurir mengambil paket sementara ada pengajuan pembatalan yang belum selesai: pesanan tidak lagi bisa dibatalkan (D-043),
+                // jadi staf diberi tahu supaya pengajuan ditolak atau pelanggan dihubungi, bukan dibiarkan menggantung.
+                if ($order->cancellationRequests()->whereIn('status', OrderCancellationRequest::OPEN)->exists()) {
+                    $this->notifier->toRoles(['customer-service', 'store-admin'], new StaffEvent('shipment_problem', 'order', $order->order_number, "Pesanan {$order->order_number} sudah diambil kurir padahal ada pengajuan pembatalan yang belum selesai. Pengajuan tidak bisa disetujui: tolak atau hubungi pelanggan", $order->customer_name));
+                }
             }
 
             $shipment->save();
@@ -266,6 +272,7 @@ class OrderStatusService
                 $order->forceFill(['status' => Order::COMPLETED, 'shipping_status' => 'delivered'])->save();
                 $order->histories()->create(['status_type' => 'order', 'from_status' => Order::SHIPPED, 'to_status' => Order::COMPLETED, 'source' => 'biteship_webhook']);
                 $order->histories()->create(['status_type' => 'shipping', 'from_status' => $from, 'to_status' => 'delivered', 'source' => 'biteship_webhook']);
+                $this->notifyCompleted($order);
             }
         });
     }
@@ -281,9 +288,16 @@ class OrderStatusService
             $shipment->update(['status' => 'delivered', 'delivered_at' => now()]);
 
             $this->transition($locked, Order::COMPLETED, 'delivered', $actor);
+            $this->notifyCompleted($locked, $actor);
 
             return $locked;
         });
+    }
+
+    /** OQ-25: Admin Toko dan Super Admin diberi tahu setiap pesanan selesai; yang menandainya sendiri tidak. */
+    private function notifyCompleted(Order $order, ?User $actor = null): void
+    {
+        $this->notifier->toRoles(['store-admin', 'super-admin'], new StaffEvent('order_completed', 'order', $order->order_number, "Pesanan {$order->order_number} selesai", $order->customer_name), $actor);
     }
 
     private function lock(Order $order): Order

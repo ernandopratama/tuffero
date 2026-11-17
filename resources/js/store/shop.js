@@ -208,7 +208,10 @@ export const checkoutPage = () => mix(addressPicker('co'), voucherPicker(), phon
         get fee() { return this.selected?.fee ?? null; },
         get hasSaving() { return (this.cart?.saving ?? 0) > 0; },
         get savingText() { return rupiah(this.cart.saving); },
-        get total() { return (this.cart?.subtotal ?? 0) - this.discount + (this.fee ?? 0); },
+        // Potongan gratis ongkir tidak pernah melebihi ongkir yang dipilih; server menghitung ulang saat pesanan dibuat.
+        get shipDiscount() { return Math.min(this.shippingDiscount, this.fee ?? 0); },
+        get total() { return (this.cart?.subtotal ?? 0) - this.discount + (this.fee ?? 0) - this.shipDiscount; },
+        voucherContext() { return this.selected ? { shipping_fee: this.selected.fee, province: this.form.province } : {}; },
         get feeText() { return this.fee === null ? this.words.shippingPending : rupiah(this.fee); },
         get subtotalText() { return rupiah(this.cart?.subtotal ?? 0); },
         get totalText() { return rupiah(this.total); },
@@ -319,6 +322,8 @@ export const checkoutPage = () => mix(addressPicker('co'), voucherPicker(), phon
             delete this.errors.courier;
             delete this.errors.service;
             this.formError = this.errors.cart || this.errors.shipping || '';
+            // Potongan gratis ongkir bergantung pada ongkir dan provinsi: periksa ulang voucher yang dipakai.
+            if (this.applied.some((item) => this.isShippingVoucher(item))) this.restoreVouchers();
         },
         courierLogo(rate) { return COURIER_LOGOS.includes(rate.courier) ? `/images/Logo/kurir/${rate.courier}.webp` : ''; },
         courierInitials(rate) { return String(rate.courier).slice(0, 2).toUpperCase(); },
@@ -485,7 +490,7 @@ const STEP_INDEX = { pending_payment: 1, paid: 2, processing: 2, shipped: 3, com
 // Langkah atas (Keranjang, Pembayaran, Pengiriman, Selesai) dan tahap kartu status (FigCraft 05/06).
 const FLOW_INDEX = { pending_payment: 1, paid: 2, processing: 2, shipped: 2, completed: 3 };
 const STAGE_INDEX = { paid: 1, processing: 1, shipped: 2, completed: 4 };
-const VIEW = { pending_payment: 'pay', expired: 'expired', paid: 'progress', processing: 'progress', shipped: 'progress', completed: 'done', cancelled: 'closed', refunded: 'closed' };
+const VIEW = { awaiting_approval: 'review', rejected: 'closed', pending_payment: 'pay', expired: 'expired', paid: 'progress', processing: 'progress', shipped: 'progress', completed: 'done', cancelled: 'closed', refunded: 'closed' };
 const locale = () => (document.documentElement.lang === 'en' ? 'en-GB' : 'id-ID');
 // Toko di Malang: waktu ditampilkan dalam WIB apa pun zona waktu perangkat.
 const wib = (value, options) => `${new Date(value).toLocaleString(locale(), { timeZone: 'Asia/Jakarta', ...options })} WIB`;
@@ -507,6 +512,8 @@ export const orderPage = () => ({
     channel: 'whatsapp',
     cancelBusy: false,
     cancelError: '',
+    cancelNowBusy: false,
+    cancelNowError: '',
     cancelDone: null,
     words: {},
     payConfig: null,
@@ -533,6 +540,8 @@ export const orderPage = () => ({
         setInterval(() => { this.now = Date.now(); }, 1000);
         // Setiap 10 detik selama panel bayar terbuka dan tab terlihat; server membatasi panggilan ke Midtrans (cooldown 5 detik).
         setInterval(() => { this.autoCheck(); }, 10000);
+        // Selama dicek admin: muat ulang tiap 30 detik supaya tombol Bayar muncul sendiri setelah disetujui.
+        setInterval(() => { if (this.view === 'review' && !document.hidden) this.load(); }, 30000);
     },
     rupiah,
     productName,
@@ -544,6 +553,8 @@ export const orderPage = () => ({
     get shown() { return !this.loading && !this.notFound && !this.failed && !!this.order; },
     get hasDiscount() { return (this.order?.discount_total ?? 0) > 0; },
     get discountText() { return '-' + rupiah(this.order.discount_total); },
+    get hasShippingDiscount() { return (this.order?.shipping_discount ?? 0) > 0; },
+    get shippingDiscountText() { return '-' + rupiah(this.order.shipping_discount); },
     get stepIndex() { return STEP_INDEX[this.order?.status] ?? -1; },
     get statusText() { return this.words.status[this.order?.status] || [this.order?.status, '']; },
     // Pesanan Dikirim: badge dan kalimat pembuka mengikuti status paket Biteship (this.carrier), bukan hanya status pesanan.
@@ -571,6 +582,10 @@ export const orderPage = () => ({
     openCancel() { this.cancelError = ''; this.$refs.cancelDialog.showModal(); },
     closeCancel() { this.$refs.cancelDialog.close(); },
     cancelBackdrop(event) { if (event.target === this.$refs.cancelDialog) this.closeCancel(); },
+    // Pesanan belum dibayar: batal langsung tanpa persetujuan (D-138).
+    openCancelNow() { this.cancelNowError = ''; this.$refs.cancelNowDialog.showModal(); },
+    closeCancelNow() { this.$refs.cancelNowDialog.close(); },
+    cancelNowBackdrop(event) { if (event.target === this.$refs.cancelNowDialog) this.closeCancelNow(); },
     // Waktu bayar habis menurut jam server: halaman langsung berganti ke "kedaluwarsa" tanpa menunggu penjadwal menutup pesanan.
     get timeUp() { return this.order?.status === 'pending_payment' && !!this.order.expires_at && new Date(this.order.expires_at) <= this.now + this.skew; },
     get view() {
@@ -598,6 +613,8 @@ export const orderPage = () => ({
         return `${this.words.stageLabel.replace(':n', i + 1)} · ${this.words.stageState[state]}`;
     },
     get payEyebrow() { return this.words.payEyebrow.replace(':number', this.order.order_number); },
+    // Menunggu persetujuan Admin Toko (D-132): tenggat cek = batas tahan stok (expires_at).
+    get reviewDueText() { return this.words.reviewDue.replace(':date', wib(this.order.expires_at, { weekday: 'long', day: 'numeric', month: 'long', hour: '2-digit', minute: '2-digit' })); },
     get payBeforeText() { return this.words.payBefore.replace(':date', wib(this.order.expires_at, { day: 'numeric', month: 'long', year: 'numeric', hour: '2-digit', minute: '2-digit' })); },
     get howSteps() { return this.words.how.map((step) => step.replace(':amount', rupiah(this.order.total))); },
     get productsText() { return this.words.products.replace(':count', this.order.items.length); },
@@ -774,6 +791,22 @@ export const orderPage = () => ({
             this.cancelError = this.words.cancelErrors[key] || (e.response?.status === 429 ? this.words.tooMany : this.words.cancelFailed);
         } finally {
             this.cancelBusy = false;
+        }
+    },
+    async cancelNow() {
+        this.cancelNowBusy = true;
+        this.cancelNowError = '';
+        try {
+            await api.post(`/orders/${this.ref}/cancel`, {}, this.headers());
+            this.$refs.cancelNowDialog?.close();
+            await this.load();
+        } catch (e) {
+            const key = e.response?.data?.errors?.order?.[0];
+            this.cancelNowError = this.words.cancelNowErrors[key] || (e.response?.status === 429 ? this.words.tooMany : this.words.cancelNowFailed);
+            // Status bisa sudah berubah (mis. baru dibayar): muat ulang supaya halaman mengikuti server.
+            if (key) await this.load();
+        } finally {
+            this.cancelNowBusy = false;
         }
     },
     // Hasil popup Snap bukan bukti bayar (BR-11): status selalu dimuat ulang dari server, yang diperbarui notifikasi Midtrans.

@@ -77,7 +77,7 @@ class AdminReportTest extends TestCase
         $this->assertTrue($response->json('data.money'));
         $this->assertSame('rupiah', $response->json('data.sales.revenue_chart.format'));
         $series = collect($response->json('data.sales.revenue_chart.series'))->keyBy('key');
-        $this->assertSame(['revenue', 'refunded', 'net'], $series->keys()->all());
+        $this->assertSame(['revenue', 'refunded', 'net', 'shipping_subsidy'], $series->keys()->all());
         $this->assertSame($series['revenue']['values'][9], $series['net']['values'][9]); // tanpa dana yang dikembalikan, bersih = kotor
         $this->assertGreaterThan(0, $series['net']['values'][9]);
         $this->assertGreaterThan(0, $response->json('data.top_products.0.revenue'));

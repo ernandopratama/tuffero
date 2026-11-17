@@ -12,6 +12,7 @@ use App\Models\Warehouse;
 use App\Services\OrderStatusService;
 use Database\Seeders\DatabaseSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Route;
 use PHPUnit\Framework\Attributes\DataProvider;
 use Tests\TestCase;
 
@@ -85,7 +86,7 @@ class AdminOrderTest extends TestCase
             'gudang bukan pesanan penuh' => ['warehouse', 'orders', 403],
             'marketing bukan pesanan' => ['marketing', 'orders', 403],
             'gudang pengemasan' => ['warehouse', 'fulfillment', 200],
-            'admin toko bukan pengemasan' => ['store-admin', 'fulfillment', 403],
+            'admin toko pengemasan (D-134)' => ['store-admin', 'fulfillment', 200],
             'cs bukan pengemasan' => ['customer-service', 'fulfillment', 403],
             'gudang pengiriman' => ['warehouse', 'shipments', 200],
             'cs lihat pengiriman' => ['customer-service', 'shipments', 200],
@@ -197,7 +198,7 @@ class AdminOrderTest extends TestCase
     public function test_full_status_flow_with_history(): void
     {
         $order = $this->paidOrder();
-        $user = $this->staff('warehouse');
+        $user = $this->staff('store-admin');
         $this->actingAs($user);
 
         $this->postJson("/api/v1/admin/orders/{$order->id}/ship", ['waybill_id' => 'JT123'])->assertUnprocessable();
@@ -301,21 +302,17 @@ class AdminOrderTest extends TestCase
         $this->assertSame(10, $this->stock->fresh()->quantity);
     }
 
-    public function test_paid_cancellation_needs_two_approvals_and_returns_stock(): void
+    public function test_paid_cancellation_finishes_at_store_approval_and_returns_stock(): void
     {
         $order = $this->paidOrder();
         $request = $this->cancellation($order);
 
         $this->act('customer-service', "cancellations/{$request->id}/validate");
+        $this->assertSame(8, $this->stock->fresh()->quantity);
         $this->act('store-admin', "cancellations/{$request->id}/approve");
 
-        $this->assertSame(Request::STORE_APPROVED, $request->fresh()->status);
-        $this->assertSame(Order::PAID, $order->fresh()->status);
-        $this->assertSame(8, $this->stock->fresh()->quantity);
-
-        $this->act('owner', "cancellations/{$request->id}/final-approve");
-
         $order->refresh();
+        $this->assertSame(Request::APPROVED, $request->fresh()->status);
         $this->assertSame(Order::CANCELLED, $order->status);
         $this->assertSame('refund_pending', $order->payment_status);
         $this->assertSame(10, $this->stock->fresh()->quantity);
@@ -328,19 +325,20 @@ class AdminOrderTest extends TestCase
         $this->assertSame(Request::REFUNDED, $request->fresh()->status);
     }
 
-    public function test_two_approvals_must_be_from_different_people(): void
+    public function test_owner_can_see_cancellations_but_cannot_act_on_them(): void
     {
-        $order = $this->paidOrder();
-        $request = $this->cancellation($order);
-        $superAdmin = $this->staff('super-admin');
+        $request = $this->cancellation($this->paidOrder());
         $this->act('customer-service', "cancellations/{$request->id}/validate");
 
-        $this->actingAs($superAdmin)->postJson("/api/v1/admin/cancellations/{$request->id}/approve")->assertOk();
-        $this->actingAs($superAdmin)->postJson("/api/v1/admin/cancellations/{$request->id}/final-approve")->assertUnprocessable();
+        $owner = $this->staff('owner');
+        $this->actingAs($owner)->getJson('/api/v1/admin/cancellations')->assertOk()->assertJsonPath('data.items.0.request_number', $request->request_number);
 
-        $this->assertSame(Request::STORE_APPROVED, $request->fresh()->status);
-        $this->act('owner', "cancellations/{$request->id}/final-approve");
-        $this->assertSame(Order::CANCELLED, $order->fresh()->status);
+        foreach (['validate', 'approve', 'reject', 'courier-cancel', 'refunded'] as $action) {
+            $this->actingAs($owner)->postJson("/api/v1/admin/cancellations/{$request->id}/{$action}", ['reason' => 'x'])->assertForbidden();
+        }
+        $this->assertFalse($owner->can('orders.cancel_final'), 'Izin ACC Pemilik sudah dihapus (D-123).');
+        $this->assertNotContains('api/v1/admin/cancellations/{cancellation}/final-approve', collect(Route::getRoutes()->getRoutes())->map(fn ($route) => $route->uri())->all(), 'Rute ACC Pemilik sudah dihapus.');
+        $this->assertSame(Request::VALIDATED, $request->fresh()->status);
     }
 
     /** @return array<string, array{string, string}> */
@@ -350,8 +348,8 @@ class AdminOrderTest extends TestCase
             'admin toko validasi' => ['store-admin', 'validate'],
             'cs acc pertama' => ['customer-service', 'approve'],
             'pemilik acc pertama' => ['owner', 'approve'],
-            'cs acc kedua' => ['customer-service', 'final-approve'],
-            'admin toko acc kedua' => ['store-admin', 'final-approve'],
+            'pemilik tolak' => ['owner', 'reject'],
+            'pemilik validasi' => ['owner', 'validate'],
             'gudang tolak' => ['warehouse', 'reject'],
             'marketing validasi' => ['marketing', 'validate'],
         ];
@@ -369,7 +367,7 @@ class AdminOrderTest extends TestCase
     {
         $request = $this->cancellation($this->paidOrder());
 
-        $this->act('owner', "cancellations/{$request->id}/final-approve", [], 422);
+        $this->act('store-admin', "cancellations/{$request->id}/approve", [], 422);
         $this->act('store-admin', "cancellations/{$request->id}/refunded", [], 422);
     }
 
@@ -406,10 +404,10 @@ class AdminOrderTest extends TestCase
         $request = $this->cancellation($order);
         $this->act('customer-service', "cancellations/{$request->id}/validate");
         $order->forceFill(['status' => Order::SHIPPED])->save();
-        $this->act('store-admin', "cancellations/{$request->id}/approve");
 
-        $this->act('owner', "cancellations/{$request->id}/final-approve", [], 422);
+        $this->act('store-admin', "cancellations/{$request->id}/approve", [], 422);
 
+        $this->assertSame(Request::VALIDATED, $request->fresh()->status);
         $this->assertSame(Order::SHIPPED, $order->fresh()->status);
         $this->assertSame(8, $this->stock->fresh()->quantity);
     }

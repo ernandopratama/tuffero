@@ -11,7 +11,9 @@ let loaded = false;
 
 const load = (src) => new Promise((resolve, reject) => {
     const el = document.createElement('script');
-    el.src = `/js/${src}`;
+    // ?v= dari waktu ubah berkas (window.tufferoAssetV, diisi layout toko) supaya browser mengambil ulang saat berkas berubah.
+    const version = window.tufferoAssetV?.[src];
+    el.src = `/js/${src}${version ? `?v=${version}` : ''}`;
     el.async = false;
     el.onload = resolve;
     el.onerror = () => reject(new Error(`Gagal memuat ${src}`));

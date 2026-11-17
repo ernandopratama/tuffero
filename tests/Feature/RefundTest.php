@@ -707,6 +707,27 @@ class RefundTest extends TestCase
         $this->act($owner, $refund, 'approve', ['approved_amount' => 50000, 'include_shipping' => true])->assertUnprocessable();
     }
 
+    public function test_shipping_refund_excludes_the_free_shipping_subsidy(): void
+    {
+        $cs = $this->staff('customer-service');
+        $owner = $this->staff('owner');
+
+        // D-126: ongkir Rp12.000, potongan gratis ongkir Rp10.000 = pelanggan membayar Rp2.000.
+        $order = $this->received(2);
+        $order->forceFill(['shipping_discount' => 10000])->save();
+        $refund = $this->filed($order, ['reason_type' => 'wrong_item']);
+        $this->act($cs, $refund, 'evidence', ['result' => 'received', 'channel' => 'email', 'note' => 'Lengkap'])->assertOk();
+        $this->act($owner, $refund, 'approve', ['approved_amount' => 50000, 'include_shipping' => true])->assertOk();
+        $this->assertSame($order->shipping_fee - 10000, $refund->fresh()->shipping_amount);
+
+        // Ongkir ditanggung penuh oleh voucher: tidak ada ongkir yang bisa dikembalikan.
+        $covered = $this->received(2);
+        $covered->forceFill(['shipping_discount' => $covered->shipping_fee])->save();
+        $second = $this->filed($covered, ['reason_type' => 'wrong_item']);
+        $this->act($cs, $second, 'evidence', ['result' => 'received', 'channel' => 'email', 'note' => 'Lengkap'])->assertOk();
+        $this->act($owner, $second, 'approve', ['approved_amount' => 50000, 'include_shipping' => true])->assertUnprocessable()->assertJsonValidationErrors('include_shipping');
+    }
+
     public function test_cs_records_the_customer_choice_after_the_video_and_the_finish_follows_it(): void
     {
         $cs = $this->staff('customer-service');

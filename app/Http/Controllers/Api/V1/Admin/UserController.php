@@ -7,6 +7,7 @@ use App\Http\Requests\Admin\StoreUserRequest;
 use App\Http\Requests\Admin\UpdateUserRequest;
 use App\Models\User;
 use App\Services\MfaService;
+use App\Services\RoleService;
 use App\Services\UserManagementService;
 use App\Traits\ApiResponse;
 use Illuminate\Http\JsonResponse;
@@ -46,6 +47,7 @@ class UserController extends Controller
         return $this->success('Roles retrieved.', [
             'roles' => Role::with('permissions')->orderBy('id')->get()->map(fn (Role $role) => [
                 'name' => $role->name,
+                'label' => RoleService::roleLabel($role),
                 'permissions' => $role->permissions->pluck('name')->sort()->values(),
             ]),
         ]);
@@ -88,6 +90,7 @@ class UserController extends Controller
             'email' => $user->email,
             'username' => $user->username,
             'role' => $user->getRoleNames()->first(),
+            'role_label' => RoleService::roleLabel($user->roles->first()),
             'is_active' => $user->is_active,
             'mfa_required' => $user->mfa_required,
             'mfa_enrolled' => $user->mfa_totp_confirmed_at !== null,

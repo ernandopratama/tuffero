@@ -3,20 +3,21 @@ import { computed, onMounted, ref } from 'vue';
 import AdminIcon from '../components/AdminIcon.vue';
 import AttentionModal from '../components/dashboard/AttentionModal.vue';
 import BarChart from '../components/dashboard/BarChart.vue';
+import ContentCalendar from '../components/dashboard/ContentCalendar.vue';
 import GaugeCard from '../components/dashboard/GaugeCard.vue';
 import KpiCard from '../components/dashboard/KpiCard.vue';
 import ListCard from '../components/dashboard/ListCard.vue';
 import { useAuthStore } from '../stores/auth';
 import api from '../utils/api';
 import { apiError } from '../utils/apiError';
-import { ROLE_LABELS } from '../utils/adminMenu';
+import { roleLabel as labelOf } from '../utils/adminMenu';
 
 const auth = useAuthStore();
 
 // Dua tombol cepat per role. Tombol hanya tampil bila akun memang boleh membuka halamannya.
 const SHORTCUTS = {
     'super-admin': [['Kelola pengguna', 'user', 'AdminUsers', 'users.manage'], ['Lihat audit log', 'shield', 'AdminAudit', 'audit.view']],
-    owner: [['Tinjau ACC pembatalan', 'check', 'AdminCancellations', 'orders.cancel_final'], ['Putuskan refund', 'undo', 'AdminRefunds', 'refunds.decide'], ['Lihat pesanan', 'receipt', 'AdminOrders', 'orders.view']],
+    owner: [['Lihat pembatalan', 'x', 'AdminCancellations', 'cancellations.view'], ['Putuskan refund', 'undo', 'AdminRefunds', 'refunds.decide'], ['Lihat pesanan', 'receipt', 'AdminOrders', 'orders.view']],
     'store-admin': [['Proses pesanan', 'receipt', 'AdminOrders', 'orders.update_status'], ['ACC pembatalan', 'x', 'AdminCancellations', 'orders.cancel']],
     'customer-service': [['Validasi pengajuan', 'check', 'AdminCancellations', 'orders.cancel_request'], ['Proses refund', 'undo', 'AdminRefunds', 'refunds.process']],
     warehouse: [['Mulai pengemasan', 'box', 'AdminFulfillment', 'orders.view_fulfillment'], ['Sesuaikan stok', 'warehouse', 'AdminStock', 'stock.adjust']],
@@ -33,7 +34,9 @@ const greeting = computed(() => {
     return `Selamat ${part}, ${auth.user?.name}`;
 });
 const today = new Intl.DateTimeFormat('id-ID', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' }).format(new Date());
-const roleLabel = computed(() => ROLE_LABELS[auth.activeRole]);
+const roleLabel = computed(() => labelOf(auth.activeRole, auth.user?.role_label));
+// Kalender konten: Super Admin, Pemilik, dan Marketing (pemegang izin menyusun atau memutuskan draf konten).
+const showCalendar = computed(() => auth.can('marketing_drafts.manage') || auth.can('marketing_drafts.approve'));
 const shortcuts = computed(() => (SHORTCUTS[auth.activeRole] || []).filter(([, , , permission]) => auth.can(permission)));
 
 async function load(quiet = false) {
@@ -152,6 +155,8 @@ onMounted(() => load());
           <GaugeCard :gauge="data.gauge" />
         </section>
       </div>
+
+      <ContentCalendar v-if="showCalendar" />
 
       <section v-if="data.service_stats?.length" class="animate-rise rounded-card border border-border bg-surface p-6 shadow-card" style="animation-delay: 320ms" aria-labelledby="stats-title">
         <header class="mb-4 flex flex-wrap items-center justify-between gap-2">

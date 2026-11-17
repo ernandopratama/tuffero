@@ -135,7 +135,7 @@ class FulfillmentToolsTest extends TestCase
     /** @return array<string, array{string}> */
     public static function rolesWithoutFulfillment(): array
     {
-        return array_map(fn (string $role) => [$role], ['owner', 'store-admin', 'customer-service', 'marketing']);
+        return array_map(fn (string $role) => [$role], ['owner', 'customer-service', 'marketing']);
     }
 
     #[DataProvider('rolesWithoutFulfillment')]

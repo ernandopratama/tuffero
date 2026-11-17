@@ -11,7 +11,7 @@ use Illuminate\Support\Str;
  */
 class StaffEvent extends Notification
 {
-    /** @param  'order'|'cancellation'|'refund'|'stock'|'security'|'draft'  $kind */
+    /** @param  'order'|'cancellation'|'refund'|'stock'|'security'|'draft'|'customer_block'|'access'  $kind */
     public function __construct(
         private readonly string $event,
         private readonly string $kind,

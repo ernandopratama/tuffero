@@ -104,12 +104,11 @@ class StaffEventNotificationTest extends TestCase
         $this->assertSame(["Pengajuan {$request->request_number} menunggu ACC Admin Toko"], $this->titles($storeAdmin));
         $this->assertCount(1, $cs->notifications, 'Pelaku sendiri tidak dinotifikasi ulang.');
 
+        // ACC Admin Toko menyelesaikan pembatalan (D-123): Pemilik hanya diberi tahu, tanpa ACC kedua.
         $service->approveByStore($request->fresh(), $storeAdmin);
-        $this->assertSame(["Pengajuan {$request->request_number} menunggu ACC Pemilik"], $this->titles($owner));
-
-        $service->approveByOwner($request->fresh(), $owner);
-        $this->assertContains("Dana pesanan {$order->order_number} menunggu dikembalikan", $this->titles($storeAdmin));
-        $this->assertCount(1, $owner->notifications, 'Pemilik yang meng-ACC tidak menerima notifikasi dananya sendiri.');
+        $this->assertSame(["Admin Toko menyetujui pembatalan pesanan dibayar {$order->order_number}"], $this->titles($owner));
+        $this->assertNotContains("Dana pesanan {$order->order_number} menunggu dikembalikan", $this->titles($storeAdmin), 'Pelaku sendiri tidak dinotifikasi.');
+        $this->assertSame(Order::CANCELLED, $order->fresh()->status);
     }
 
     public function test_overdue_cancellation_reminds_cs_and_store_admin_once(): void

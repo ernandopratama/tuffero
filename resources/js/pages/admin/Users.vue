@@ -8,7 +8,7 @@ import TableToolbar from '../../components/ui/TableToolbar.vue';
 import { useDataTable } from '../../composables/useDataTable';
 import api from '../../utils/api';
 import { apiError } from '../../utils/apiError';
-import { ROLE_LABELS } from '../../utils/adminMenu';
+import { roleLabel } from '../../utils/adminMenu';
 import { useAuthStore } from '../../stores/auth';
 import PageHeader from '../../components/ui/PageHeader.vue';
 import AddButton from '../../components/ui/AddButton.vue';
@@ -25,7 +25,7 @@ const COLUMNS = [
 
 const { rows, meta, page, perPage, search, filter, loading, error, load } = useDataTable('/admin/users', { filters: { role: '', is_active: '' } });
 const roles = ref([]);
-const roleOptions = computed(() => roles.value.map((role) => ({ value: role.name, label: ROLE_LABELS[role.name] || role.name })));
+const roleOptions = computed(() => roles.value.map((role) => ({ value: role.name, label: roleLabel(role.name, role.label) })));
 const pageError = ref('');
 const pageNotice = ref('');
 
@@ -169,7 +169,7 @@ onMounted(loadRoles);
       <span class="break-all text-secondary">{{ row.email }}</span>
       <span v-if="row.username" class="block font-mono text-label-sm text-secondary">@{{ row.username }}</span>
     </template>
-    <template #cell-role="{ row }">{{ ROLE_LABELS[row.role] || 'Tanpa role' }}</template>
+    <template #cell-role="{ row }">{{ roleLabel(row.role, row.role_label) }}</template>
     <template #cell-status="{ row }">
       <span class="rounded-full px-2 py-0.5 text-label-sm" :class="row.is_active ? 'bg-success-surface text-success' : 'bg-error-surface text-on-error-surface'">{{ row.is_active ? 'Aktif' : 'Nonaktif' }}</span>
     </template>
@@ -183,15 +183,12 @@ onMounted(loadRoles);
     </template>
   </DataTable>
 
-  <section class="mt-space-xl rounded-lg border border-border bg-surface p-space-lg">
-    <h2 class="font-heading text-headline-sm">Izin tiap role</h2>
-    <p class="mt-1 text-body-sm text-secondary">Hanya untuk dilihat. Izin mengikuti matriks yang disetujui di Decision Log.</p>
-    <details v-for="role in roles" :key="role.name" class="mt-space-md border-t border-border pt-space-md">
-      <summary class="cursor-pointer text-label-md">{{ ROLE_LABELS[role.name] || role.name }} ({{ role.permissions.length }} izin)</summary>
-      <ul class="mt-space-sm flex flex-wrap gap-space-xs">
-        <li v-for="permission in role.permissions" :key="permission" class="rounded-full bg-accent-tint-12 px-2 py-0.5 font-mono text-body-sm">{{ permission }}</li>
-      </ul>
-    </details>
+  <section v-if="auth.can('roles.manage')" class="mt-space-xl flex flex-wrap items-center justify-between gap-space-md rounded-lg border border-border bg-surface p-space-lg">
+    <div>
+      <h2 class="font-heading text-headline-sm">Izin tiap role</h2>
+      <p class="mt-1 text-body-sm text-secondary">Role dan izin kini diatur di halaman Role dan Izin.</p>
+    </div>
+    <router-link :to="{ name: 'AdminRoles' }" class="inline-flex min-h-10 items-center gap-1.5 rounded-full border border-secondary px-4 text-label-md transition-[transform,background-color] duration-[160ms] ease-out-strong hover:bg-accent-tint-15 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary active:scale-[0.97]">Buka Role dan Izin</router-link>
   </section>
 
   <AppModal ref="dialog" :variant="editing ? 'update' : 'create'" :title="editing ? 'Ubah akun' : 'Tambah akun'">
@@ -217,7 +214,7 @@ onMounted(loadRoles);
         Role
         <select v-model="form.role" required :disabled="isSelf" class="mt-1 w-full rounded border border-secondary bg-surface px-3 py-2 text-body-md focus:outline-2 focus:outline-primary disabled:opacity-60">
           <option value="" disabled>Pilih role</option>
-          <option v-for="role in roles" :key="role.name" :value="role.name">{{ ROLE_LABELS[role.name] || role.name }}</option>
+          <option v-for="role in roles" :key="role.name" :value="role.name">{{ roleLabel(role.name, role.label) }}</option>
         </select>
         <span v-if="fieldErrors.role" class="mt-1 block text-body-sm text-error">{{ fieldErrors.role[0] }}</span>
       </label>

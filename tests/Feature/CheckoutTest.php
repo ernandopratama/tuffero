@@ -331,42 +331,85 @@ class CheckoutTest extends TestCase
         $this->checkout()->assertStatus(409)->assertJsonMissingPath('data.public_ref');
     }
 
-    public function test_one_phone_cannot_hold_stock_with_too_many_unpaid_orders(): void
+    public function test_order_from_one_million_is_flagged_for_review_but_stays_payable(): void
     {
-        $this->variant('NAS-01', 100);
+        $this->variant('NAS-01', 100, ['price' => 1000000]);
+        $this->addToCart('NAS-01', 1);
+        $order = Order::where('public_ref', $this->checkout()->assertCreated()->json('data.public_ref'))->firstOrFail();
 
-        foreach (['key-0000000000000001', 'key-0000000000000002', 'key-0000000000000003'] as $key) {
-            $this->addToCart();
-            $this->checkout([], $key)->assertCreated();
-        }
-
-        $this->addToCart();
-        $this->checkout([], 'key-0000000000000004')->assertUnprocessable()->assertJsonPath('errors.customer_phone.0', 'too_many_unpaid_orders');
-        $this->assertSame(3, Order::count());
-        $this->assertSame(6, $this->stock(ProductVariant::firstOrFail())->reserved);
-
-        // Nomor lain tidak terpengaruh, dan retry dengan kunci lama tetap mengembalikan pesanan yang sama.
-        $this->checkout(['customer_phone' => '0812-9999-0000'], 'key-0000000000000005')->assertCreated();
-        $this->checkout([], 'key-0000000000000001')->assertOk();
+        $this->assertSame(Order::PENDING_PAYMENT, $order->status);
+        $this->assertNotNull($order->review_due_at);
+        $this->assertNull($order->reviewed_at);
     }
 
-    public function test_unpaid_limit_and_daily_limit_follow_settings(): void
+    public function test_small_order_is_not_flagged(): void
+    {
+        $this->variant();
+        $this->addToCart();
+        $this->checkout()->assertCreated();
+
+        $this->assertNull(Order::firstOrFail()->review_due_at);
+    }
+
+    public function test_unpaid_total_from_three_million_waits_for_store_admin_approval(): void
+    {
+        $variant = $this->variant('NAS-01', 100, ['price' => 1000000]);
+
+        $this->addToCart('NAS-01', 1);
+        $this->checkout([], 'key-0000000000000001')->assertCreated();
+
+        // Rp1 juta belum dibayar + pesanan baru Rp2 juta (+ongkir) = di atas Rp3 juta: menunggu persetujuan, belum bisa dibayar.
+        $this->addToCart('NAS-01', 2);
+        $ref = $this->checkout([], 'key-0000000000000002')->assertCreated()->json('data.public_ref');
+        $order = Order::where('public_ref', $ref)->firstOrFail();
+
+        $this->assertSame(Order::AWAITING_APPROVAL, $order->status);
+        $this->assertEquals($order->review_due_at, $order->expires_at);
+        $this->assertSame(3, $this->stock($variant)->reserved);
+        $this->getJson("/api/v1/orders/{$ref}")->assertOk()->assertJsonPath('data.status', Order::AWAITING_APPROVAL);
+        $this->postJson("/api/v1/orders/{$ref}/payment")->assertUnprocessable()->assertJsonPath('errors.order.0', 'not_payable');
+
+        // Satu pesanan menunggu persetujuan per nomor HP; nomor lain tidak terpengaruh.
+        $this->addToCart('NAS-01', 1);
+        $this->checkout([], 'key-0000000000000003')->assertUnprocessable()->assertJsonPath('errors.customer_phone.0', 'approval_pending');
+        $this->checkout(['customer_phone' => '0812-9999-0000'], 'key-0000000000000004')->assertCreated();
+    }
+
+    public function test_single_order_from_three_million_waits_for_approval(): void
+    {
+        $this->variant('NAS-01', 100, ['price' => 1500000]);
+        $this->addToCart('NAS-01', 2);
+        $this->checkout()->assertCreated();
+
+        $this->assertSame(Order::AWAITING_APPROVAL, Order::firstOrFail()->status);
+    }
+
+    public function test_expired_unpaid_orders_do_not_count_toward_approval_threshold(): void
+    {
+        $this->variant('NAS-01', 100, ['price' => 1000000]);
+        $this->addToCart('NAS-01', 2);
+        $this->checkout([], 'key-0000000000000001')->assertCreated();
+        Order::query()->update(['expires_at' => now()->subMinute()]);
+
+        $this->addToCart('NAS-01', 1);
+        $this->checkout([], 'key-0000000000000002')->assertCreated();
+
+        $this->assertSame(Order::PENDING_PAYMENT, Order::latest('id')->firstOrFail()->status);
+    }
+
+    public function test_daily_limit_follows_settings(): void
     {
         $this->variant('NAS-01', 100);
-        Setting::where('key', 'antifraud.max_unpaid_orders')->update(['value' => '1']);
+        Setting::where('key', 'antifraud.max_orders_per_day')->update(['value' => '1']);
 
         $this->addToCart();
         $this->checkout([], 'key-0000000000000001')->assertCreated();
         $this->addToCart();
-        $this->checkout([], 'key-0000000000000002')->assertUnprocessable()->assertJsonPath('errors.customer_phone.0', 'too_many_unpaid_orders');
-
-        Setting::where('key', 'antifraud.max_unpaid_orders')->update(['value' => '10']);
-        Setting::where('key', 'antifraud.max_orders_per_day')->update(['value' => '1']);
-        $this->checkout([], 'key-0000000000000003')->assertUnprocessable()->assertJsonPath('errors.customer_phone.0', 'daily_order_limit');
+        $this->checkout([], 'key-0000000000000002')->assertUnprocessable()->assertJsonPath('errors.customer_phone.0', 'daily_order_limit');
 
         // Pesanan lebih dari 24 jam tidak dihitung.
         Order::query()->update(['created_at' => now()->subDays(2)]);
-        $this->checkout([], 'key-0000000000000004')->assertCreated();
+        $this->checkout([], 'key-0000000000000003')->assertCreated();
     }
 
     public function test_checkout_requires_idempotency_key(): void

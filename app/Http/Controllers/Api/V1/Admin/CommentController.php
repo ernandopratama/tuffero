@@ -126,7 +126,7 @@ class CommentController extends Controller
             $request->route('order') !== null => ['orders.view', 'orders.view_fulfillment'],
             $request->route('voucher') !== null => ['vouchers.view'],
             $request->route('refund') !== null => ['refunds.view'],
-            $request->route('cancellation') !== null => ['orders.cancel_request', 'orders.cancel', 'orders.cancel_final'],
+            $request->route('cancellation') !== null => ['orders.cancel_request', 'orders.cancel', 'cancellations.view'],
             default => ['content.view'],
         };
 

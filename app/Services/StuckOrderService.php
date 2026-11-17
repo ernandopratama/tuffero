@@ -50,7 +50,7 @@ class StuckOrderService
             $this->check('paid_unprocessed', 'Dibayar, belum diproses', $paid(self::PAID_WARN_HOURS), $paid(self::PAID_BAD_HOURS),
                 'pesanan sudah dibayar lebih dari '.self::PAID_WARN_HOURS.' jam dan belum diproses', 'AdminOrders'),
             $this->check('expired_open', 'Batas bayar lewat, belum ditutup',
-                Order::where('status', Order::PENDING_PAYMENT)->where('expires_at', '<', $this->now->subMinutes(self::EXPIRED_OPEN_MINUTES)), 'always',
+                Order::whereIn('status', [Order::PENDING_PAYMENT, Order::AWAITING_APPROVAL])->where('expires_at', '<', $this->now->subMinutes(self::EXPIRED_OPEN_MINUTES)), 'always',
                 'pesanan lewat batas bayar tetapi stoknya masih tertahan. Periksa penjadwal', 'AdminOrders'),
             $this->check('late_payment', 'Dana masuk, pesanan sudah ditutup',
                 $this->latePayments(), 'always',

@@ -61,6 +61,8 @@ class ReportService
                 ['key' => 'revenue', 'name' => 'Pendapatan kotor', 'tone' => 'primary', 'values' => array_map(fn ($m) => app(RevenueService::class)->gross($range($m)), $months)],
                 ['key' => 'refunded', 'name' => 'Dana dikembalikan', 'tone' => 'secondary', 'values' => array_map(fn ($m) => app(RevenueService::class)->refunded($range($m)), $months)],
                 ['key' => 'net', 'name' => 'Pendapatan bersih', 'tone' => 'success', 'values' => array_map(fn ($m) => app(RevenueService::class)->net($range($m)), $months)],
+                // D-126: potongan gratis ongkir yang ditanggung toko.
+                ['key' => 'shipping_subsidy', 'name' => 'Subsidi ongkir', 'tone' => 'accent', 'values' => array_map(fn ($m) => app(RevenueService::class)->shippingSubsidy($range($m)), $months)],
             ]];
         }
 

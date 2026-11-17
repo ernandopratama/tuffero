@@ -20,6 +20,7 @@
 						<label>
 							<input type="checkbox" :checked="isPicked(v)" :disabled="pickBlocked(v)" @change="togglePick(v)">
 							<span class="tf-vpick-text">
+								<span class="tf-ship-badge" x-show="isShippingVoucher(v)">{{ $site->lineIcon('truck', 12) }} {{ $v['shippingTag'] }}</span>
 								<strong x-text="voucherTitle(v)"></strong>
 								<small x-text="voucherMeta(v)"></small>
 								<em :class="pickNoteClass(v)" x-text="pickNote(v)"></em>

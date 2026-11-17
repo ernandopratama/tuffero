@@ -73,7 +73,7 @@ class StoreCatalogService
         $sold = $campaign->is_flash && $variantIds->isNotEmpty()
             ? OrderItem::query()->join('orders', 'orders.id', '=', 'order_items.order_id')
                 ->whereIn('order_items.product_variant_id', $variantIds)
-                ->whereIn('orders.status', [Order::PENDING_PAYMENT, Order::PAID, Order::PROCESSING, Order::SHIPPED, Order::COMPLETED])
+                ->whereIn('orders.status', [Order::AWAITING_APPROVAL, Order::PENDING_PAYMENT, Order::PAID, Order::PROCESSING, Order::SHIPPED, Order::COMPLETED])
                 ->whereBetween('orders.created_at', [$campaign->starts_at, $campaign->ends_at])
                 ->groupBy('order_items.product_variant_id')
                 ->selectRaw('order_items.product_variant_id as variant_id, sum(order_items.quantity) as sold')

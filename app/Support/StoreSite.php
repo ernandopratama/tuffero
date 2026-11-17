@@ -45,7 +45,7 @@ class StoreSite
     // Senin = indeks 0; null = tutup. Angka = jam, waktu Malang (WIB).
     public const OPEN_HOURS = [[9, 16], [9, 16], [9, 16], [9, 16], [9, 16], [9, 16], null];
 
-    private const FALLBACK_WHATSAPP = '+6281231481755';
+    private const FALLBACK_WHATSAPP = '+6281252507880';
 
     private ?string $whatsapp = null;
 

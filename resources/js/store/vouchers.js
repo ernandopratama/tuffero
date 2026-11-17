@@ -24,7 +24,7 @@ export const vouchersPage = () => ({
     title(item) { return card.title(this.words, item); },
     description(item) { return item.description || ''; },
     meta(item) { return card.meta(this.words, item); },
-    cardClass(item) { return item.claimed || item.exhausted ? 'is-off' : ''; },
+    cardClass(item) { return [item.claimed || item.exhausted ? 'is-off' : '', item.kind === 'shipping' ? 'is-shipping' : ''].join(' '); },
     canClaim(item) { return !item.claimed && !item.exhausted && this.busy !== item.code; },
     actionText(item) {
         if (item.claimed) return this.words.claimed;
@@ -88,7 +88,7 @@ export const accountVouchersPage = () => ({
     title(item) { return card.title(this.words, item); },
     description(item) { return item.description || ''; },
     meta(item) { return card.meta(this.words, item); },
-    cardClass(item) { return item.status === 'available' ? '' : 'is-off'; },
+    cardClass(item) { return [item.status === 'available' ? '' : 'is-off', item.kind === 'shipping' ? 'is-shipping' : ''].join(' '); },
     async load() {
         this.loading = true;
         this.failed = false;

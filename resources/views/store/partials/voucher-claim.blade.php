@@ -23,6 +23,7 @@
 		<template x-for="v in items" :key="v.code">
 			<li :class="cardClass(v)">
 				<div>
+					<span class="tf-ship-badge" x-show="v.kind === 'shipping'">{{ $site->lineIcon('truck', 12) }} {{ $c['shippingTag'] }}</span>
 					<strong x-text="title(v)"></strong>
 					<span x-text="description(v)"></span>
 					<small x-text="meta(v)"></small>

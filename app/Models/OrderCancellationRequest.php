@@ -23,8 +23,6 @@ class OrderCancellationRequest extends Model
 
     public const VALIDATED = 'validated';
 
-    public const STORE_APPROVED = 'store_approved';
-
     public const APPROVED = 'approved';
 
     public const REJECTED = 'rejected';
@@ -32,7 +30,7 @@ class OrderCancellationRequest extends Model
     public const REFUNDED = 'refunded';
 
     /** Status yang masih berjalan dan menahan pengiriman. */
-    public const OPEN = [self::SUBMITTED, self::VALIDATED, self::STORE_APPROVED];
+    public const OPEN = [self::SUBMITTED, self::VALIDATED];
 
     /**
      * Get the attributes that should be cast.
@@ -48,6 +46,7 @@ class OrderCancellationRequest extends Model
             'owner_approved_at' => 'datetime',
             'rejected_at' => 'datetime',
             'refunded_at' => 'datetime',
+            'auto_refund_at' => 'datetime',
         ];
     }
 

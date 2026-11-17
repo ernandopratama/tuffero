@@ -20,7 +20,9 @@ const KINDS = {
     refund: { label: 'refund', route: () => 'AdminRefunds' },
     stock: { label: 'stok', route: () => 'AdminStock' },
     security: { label: 'keamanan', route: () => 'AdminProfile' },
+    access: { label: 'role dan izin', route: () => 'AdminRoles' },
     draft: { label: 'draf konten', route: () => 'AdminMarketingDrafts' },
+    customer_block: { label: 'blokir pelanggan', route: () => 'AdminCustomerBlocks' },
 };
 
 const router = useRouter();

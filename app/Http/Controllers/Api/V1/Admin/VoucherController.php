@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Http\Requests\Admin\VoucherRequest;
 use App\Models\Voucher;
 use App\Services\PromoService;
+use App\Services\VoucherService;
 use App\Traits\ApiResponse;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -14,7 +15,7 @@ class VoucherController extends Controller
 {
     use ApiResponse;
 
-    public function __construct(private PromoService $promo) {}
+    public function __construct(private PromoService $promo, private VoucherService $vouchers) {}
 
     public function index(Request $request): JsonResponse
     {
@@ -22,9 +23,12 @@ class VoucherController extends Controller
 
         $page = Voucher::withCount('claims')->when($search !== '', fn ($query) => $query->where('code', 'like', "%{$search}%"))
             ->when(in_array($request->query('type'), ['percent', 'fixed'], true), fn ($query) => $query->where('type', $request->query('type')))
+            ->when(in_array($request->query('kind'), [Voucher::KIND_ORDER, Voucher::KIND_SHIPPING], true), fn ($query) => $query->where('kind', $request->query('kind')))
             ->when($request->query('is_active') !== null && $request->query('is_active') !== '', fn ($query) => $query->where('is_active', $request->boolean('is_active')))
             ->orderByDesc('id')
             ->paginate($this->perPage($request));
+        // Terpakai dari anggaran (D-126): potongan pesanan yang tidak batal.
+        $page->getCollection()->each(fn (Voucher $voucher) => $voucher->setAttribute('spent', $this->vouchers->spent($voucher)));
 
         return $this->success('Vouchers retrieved.', [
             'items' => $page->items(),
