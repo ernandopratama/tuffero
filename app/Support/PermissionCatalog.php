@@ -80,7 +80,7 @@ class PermissionCatalog
         'marketing_drafts.view' => ['Konten dan marketing', 'Lihat draf konten'],
         'marketing_drafts.manage' => ['Konten dan marketing', 'Susun draf konten'],
         'marketing_drafts.approve' => ['Konten dan marketing', 'Putuskan draf konten'],
-        'terms.manage' => ['Konten dan marketing', 'Kelola Syarat dan Ketentuan'],
+        'terms.manage' => ['Konten dan marketing', 'Kelola Syarat dan Ketentuan dan Kebijakan Privasi'],
 
         'faqs.manage' => ['Customer Service', 'Kelola FAQ chat'],
         'templates.manage' => ['Customer Service', 'Kelola template balasan'],
@@ -92,6 +92,7 @@ class PermissionCatalog
 
         'reports.view' => ['Laporan', 'Lihat laporan lengkap'],
         'reports.view_summary' => ['Laporan', 'Lihat ringkasan laporan'],
+        'reports.export' => ['Laporan', 'Ekspor penjualan untuk finance'],
     ];
 
     public static function isSystem(string $permission): bool

@@ -38,12 +38,14 @@ class AdminWarehouseTest extends TestCase
     {
         $admin = $this->staff('super-admin');
         $warehouse = $this->warehouse();
+        // Seeder kini mengisi alamat dan kode pos bawaan; tes ini memulai dari gudang yang belum siap kirim.
+        $warehouse->update(['address' => null, 'postal_code' => null, 'phone' => null]);
 
         $this->actingAs($admin)->getJson('/api/v1/admin/warehouses')->assertOk()
             ->assertJsonPath('data.items.0.code', 'MLG')
             ->assertJsonPath('data.items.0.shipping_ready', false);
 
-        $this->actingAs($admin)->patchJson("/api/v1/admin/warehouses/{$warehouse->id}", [
+        $this->actingAs($admin)->patchJson("/api/v1/admin/warehouses/{$warehouse->public_id}", [
             'address' => 'Jl. Contoh No. 1, Malang',
             'postal_code' => '65141',
             'phone' => '081234567890',
@@ -67,7 +69,7 @@ class AdminWarehouseTest extends TestCase
         $user = $this->staff($role);
 
         $this->actingAs($user)->getJson('/api/v1/admin/warehouses')->assertOk()->assertJsonPath('data.items.0.code', 'MLG');
-        $this->actingAs($user)->patchJson("/api/v1/admin/warehouses/{$this->warehouse()->id}", ['name' => 'X'])->assertForbidden();
+        $this->actingAs($user)->patchJson("/api/v1/admin/warehouses/{$this->warehouse()->public_id}", ['name' => 'X'])->assertForbidden();
         $this->assertNotSame('X', $this->warehouse()->name);
     }
 
@@ -81,7 +83,7 @@ class AdminWarehouseTest extends TestCase
     public function test_super_admin_store_admin_and_warehouse_can_edit(string $role): void
     {
         $this->actingAs($this->staff($role))
-            ->patchJson("/api/v1/admin/warehouses/{$this->warehouse()->id}", ['postal_code' => '65141'])
+            ->patchJson("/api/v1/admin/warehouses/{$this->warehouse()->public_id}", ['postal_code' => '65141'])
             ->assertOk();
 
         $this->assertSame('65141', $this->warehouse()->postal_code);
@@ -90,7 +92,7 @@ class AdminWarehouseTest extends TestCase
     public function test_code_cannot_be_changed_and_input_is_validated(): void
     {
         $admin = $this->staff('super-admin');
-        $url = "/api/v1/admin/warehouses/{$this->warehouse()->id}";
+        $url = "/api/v1/admin/warehouses/{$this->warehouse()->public_id}";
 
         $this->actingAs($admin)->patchJson($url, ['code' => 'XXX'])->assertOk();
         $this->assertSame('MLG', $this->warehouse()->code);
@@ -105,14 +107,14 @@ class AdminWarehouseTest extends TestCase
         $admin = $this->staff('super-admin');
         $malang = $this->warehouse();
 
-        $this->actingAs($admin)->patchJson("/api/v1/admin/warehouses/{$malang->id}", ['is_active' => false])->assertJsonValidationErrors('is_active');
+        $this->actingAs($admin)->patchJson("/api/v1/admin/warehouses/{$malang->public_id}", ['is_active' => false])->assertJsonValidationErrors('is_active');
         $this->assertTrue($malang->refresh()->is_active);
 
         $jakarta = Warehouse::create(['code' => 'JKT', 'name' => 'Gudang Jakarta', 'city' => 'Jakarta', 'is_active' => true]);
-        $this->actingAs($admin)->patchJson("/api/v1/admin/warehouses/{$malang->id}", ['is_active' => false])->assertOk();
+        $this->actingAs($admin)->patchJson("/api/v1/admin/warehouses/{$malang->public_id}", ['is_active' => false])->assertOk();
         $this->assertFalse($malang->refresh()->is_active);
 
-        $this->actingAs($admin)->patchJson("/api/v1/admin/warehouses/{$jakarta->id}", ['is_active' => false])->assertJsonValidationErrors('is_active');
+        $this->actingAs($admin)->patchJson("/api/v1/admin/warehouses/{$jakarta->public_id}", ['is_active' => false])->assertJsonValidationErrors('is_active');
     }
 
     public function test_staff_without_mfa_cannot_write(): void
@@ -120,6 +122,6 @@ class AdminWarehouseTest extends TestCase
         $user = User::factory()->create();
         $user->assignRole('super-admin');
 
-        $this->actingAs($user)->patchJson("/api/v1/admin/warehouses/{$this->warehouse()->id}", ['name' => 'X'])->assertForbidden();
+        $this->actingAs($user)->patchJson("/api/v1/admin/warehouses/{$this->warehouse()->public_id}", ['name' => 'X'])->assertForbidden();
     }
 }

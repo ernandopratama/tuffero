@@ -70,7 +70,7 @@ class AutoRefundTest extends TestCase
 
         $this->withSession(["order_access.{$ref}" => true])->postJson("/api/v1/orders/{$ref}/cancellation", ['reason' => 'Salah pesan', 'channel' => 'whatsapp'])->assertCreated();
         $request = Request::latest('id')->firstOrFail();
-        $this->act('customer-service', "cancellations/{$request->id}/validate");
+        $this->act('customer-service', "cancellations/{$request->public_id}/validate");
 
         return $request->fresh();
     }
@@ -90,7 +90,7 @@ class AutoRefundTest extends TestCase
         Http::fake();
         $request = $this->validatedRequest();
 
-        $this->act('store-admin', "cancellations/{$request->id}/approve");
+        $this->act('store-admin', "cancellations/{$request->public_id}/approve");
 
         Http::assertNothingSent();
         $order = Order::findOrFail($request->order_id);
@@ -107,7 +107,7 @@ class AutoRefundTest extends TestCase
         $this->fakeRefund();
         $request = $this->validatedRequest('qris', 'settlement');
 
-        $this->act('store-admin', "cancellations/{$request->id}/approve");
+        $this->act('store-admin', "cancellations/{$request->public_id}/approve");
 
         $order = Order::findOrFail($request->order_id);
         Http::assertSentCount(1);
@@ -124,7 +124,7 @@ class AutoRefundTest extends TestCase
         $this->assertSame('refunded', $order->payment_status);
         $this->assertDatabaseHas('order_status_histories', ['order_id' => $order->id, 'to_status' => 'refunded', 'source' => 'midtrans_refund']);
         $this->assertDatabaseHas('audit_logs', ['action' => 'refund.auto_done']);
-        $this->assertSame((int) $order->total, app(RevenueService::class)->refunded([now()->subDay(), now()->addDay()]), 'Laporan keuangan membaca refunded_at.');
+        $this->assertSame((int) $order->total, app(RevenueService::class)->cancellationRefunds([now()->subDay(), now()->addDay()]), 'Laporan keuangan membaca refunded_at.');
     }
 
     public function test_card_in_capture_state_is_voided_not_refunded(): void
@@ -133,7 +133,7 @@ class AutoRefundTest extends TestCase
         $this->fakeRefund();
         $request = $this->validatedRequest('credit_card', 'capture');
 
-        $this->act('store-admin', "cancellations/{$request->id}/approve");
+        $this->act('store-admin', "cancellations/{$request->public_id}/approve");
 
         Http::assertSentCount(1);
         Http::assertSent(fn ($sent) => str_ends_with($sent->url(), '/cancel'));
@@ -150,7 +150,7 @@ class AutoRefundTest extends TestCase
         ]);
         $request = $this->validatedRequest('credit_card', 'capture');
 
-        $this->act('store-admin', "cancellations/{$request->id}/approve");
+        $this->act('store-admin', "cancellations/{$request->public_id}/approve");
 
         Http::assertSentCount(2);
         $this->assertSame('done', $request->fresh()->auto_refund_status);
@@ -162,7 +162,7 @@ class AutoRefundTest extends TestCase
         $this->fakeRefund();
         $request = $this->validatedRequest('credit_card', 'settlement');
 
-        $this->act('store-admin', "cancellations/{$request->id}/approve");
+        $this->act('store-admin', "cancellations/{$request->public_id}/approve");
 
         Http::assertSentCount(1);
         Http::assertSent(fn ($sent) => str_ends_with($sent->url(), '/refund'));
@@ -174,13 +174,13 @@ class AutoRefundTest extends TestCase
         Http::fake();
         $request = $this->validatedRequest('bank_transfer', 'settlement');
 
-        $this->act('store-admin', "cancellations/{$request->id}/approve");
+        $this->act('store-admin', "cancellations/{$request->public_id}/approve");
 
         Http::assertNothingSent();
         $this->assertSame('refund_pending', Order::findOrFail($request->order_id)->payment_status);
         $this->assertNull($request->fresh()->auto_refund_status);
-        $this->act('store-admin', "cancellations/{$request->id}/auto-refund", 422);
-        $this->act('store-admin', "cancellations/{$request->id}/refunded");
+        $this->act('store-admin', "cancellations/{$request->public_id}/auto-refund", 422);
+        $this->act('store-admin', "cancellations/{$request->public_id}/refunded");
         $this->assertSame(Request::REFUNDED, $request->fresh()->status);
     }
 
@@ -191,7 +191,7 @@ class AutoRefundTest extends TestCase
         $otherStoreAdmin = $this->staff('store-admin');
         $request = $this->validatedRequest('qris');
 
-        $this->act('store-admin', "cancellations/{$request->id}/approve");
+        $this->act('store-admin', "cancellations/{$request->public_id}/approve");
 
         $order = Order::findOrFail($request->order_id);
         $this->assertSame(Order::CANCELLED, $order->status, 'ACC tetap berhasil.');
@@ -210,7 +210,7 @@ class AutoRefundTest extends TestCase
         $this->fakeRefund(['status_code' => '200', 'status_message' => 'ok', 'transaction_status' => 'partial_refund']);
         $request = $this->validatedRequest('qris');
 
-        $this->act('store-admin', "cancellations/{$request->id}/approve");
+        $this->act('store-admin', "cancellations/{$request->public_id}/approve");
 
         $this->assertSame('failed', $request->fresh()->auto_refund_status);
         $this->assertSame('refund_pending', Order::findOrFail($request->order_id)->payment_status);
@@ -222,7 +222,7 @@ class AutoRefundTest extends TestCase
         Http::fake([self::REFUND_URL => Http::sequence()->pushFailedConnection('timeout')]);
         $request = $this->validatedRequest('qris');
 
-        $this->act('store-admin', "cancellations/{$request->id}/approve");
+        $this->act('store-admin', "cancellations/{$request->public_id}/approve");
 
         $this->assertSame('failed', $request->fresh()->auto_refund_status);
         $this->assertSame(Order::CANCELLED, Order::findOrFail($request->order_id)->status);
@@ -236,17 +236,17 @@ class AutoRefundTest extends TestCase
             ->push(['status_code' => '200', 'transaction_status' => 'refund'])]);
         $request = $this->validatedRequest('qris');
 
-        $this->act('store-admin', "cancellations/{$request->id}/approve");
+        $this->act('store-admin', "cancellations/{$request->public_id}/approve");
         $this->assertSame('failed', $request->fresh()->auto_refund_status);
 
-        $this->act('store-admin', "cancellations/{$request->id}/auto-refund");
+        $this->act('store-admin', "cancellations/{$request->public_id}/auto-refund");
         $this->assertSame('done', $request->fresh()->auto_refund_status);
         $this->assertSame(Request::REFUNDED, $request->fresh()->status);
 
         $keys = collect(Http::recorded())->map(fn ($pair) => $pair[0]['refund_key'])->all();
         $this->assertSame([$request->request_number, $request->request_number], $keys);
 
-        $this->act('store-admin', "cancellations/{$request->id}/auto-refund", 422);
+        $this->act('store-admin', "cancellations/{$request->public_id}/auto-refund", 422);
         Http::assertSentCount(2);
     }
 
@@ -255,9 +255,9 @@ class AutoRefundTest extends TestCase
         $this->enable();
         $this->fakeRefund(['status_code' => '500', 'status_message' => 'Insufficient balance']);
         $request = $this->validatedRequest('qris');
-        $this->act('store-admin', "cancellations/{$request->id}/approve");
+        $this->act('store-admin', "cancellations/{$request->public_id}/approve");
 
-        $response = $this->act('store-admin', "cancellations/{$request->id}/auto-refund", 422);
+        $response = $this->act('store-admin', "cancellations/{$request->public_id}/auto-refund", 422);
 
         $this->assertStringContainsString('Insufficient balance', $response->json('errors.request.0'));
         $this->assertSame('refund_pending', Order::findOrFail($request->order_id)->payment_status);
@@ -268,12 +268,12 @@ class AutoRefundTest extends TestCase
         $this->enable();
         $this->fakeRefund(['status_code' => '500', 'status_message' => 'Insufficient balance']);
         $request = $this->validatedRequest('qris');
-        $this->act('store-admin', "cancellations/{$request->id}/approve");
+        $this->act('store-admin', "cancellations/{$request->public_id}/approve");
 
-        $this->act('store-admin', "cancellations/{$request->id}/refunded");
+        $this->act('store-admin', "cancellations/{$request->public_id}/refunded");
         $this->assertSame(Request::REFUNDED, $request->fresh()->status);
 
-        $this->act('store-admin', "cancellations/{$request->id}/auto-refund", 422);
+        $this->act('store-admin', "cancellations/{$request->public_id}/auto-refund", 422);
         Http::assertSentCount(1);
     }
 
@@ -282,11 +282,11 @@ class AutoRefundTest extends TestCase
         $this->enable();
         $this->fakeRefund(['status_code' => '500', 'status_message' => 'Insufficient balance']);
         $request = $this->validatedRequest('qris');
-        $this->act('store-admin', "cancellations/{$request->id}/approve");
+        $this->act('store-admin', "cancellations/{$request->public_id}/approve");
 
-        $this->act('owner', "cancellations/{$request->id}/auto-refund", 403);
-        $this->act('customer-service', "cancellations/{$request->id}/auto-refund", 403);
-        $this->act('warehouse', "cancellations/{$request->id}/auto-refund", 403);
+        $this->act('owner', "cancellations/{$request->public_id}/auto-refund", 403);
+        $this->act('customer-service', "cancellations/{$request->public_id}/auto-refund", 403);
+        $this->act('warehouse', "cancellations/{$request->public_id}/auto-refund", 403);
         Http::assertSentCount(1);
 
         $row = $this->actingAs($this->staff('store-admin'))->getJson('/api/v1/admin/cancellations')->json('data.items.0');
@@ -301,7 +301,7 @@ class AutoRefundTest extends TestCase
         Http::fake();
         $request = $this->validatedRequest('qris');
 
-        $this->act('store-admin', "cancellations/{$request->id}/approve");
+        $this->act('store-admin', "cancellations/{$request->public_id}/approve");
 
         Http::assertNothingSent();
         $this->assertSame('refund_pending', Order::findOrFail($request->order_id)->payment_status);

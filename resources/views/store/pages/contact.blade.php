@@ -80,28 +80,45 @@
 			</div>
 		</section>
 
-		@foreach ($p['legal']['docs'] as $doc)
-			<section id="{{ $doc['id'] }}" class="tf-page-section tf-wrap tf-faq">
-				<div class="tf-head">
-					<p class="tf-eyebrow wow fadeInUp">{{ $p['legal']['eyebrow'] }}</p>
-					<h2 class="tf-h2 tf-h2-tight">{{ $doc['title'] }}</h2>
-					@if ($doc['id'] === 'syarat' && $terms)
-						<p class="tf-legal-version">{{ str_replace(['{version}', '{date}'], [$terms['version'], $terms['date']], $p['legal']['version']) }}</p>
-					@endif
-				</div>
-				<div class="tf-faq-list wow fadeInUp">
-					@foreach ($doc['items'] as [$heading, $body])
-						<details>
-							<summary>{{ $heading }}<svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg></summary>
-							{{-- Baris kosong memisahkan paragraf; teks selalu di-escape (isi S&K dari dashboard adalah teks polos). --}}
-							@foreach (preg_split('/
+		{{-- S&K (kiri) dan Kebijakan Privasi (kanan): dua kartu berdampingan di layar lebar, bertumpuk di HP. Id #syarat dan #privasi tetap jadi anchor. --}}
+		<section class="tf-page-section tf-wrap tf-legal" aria-label="{{ $p['legal']['eyebrow'] }}">
+			@foreach ($p['legal']['docs'] as $doc)
+				<article id="{{ $doc['id'] }}" class="tf-legal-card wow fadeInUp" data-wow-delay="{{ $loop->index * 0.1 }}s">
+					<header class="tf-legal-head">
+						<span class="tf-legal-icon" aria-hidden="true">
+							@if ($doc['id'] === 'privasi')
+								<svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3 5 6v5c0 4.4 2.9 8.3 7 10 4.1-1.7 7-5.6 7-10V6z"/><path d="m9 12 2.2 2.2L15.5 10"/></svg>
+							@else
+								<svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z"/><path d="M14 3v5h5M9 13h6M9 17h6"/></svg>
+							@endif
+						</span>
+						<div class="tf-legal-titles">
+							<p class="tf-eyebrow">{{ $p['legal']['eyebrow'] }}</p>
+							<h2 class="tf-legal-title">{{ $doc['title'] }}</h2>
+						</div>
+					</header>
+					<div class="tf-legal-meta">
+						@if (isset($terms[$doc['id']]))
+							<p class="tf-legal-version">{{ str_replace(['{version}', '{date}'], [$terms[$doc['id']]['version'], $terms[$doc['id']]['date']], $p['legal']['version']) }}</p>
+						@endif
+						<p class="tf-legal-count">{{ str_replace('{n}', count($doc['items']), $p['legal']['count']) }}</p>
+					</div>
+					<div class="tf-legal-list">
+						@foreach ($doc['items'] as [$heading, $body])
+							<details>
+								<summary><span class="tf-legal-num" aria-hidden="true">{{ sprintf('%02d', $loop->iteration) }}</span><span class="tf-legal-q">{{ $heading }}</span><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg></summary>
+								<div class="tf-legal-body">
+									{{-- Baris kosong memisahkan paragraf; teks selalu di-escape (isi dari dashboard adalah teks polos). --}}
+									@foreach (preg_split('/
 {2,}/', $body) as $paragraph)
-								<p>{{ $paragraph }}</p>
-							@endforeach
-						</details>
-					@endforeach
-				</div>
-			</section>
-		@endforeach
+										<p>{{ $paragraph }}</p>
+									@endforeach
+								</div>
+							</details>
+						@endforeach
+					</div>
+				</article>
+			@endforeach
+		</section>
 	</main>
 @endsection

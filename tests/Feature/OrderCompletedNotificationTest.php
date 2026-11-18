@@ -56,11 +56,11 @@ class OrderCompletedNotificationTest extends TestCase
         $order = $this->shippedOrder();
 
         foreach (['warehouse', 'customer-service', 'owner', 'marketing'] as $role) {
-            $this->actingAs($this->staff($role))->postJson("/api/v1/admin/orders/{$order->id}/complete")->assertForbidden();
+            $this->actingAs($this->staff($role))->postJson("/api/v1/admin/orders/{$order->public_ref}/complete")->assertForbidden();
         }
         $this->assertSame(Order::SHIPPED, $order->fresh()->status);
 
-        $this->actingAs($this->staff('store-admin'))->postJson("/api/v1/admin/orders/{$order->id}/complete")->assertOk();
+        $this->actingAs($this->staff('store-admin'))->postJson("/api/v1/admin/orders/{$order->public_ref}/complete")->assertOk();
         $this->assertSame(Order::COMPLETED, $order->fresh()->status);
     }
 
@@ -68,7 +68,7 @@ class OrderCompletedNotificationTest extends TestCase
     {
         $order = $this->shippedOrder();
 
-        $this->actingAs($this->staff('super-admin'))->postJson("/api/v1/admin/orders/{$order->id}/complete")->assertOk();
+        $this->actingAs($this->staff('super-admin'))->postJson("/api/v1/admin/orders/{$order->public_ref}/complete")->assertOk();
     }
 
     public function test_store_admins_and_super_admins_are_notified_except_the_actor(): void
@@ -79,7 +79,7 @@ class OrderCompletedNotificationTest extends TestCase
         $warehouse = $this->staff('warehouse');
         $order = $this->shippedOrder();
 
-        $this->actingAs($actor)->postJson("/api/v1/admin/orders/{$order->id}/complete")->assertOk();
+        $this->actingAs($actor)->postJson("/api/v1/admin/orders/{$order->public_ref}/complete")->assertOk();
 
         $this->assertSame(1, $otherStoreAdmin->notifications()->where('data->event', 'order_completed')->count());
         $this->assertSame(1, $superAdmin->notifications()->where('data->event', 'order_completed')->count());

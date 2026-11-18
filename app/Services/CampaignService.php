@@ -46,7 +46,7 @@ class CampaignService
     public function setImage(Campaign $campaign, UploadedFile $file, User $actor): Campaign
     {
         $old = $campaign->image_path;
-        $path = $this->images->storeWebp($file, "campaigns/{$campaign->id}", 1920);
+        $path = $this->images->storeWebp($file, 'campaigns', 1920);
 
         DB::transaction(function () use ($campaign, $path, $actor) {
             $campaign->forceFill(['image_path' => $path])->save();

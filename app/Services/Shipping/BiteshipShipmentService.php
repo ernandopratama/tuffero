@@ -36,7 +36,7 @@ class BiteshipShipmentService
      * Membuat order di Biteship. Dipanggil di dalam transaksi + kunci baris pesanan oleh OrderStatusService::shipViaBiteship,
      * jadi satu pesanan tidak bisa membuat dua order. reference_id = nomor pesanan (unik di Biteship) sebagai pengaman kedua.
      *
-     * @return array{provider_order_id: string, tracking_id: ?string, waybill_id: ?string, status: string}
+     * @return array{provider_order_id: string, tracking_id: ?string, waybill_id: ?string, routing_code: ?string, status: string}
      */
     public function createOrder(Order $order): array
     {
@@ -94,6 +94,8 @@ class BiteshipShipmentService
             'provider_order_id' => (string) $response->json('id'),
             'tracking_id' => $response->json('courier.tracking_id'),
             'waybill_id' => $response->json('courier.waybill_id'),
+            // Kode sortir kurir; sering null. Data dari luar, jadi hanya bentuk kode (huruf, angka, spasi, tanda hubung) yang disimpan.
+            'routing_code' => is_string($code = $response->json('courier.routing_code')) && preg_match('/^[A-Za-z0-9 -]{1,64}$/', trim($code)) ? trim($code) : null,
             'status' => (string) $response->json('status', 'confirmed'),
         ];
     }

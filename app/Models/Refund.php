@@ -20,6 +20,12 @@ use Illuminate\Database\Eloquent\Relations\MorphMany;
 #[Hidden(['idempotency_key', 'ip_address', 'user_agent'])]
 class Refund extends Model
 {
+    /** Rute admin `{refund}` memakai UUID `public_ref`, bukan ID angka (D-143). Bukan token akses. */
+    public function getRouteKeyName(): string
+    {
+        return 'public_ref';
+    }
+
     public const SUBMITTED = 'submitted';
 
     public const AWAITING_EVIDENCE = 'awaiting_evidence';

@@ -52,8 +52,8 @@ class AdminCustomerTest extends TestCase
         $customer = $this->customer();
 
         $this->actingAs($staff)->getJson('/api/v1/admin/customers')->assertStatus($canView ? 200 : 403);
-        $this->actingAs($staff)->getJson("/api/v1/admin/customers/{$customer->id}")->assertStatus($canView ? 200 : 403);
-        $this->actingAs($staff)->patchJson("/api/v1/admin/customers/{$customer->id}", ['is_active' => false])->assertStatus($canDeactivate ? 200 : 403);
+        $this->actingAs($staff)->getJson("/api/v1/admin/customers/{$customer->public_id}")->assertStatus($canView ? 200 : 403);
+        $this->actingAs($staff)->patchJson("/api/v1/admin/customers/{$customer->public_id}", ['is_active' => false])->assertStatus($canDeactivate ? 200 : 403);
 
         $this->assertSame(! $canDeactivate, $customer->fresh()->is_active);
     }
@@ -63,7 +63,7 @@ class AdminCustomerTest extends TestCase
         $customer = $this->customer();
         DB::table('customer_addresses')->insert(['user_id' => $customer->id, 'label' => 'Rumah', 'recipient_name' => 'A', 'phone' => '081234567890', 'street' => 'Jl. A', 'district' => 'B', 'city' => 'Malang', 'province' => 'Jawa Timur', 'postal_code' => '65111', 'is_default' => true, 'created_at' => now(), 'updated_at' => now()]);
 
-        $this->actingAs($this->staff('super-admin'))->deleteJson("/api/v1/admin/customers/{$customer->id}")->assertOk();
+        $this->actingAs($this->staff('super-admin'))->deleteJson("/api/v1/admin/customers/{$customer->public_id}")->assertOk();
 
         $this->assertDatabaseMissing('users', ['id' => $customer->id]);
         $this->assertDatabaseMissing('customer_addresses', ['user_id' => $customer->id]);
@@ -81,7 +81,7 @@ class AdminCustomerTest extends TestCase
             'payment_status' => 'paid', 'shipping_status' => 'delivered', 'subtotal' => 1000, 'shipping_fee' => 0, 'total' => 1000, 'created_at' => now(), 'updated_at' => now(),
         ]);
 
-        $this->actingAs($this->staff('super-admin'))->deleteJson("/api/v1/admin/customers/{$customer->id}")->assertUnprocessable();
+        $this->actingAs($this->staff('super-admin'))->deleteJson("/api/v1/admin/customers/{$customer->public_id}")->assertUnprocessable();
 
         $this->assertDatabaseHas('users', ['id' => $customer->id]);
         $this->assertSame(0, AuditLog::where('action', 'customer.deleted')->count());
@@ -92,8 +92,8 @@ class AdminCustomerTest extends TestCase
         $owner = $this->staff('owner');
         $customer = $this->customer();
 
-        $this->actingAs($owner)->deleteJson("/api/v1/admin/customers/{$customer->id}")->assertForbidden();
-        $this->actingAs($this->staff('super-admin'))->deleteJson("/api/v1/admin/customers/{$owner->id}")->assertNotFound();
+        $this->actingAs($owner)->deleteJson("/api/v1/admin/customers/{$customer->public_id}")->assertForbidden();
+        $this->actingAs($this->staff('super-admin'))->deleteJson("/api/v1/admin/customers/{$owner->public_id}")->assertNotFound();
 
         $this->assertDatabaseHas('users', ['id' => $customer->id]);
         $this->assertDatabaseHas('users', ['id' => $owner->id]);
@@ -115,7 +115,7 @@ class AdminCustomerTest extends TestCase
 
         $this->actingAs($admin)->getJson('/api/v1/admin/customers?is_active=0')
             ->assertJsonPath('data.meta.total', 1)
-            ->assertJsonPath('data.items.0.id', $inactive->id);
+            ->assertJsonPath('data.items.0.id', $inactive->public_id);
     }
 
     public function test_list_contains_customers_only_and_searches_phone(): void
@@ -125,11 +125,11 @@ class AdminCustomerTest extends TestCase
         $other = $this->customer(['phone' => '+628110000008']);
 
         $items = collect($this->actingAs($admin)->getJson('/api/v1/admin/customers')->assertOk()->json('data.items'));
-        $this->assertEqualsCanonicalizing([$customer->id, $other->id], $items->pluck('id')->all());
+        $this->assertEqualsCanonicalizing([$customer->public_id, $other->public_id], $items->pluck('id')->all());
 
         $this->actingAs($admin)->getJson('/api/v1/admin/customers?search=0000008')
             ->assertJsonPath('data.meta.total', 1)
-            ->assertJsonPath('data.items.0.id', $other->id);
+            ->assertJsonPath('data.items.0.id', $other->public_id);
     }
 
     public function test_staff_accounts_are_not_reachable_as_customers(): void
@@ -137,8 +137,8 @@ class AdminCustomerTest extends TestCase
         $admin = $this->staff('owner');
         $staff = $this->staff('warehouse');
 
-        $this->actingAs($admin)->getJson("/api/v1/admin/customers/{$staff->id}")->assertNotFound();
-        $this->actingAs($admin)->patchJson("/api/v1/admin/customers/{$staff->id}", ['is_active' => false])->assertNotFound();
+        $this->actingAs($admin)->getJson("/api/v1/admin/customers/{$staff->public_id}")->assertNotFound();
+        $this->actingAs($admin)->patchJson("/api/v1/admin/customers/{$staff->public_id}", ['is_active' => false])->assertNotFound();
         $this->assertTrue($staff->fresh()->is_active);
     }
 
@@ -148,7 +148,7 @@ class AdminCustomerTest extends TestCase
         $customer = $this->customer();
         $customer->addresses()->create(['label' => 'Rumah', 'recipient_name' => 'Budi', 'phone' => '+628110000009', 'street' => 'Jl. Uji 1', 'district' => 'Klojen', 'city' => 'Malang', 'province' => 'Jawa Timur', 'postal_code' => '65111']);
 
-        $response = $this->actingAs($admin)->getJson("/api/v1/admin/customers/{$customer->id}")
+        $response = $this->actingAs($admin)->getJson("/api/v1/admin/customers/{$customer->public_id}")
             ->assertOk()
             ->assertJsonPath('data.addresses.0.street', 'Jl. Uji 1');
 
@@ -165,7 +165,7 @@ class AdminCustomerTest extends TestCase
         $customer = $this->customer();
         DB::table('sessions')->insert(['id' => 'sesi-pelanggan', 'user_id' => $customer->id, 'payload' => '', 'last_activity' => now()->getTimestamp()]);
 
-        $this->actingAs($admin)->patchJson("/api/v1/admin/customers/{$customer->id}", [
+        $this->actingAs($admin)->patchJson("/api/v1/admin/customers/{$customer->public_id}", [
             'is_active' => false,
             'email' => 'penyerang@tuffero.test',
             'phone' => '+628110000007',
@@ -185,7 +185,7 @@ class AdminCustomerTest extends TestCase
         $admin = User::factory()->create(['mfa_totp_confirmed_at' => null])->assignRole('owner');
         $customer = $this->customer();
 
-        $this->actingAs($admin)->patchJson("/api/v1/admin/customers/{$customer->id}", ['is_active' => false])->assertForbidden();
+        $this->actingAs($admin)->patchJson("/api/v1/admin/customers/{$customer->public_id}", ['is_active' => false])->assertForbidden();
         $this->assertTrue($customer->fresh()->is_active);
     }
 }

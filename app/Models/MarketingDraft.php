@@ -2,11 +2,13 @@
 
 namespace App\Models;
 
+use App\Models\Concerns\HasPublicId;
 use Carbon\CarbonInterface;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Casts\Attribute;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\SoftDeletes;
 
 /**
@@ -18,10 +20,11 @@ use Illuminate\Database\Eloquent\SoftDeletes;
  * @property CarbonInterface|null $reviewed_at
  * @property CarbonInterface|null $posted_at
  */
-// status, penulis, dan kolom keputusan tidak fillable: hanya berubah lewat MarketingDraftService.
-#[Fillable(['type', 'platform', 'title', 'body', 'sources', 'source_period', 'scheduled_on'])]
+// status, penulis, kolom keputusan, dan storyboard tidak fillable: hanya berubah lewat MarketingDraftService dan StoryboardGenerator.
+#[Fillable(['type', 'platform', 'title', 'body', 'sources', 'source_period', 'scheduled_on', 'duration_seconds', 'music_note', 'visual_mode'])]
 class MarketingDraft extends Model
 {
+    use HasPublicId;
     use SoftDeletes;
 
     public const DRAFT = 'draft';
@@ -47,10 +50,43 @@ class MarketingDraft extends Model
     /** Draf hanya boleh disunting saat belum diajukan atau setelah ditolak. */
     public const EDITABLE = [self::DRAFT, self::REJECTED];
 
+    /** Status storyboard otomatis untuk draf skrip video. */
+    public const STORYBOARD_PENDING = 'pending';
+
+    public const STORYBOARD_READY = 'ready';
+
+    public const STORYBOARD_FAILED = 'failed';
+
+    /** Mode AI penuh menunggu foto acuan cukup; AI belum dipanggil. */
+    public const STORYBOARD_WAITING = 'waiting';
+
+    /** Sumber visual video: foto/rekaman tim (bawaan) atau dibuat AI sepenuhnya dari foto acuan produk asli. */
+    public const VISUAL_MODES = ['team' => 'Foto/rekaman tim', 'ai' => 'Dibuat AI sepenuhnya'];
+
+    /** Mode AI penuh wajib minimal 2 foto acuan supaya tampilan produk mengikuti produk asli. */
+    public const MIN_AI_REFERENCES = 2;
+
+    /** Pilihan durasi video (detik); kosong berarti 30 detik. */
+    public const DURATIONS = [15, 30, 60];
+
+    public const MAX_REFERENCES = 6;
+
     /** @return array<string, string> */
     protected function casts(): array
     {
-        return ['scheduled_on' => 'date', 'submitted_at' => 'datetime', 'reviewed_at' => 'datetime', 'posted_at' => 'datetime'];
+        return ['scheduled_on' => 'date', 'submitted_at' => 'datetime', 'reviewed_at' => 'datetime', 'posted_at' => 'datetime', 'storyboard' => 'array', 'storyboard_at' => 'datetime'];
+    }
+
+    /** @return HasMany<MarketingDraftReference, $this> */
+    public function references(): HasMany
+    {
+        return $this->hasMany(MarketingDraftReference::class)->orderBy('id');
+    }
+
+    /** @return HasMany<MarketingDraftNote, $this> */
+    public function notes(): HasMany
+    {
+        return $this->hasMany(MarketingDraftNote::class)->orderBy('id');
     }
 
     /** Draf ditempel manual ke Instagram/TikTok yang tidak membaca Markdown, jadi tandanya dibuang saat disimpan. */

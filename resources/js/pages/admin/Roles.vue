@@ -173,7 +173,7 @@ function submitForm() {
         return;
     }
     if (form.kind === 'role') {
-        const base = roles.value.find((r) => r.id === Number(form.copyFrom));
+        const base = roles.value.find((r) => r.id === form.copyFrom);
         const perms = (base?.permissions || []).filter((n) => !byName.value[n]?.super_admin_only);
         const name = form.name.trim();
         ask({

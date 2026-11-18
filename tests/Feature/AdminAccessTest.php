@@ -260,4 +260,22 @@ class AdminAccessTest extends TestCase
         $this->assertSame('user.created', AuditLog::where('auditable_id', $user->id)->value('action'));
         $this->assertStringNotContainsString(self::PASSWORD, (string) json_encode(AuditLog::first()?->changes));
     }
+
+    public function test_create_account_command_can_create_an_owner_and_rejects_other_roles(): void
+    {
+        $this->artisan('admin:create-super-admin', ['email' => 'pemilik@example.com', 'name' => 'Akun Pemilik', '--role' => 'owner'])
+            ->expectsQuestion('Password (minimal 12 karakter, huruf besar, huruf kecil, angka)', self::PASSWORD)
+            ->assertSuccessful();
+
+        $owner = User::where('email', 'pemilik@example.com')->firstOrFail();
+        $this->assertTrue($owner->hasRole('owner'));
+        $this->assertFalse($owner->hasRole('super-admin'));
+        $this->assertTrue($owner->mfa_required);
+
+        $this->artisan('admin:create-super-admin', ['email' => 'toko@example.com', 'name' => 'Akun Toko', '--role' => 'store-admin'])
+            ->expectsQuestion('Password (minimal 12 karakter, huruf besar, huruf kecil, angka)', self::PASSWORD)
+            ->assertFailed();
+
+        $this->assertDatabaseMissing('users', ['email' => 'toko@example.com']);
+    }
 }

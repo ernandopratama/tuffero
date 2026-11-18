@@ -222,7 +222,7 @@ Isi tanpa sumber';
 
 class FakeMarketingModel implements MarketingModel
 {
-    /** @var list<array{system: string, prompt: string, search: bool}> */
+    /** @var list<array{system: string, prompt: string, search: bool, images: list<array{media_type: string, data: string}>}> */
     public array $calls = [];
 
     public string $text = '{"title": "Judul AI", "body": "Isi caption AI"}';
@@ -232,9 +232,9 @@ class FakeMarketingModel implements MarketingModel
 
     public ?MarketingModelException $failure = null;
 
-    public function generate(string $system, string $prompt, bool $search): array
+    public function generate(string $system, string $prompt, bool $search, array $images = []): array
     {
-        $this->calls[] = ['system' => $system, 'prompt' => $prompt, 'search' => $search];
+        $this->calls[] = ['system' => $system, 'prompt' => $prompt, 'search' => $search, 'images' => $images];
 
         if ($this->failure) {
             throw $this->failure;

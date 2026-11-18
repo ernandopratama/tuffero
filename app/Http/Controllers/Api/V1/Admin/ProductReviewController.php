@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Api\V1\Admin;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Admin\ProductReviewRequest;
 use App\Models\AuditLog;
+use App\Models\Product;
 use App\Models\ProductReview;
 use App\Traits\ApiResponse;
 use Illuminate\Http\JsonResponse;
@@ -18,19 +19,19 @@ class ProductReviewController extends Controller
 {
     use ApiResponse;
 
-    private const FIELDS = ['id', 'product_id', 'author_name', 'rating', 'body', 'is_published', 'created_at'];
+    private const FIELDS = ['author_name', 'rating', 'body', 'is_published', 'created_at'];
 
     /** @return array<string, mixed> */
     private function present(ProductReview $review): array
     {
-        return [...$review->only(self::FIELDS), 'product_name' => $review->product?->name, 'from_order' => $review->order_item_id !== null];
+        return ['id' => $review->public_id, ...$review->only(self::FIELDS), 'product_id' => $review->product?->public_id, 'product_name' => $review->product?->name, 'from_order' => $review->order_item_id !== null];
     }
 
     public function index(Request $request): JsonResponse
     {
         $search = $request->string('search')->trim()->toString();
 
-        $page = ProductReview::with('product:id,name')
+        $page = ProductReview::with('product:id,public_id,name')
             ->when($search !== '', fn ($query) => $query->where(fn ($inner) => $inner
                 ->where('author_name', 'like', "%{$search}%")
                 ->orWhere('body', 'like', "%{$search}%")
@@ -49,7 +50,11 @@ class ProductReviewController extends Controller
     public function store(ProductReviewRequest $request): JsonResponse
     {
         $review = DB::transaction(function () use ($request) {
-            $review = ProductReview::create($request->validated())->refresh();
+            // Produk dipilih lewat ID publik; disimpan sebagai foreign key angka.
+            $review = new ProductReview($request->safe()->except('product_id'));
+            $review->product_id = (int) Product::where('public_id', $request->validated('product_id'))->value('id');
+            $review->save();
+            $review->refresh();
             AuditLog::record('product_review.created', $review, ['product_id' => $review->product_id, 'rating' => $review->rating], $request->user()->id);
 
             return $review;

@@ -12,6 +12,7 @@ use Database\Seeders\DatabaseSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Http;
+use PHPUnit\Framework\Attributes\DataProvider;
 use Tests\TestCase;
 
 class BiteshipShipmentTest extends TestCase
@@ -58,22 +59,62 @@ class BiteshipShipmentTest extends TestCase
         return $order->fresh();
     }
 
-    private function fakeCreate(): void
+    private function fakeCreate(?string $routing = null, string $id = 'bt-order-1'): void
     {
         Http::fake(['api.biteship.com/v1/orders' => Http::response([
-            'success' => true, 'id' => 'bt-order-1', 'status' => 'confirmed',
-            'courier' => ['tracking_id' => 'trk-1', 'waybill_id' => 'WYB-1', 'company' => 'jnt', 'type' => 'ez'],
+            'success' => true, 'id' => $id, 'status' => 'confirmed',
+            'courier' => ['tracking_id' => 'trk-1', 'waybill_id' => 'WYB-1', 'company' => 'jnt', 'type' => 'ez', 'routing_code' => $routing],
         ])]);
     }
 
     private function ship(Order $order, int $status = 200): void
     {
-        $this->actingAs($this->staff())->postJson("/api/v1/admin/orders/{$order->id}/ship", [])->assertStatus($status);
+        $this->actingAs($this->staff())->postJson("/api/v1/admin/orders/{$order->public_ref}/ship", [])->assertStatus($status);
     }
 
     private function webhook(array $body, ?string $secret = 'hook-secret', int $status = 200): void
     {
         $this->postJson('/api/v1/webhooks/biteship', $body, $secret ? ['X-Biteship-Secret' => $secret] : [])->assertStatus($status);
+    }
+
+    public function test_the_courier_routing_code_is_kept_only_when_it_is_a_plain_code_and_shows_on_the_label(): void
+    {
+        $this->fakeCreate('351-BDO80A-04C');
+        $order = $this->processingOrder();
+        $this->ship($order);
+
+        $this->assertDatabaseHas('shipments', ['order_id' => $order->id, 'routing_code' => '351-BDO80A-04C']);
+        $this->actingAs($this->staff())->getJson("/api/v1/admin/orders/{$order->public_ref}/label")->assertOk()->assertJsonPath('data.routing_code', '351-BDO80A-04C');
+    }
+
+    /** @return array<string, array{0: ?string}> */
+    public static function oddRoutingCodes(): array
+    {
+        return ['kosong' => [null], 'berisi tag' => ['<script>x</script>'], 'terlalu panjang' => [str_repeat('A', 65)]];
+    }
+
+    #[DataProvider('oddRoutingCodes')]
+    public function test_a_missing_or_odd_routing_code_is_stored_as_null(?string $value): void
+    {
+        $this->fakeCreate($value);
+        $order = $this->processingOrder();
+        $this->ship($order);
+
+        $this->assertNull($order->refresh()->shipment->routing_code);
+    }
+
+    public function test_the_webhook_secret_is_accepted_only_in_the_header_not_in_the_url(): void
+    {
+        $this->fakeCreate();
+        $order = $this->processingOrder();
+        $this->ship($order);
+        $body = ['event' => 'order.status', 'order_id' => 'bt-order-1', 'status' => 'delivered'];
+
+        $this->postJson('/api/v1/webhooks/biteship?secret=hook-secret', $body)->assertForbidden();
+        $this->assertSame('confirmed', $order->refresh()->shipment->status);
+
+        $this->postJson('/api/v1/webhooks/biteship', $body, ['X-Biteship-Secret' => 'hook-secret'])->assertOk();
+        $this->assertSame('delivered', $order->refresh()->shipment->status);
     }
 
     public function test_ship_without_waybill_creates_one_biteship_order_with_automatic_waybill(): void
@@ -106,7 +147,7 @@ class BiteshipShipmentTest extends TestCase
         $this->assertSame(Order::PROCESSING, $order->fresh()->status);
         $this->assertDatabaseCount('shipments', 0);
 
-        $this->actingAs($this->staff())->postJson("/api/v1/admin/orders/{$order->id}/ship", ['waybill_id' => 'JT123'])->assertOk();
+        $this->actingAs($this->staff())->postJson("/api/v1/admin/orders/{$order->public_ref}/ship", ['waybill_id' => 'JT123'])->assertOk();
         $this->assertDatabaseHas('shipments', ['order_id' => $order->id, 'provider' => 'manual', 'waybill_id' => 'JT123']);
     }
 

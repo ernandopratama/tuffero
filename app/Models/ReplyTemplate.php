@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Models\Concerns\HasPublicId;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Model;
 
@@ -11,6 +12,8 @@ use Illuminate\Database\Eloquent\Model;
 #[Fillable(['title', 'body', 'scope', 'sort_order', 'is_active'])]
 class ReplyTemplate extends Model
 {
+    use HasPublicId;
+
     public const ANY = 'any';
 
     public const SCOPES = [self::ANY, 'order', 'refund', 'cancellation'];

@@ -18,11 +18,17 @@ class DiscountController extends Controller
 
     public function store(DiscountRequest $request, ProductVariant $variant): JsonResponse
     {
-        return $this->success('Discount created.', $this->products->createDiscount($variant, $request->validated(), $request->user()), 201);
+        return $this->success('Discount created.', $this->present($this->products->createDiscount($variant, $request->validated(), $request->user())), 201);
     }
 
     public function update(DiscountRequest $request, VariantDiscount $discount): JsonResponse
     {
-        return $this->success('Discount updated.', $this->products->updateDiscount($discount, $request->validated(), $request->user()));
+        return $this->success('Discount updated.', $this->present($this->products->updateDiscount($discount, $request->validated(), $request->user())));
+    }
+
+    /** ID publik saja; ID angka diskon dan varian tidak dikirim ke admin (D-143). @return array<string, mixed> */
+    private function present(VariantDiscount $discount): array
+    {
+        return ['id' => $discount->public_id, 'variant_id' => $discount->variant?->public_id] + $discount->only(['audience', 'type', 'value', 'starts_at', 'ends_at', 'is_active']);
     }
 }

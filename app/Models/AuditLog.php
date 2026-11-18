@@ -2,13 +2,17 @@
 
 namespace App\Models;
 
+use App\Models\Concerns\HasPublicId;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\MorphTo;
 
 #[Fillable(['actor_user_id', 'action', 'auditable_type', 'auditable_id', 'changes', 'ip_address', 'user_agent'])]
 class AuditLog extends Model
 {
+    use HasPublicId;
+
     public const UPDATED_AT = null;
 
     /**
@@ -64,5 +68,15 @@ class AuditLog extends Model
         return [
             'changes' => 'array',
         ];
+    }
+
+    /**
+     * Data sasaran log; dipakai untuk menampilkan ID publiknya (D-143). Kosong bila datanya sudah dihapus.
+     *
+     * @return MorphTo<Model, $this>
+     */
+    public function auditable(): MorphTo
+    {
+        return $this->morphTo();
     }
 }

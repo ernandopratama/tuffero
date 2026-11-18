@@ -90,7 +90,7 @@ class BiteshipCancelTest extends TestCase
     private function readyForFinal(Order $order): Request
     {
         $request = $this->request($order);
-        $this->act('customer-service', "cancellations/{$request->id}/validate");
+        $this->act('customer-service', "cancellations/{$request->public_id}/validate");
 
         return $request->fresh();
     }
@@ -106,7 +106,7 @@ class BiteshipCancelTest extends TestCase
         $this->fakeCancel();
         $request = $this->readyForFinal($order);
 
-        $this->act('store-admin', "cancellations/{$request->id}/approve");
+        $this->act('store-admin', "cancellations/{$request->public_id}/approve");
 
         Http::assertSentCount(1);
         Http::assertSent(fn ($sent) => str_ends_with($sent->url(), '/v1/orders/bt-order-1/cancel')
@@ -125,7 +125,7 @@ class BiteshipCancelTest extends TestCase
         $this->fakeCancel(400, ['success' => false, 'code' => 40002053, 'error' => 'Cannot cancel order because order already picked']);
         $request = $this->readyForFinal($order);
 
-        $response = $this->act('store-admin', "cancellations/{$request->id}/approve", 422);
+        $response = $this->act('store-admin', "cancellations/{$request->public_id}/approve", 422);
 
         $this->assertStringContainsString('already picked', $response->json('errors.request.0'));
         $this->assertSame(Request::VALIDATED, $request->fresh()->status);
@@ -141,12 +141,12 @@ class BiteshipCancelTest extends TestCase
         Http::fake([self::CANCEL_URL => Http::sequence()->pushFailedConnection('timeout')->push(['success' => true, 'id' => 'bt-order-1', 'status' => 'cancelled'])]);
         $request = $this->readyForFinal($order);
 
-        $this->act('store-admin', "cancellations/{$request->id}/approve", 422);
+        $this->act('store-admin', "cancellations/{$request->public_id}/approve", 422);
 
         $this->assertSame(Order::PROCESSING, $order->fresh()->status);
         $this->assertSame(Request::VALIDATED, $request->fresh()->status);
 
-        $this->act('store-admin', "cancellations/{$request->id}/approve");
+        $this->act('store-admin', "cancellations/{$request->public_id}/approve");
 
         $this->assertSame(Order::CANCELLED, $order->fresh()->status);
     }
@@ -157,7 +157,7 @@ class BiteshipCancelTest extends TestCase
         $this->fakeCancel(400, ['success' => false, 'code' => 40002053, 'error' => 'Cannot cancel order because order already cancelled']);
         $request = $this->readyForFinal($order);
 
-        $this->act('store-admin', "cancellations/{$request->id}/approve");
+        $this->act('store-admin', "cancellations/{$request->public_id}/approve");
 
         $this->assertSame(Order::CANCELLED, $order->fresh()->status);
         $this->assertSame('cancelled', $order->shipment()->value('status'));
@@ -169,7 +169,7 @@ class BiteshipCancelTest extends TestCase
 
         $manual = $this->processingOrder('manual');
         $request = $this->readyForFinal($manual);
-        $this->act('store-admin', "cancellations/{$request->id}/approve");
+        $this->act('store-admin', "cancellations/{$request->public_id}/approve");
         $this->assertSame(Order::CANCELLED, $manual->fresh()->status);
 
         Http::assertNothingSent();
@@ -181,18 +181,18 @@ class BiteshipCancelTest extends TestCase
         $this->fakeCancel();
         $request = $this->request($order);
 
-        $this->act('store-admin', "cancellations/{$request->id}/courier-cancel", 422);
-        $this->act('customer-service', "cancellations/{$request->id}/validate");
+        $this->act('store-admin', "cancellations/{$request->public_id}/courier-cancel", 422);
+        $this->act('customer-service', "cancellations/{$request->public_id}/validate");
 
-        $this->act('owner', "cancellations/{$request->id}/courier-cancel", 403);
-        $this->act('customer-service', "cancellations/{$request->id}/courier-cancel", 403);
-        $this->act('store-admin', "cancellations/{$request->id}/courier-cancel");
+        $this->act('owner', "cancellations/{$request->public_id}/courier-cancel", 403);
+        $this->act('customer-service', "cancellations/{$request->public_id}/courier-cancel", 403);
+        $this->act('store-admin', "cancellations/{$request->public_id}/courier-cancel");
 
         $this->assertSame('cancelled', $order->shipment()->value('status'));
         $this->assertSame(Order::PROCESSING, $order->fresh()->status, 'Pesanan baru dibatalkan saat ACC.');
-        $this->act('super-admin', "cancellations/{$request->id}/courier-cancel", 422);
+        $this->act('super-admin', "cancellations/{$request->public_id}/courier-cancel", 422);
 
-        $this->act('store-admin', "cancellations/{$request->id}/approve");
+        $this->act('store-admin', "cancellations/{$request->public_id}/approve");
 
         $this->assertSame(Order::CANCELLED, $order->fresh()->status);
         Http::assertSentCount(1);

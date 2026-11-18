@@ -2,12 +2,18 @@
 
 namespace App\Services;
 
+use App\Jobs\GenerateStoryboard;
 use App\Models\AuditLog;
 use App\Models\MarketingDraft;
+use App\Models\MarketingDraftNote;
+use App\Models\MarketingDraftReference;
 use App\Models\Setting;
 use App\Models\User;
 use App\Notifications\StaffEvent;
+use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
 
 /**
@@ -16,7 +22,7 @@ use Illuminate\Validation\ValidationException;
  */
 class MarketingDraftService
 {
-    public function __construct(private StaffNotifier $notifier) {}
+    public function __construct(private StaffNotifier $notifier, private ImageService $images) {}
 
     /** Perpindahan oleh Marketing (`marketing_drafts.manage`): aksi => [status asal, status tujuan]. */
     private const MOVES = [
@@ -37,6 +43,9 @@ class MarketingDraftService
 
             AuditLog::record('marketing_draft.created', $draft, ['title' => $draft->title, 'type' => $draft->type, 'origin' => $origin], $actor?->id);
 
+            // Draf video (termasuk kiriman Hermes hari Senin) langsung dibuatkan naskah dan storyboard di antrean.
+            $this->queueStoryboard($draft);
+
             return $draft->refresh();
         });
     }
@@ -47,13 +56,85 @@ class MarketingDraftService
         return DB::transaction(function () use ($draft, $data, $actor) {
             $draft = MarketingDraft::lockForUpdate()->findOrFail($draft->id);
             $this->guard($draft, MarketingDraft::EDITABLE, 'Draf yang sedang ditinjau atau sudah disetujui tidak bisa diubah. Tarik kembali dulu.');
+            $this->reopenIfRejected($draft);
 
-            // Draf yang ditolak kembali menjadi draf setelah disunting; catatan keputusan lama dibuang.
-            if ($draft->status === MarketingDraft::REJECTED) {
-                $draft->forceFill(['status' => MarketingDraft::DRAFT, 'reviewed_by_user_id' => null, 'reviewed_at' => null, 'review_note' => null]);
+            $before = $draft->only(['type', 'duration_seconds', 'music_note', 'visual_mode']);
+            AuditLog::saveWithAudit($draft, $data, 'marketing_draft.updated', $actor);
+
+            // Susun ulang hanya bila yang memengaruhi storyboard berubah, atau draf video ini belum punya storyboard.
+            if ($before !== $draft->only(['type', 'duration_seconds', 'music_note', 'visual_mode']) || $draft->storyboard_status === null) {
+                $this->queueStoryboard($draft);
             }
 
-            AuditLog::saveWithAudit($draft, $data, 'marketing_draft.updated', $actor);
+            return $draft->refresh();
+        });
+    }
+
+    /** Catatan tim untuk AI; setiap catatan menyusun ulang storyboard. */
+    public function addNote(MarketingDraft $draft, string $body, User $actor): MarketingDraft
+    {
+        return DB::transaction(function () use ($draft, $body, $actor) {
+            $draft = $this->lockVideoDraft($draft);
+            $draft->notes()->create(['body' => $body, 'user_id' => $actor->id]);
+            AuditLog::record('marketing_draft.note_added', $draft, [], $actor->id);
+            $this->queueStoryboard($draft);
+
+            return $draft->refresh();
+        });
+    }
+
+    /** Catatan boleh diubah atau dihapus Marketing dan Super Admin selama draf masih bisa disunting; storyboard ikut disusun ulang. */
+    public function updateNote(MarketingDraft $draft, MarketingDraftNote $note, string $body, User $actor): MarketingDraft
+    {
+        return DB::transaction(function () use ($draft, $note, $body, $actor) {
+            $draft = $this->lockVideoDraft($draft);
+            $note->update(['body' => $body]);
+            AuditLog::record('marketing_draft.note_updated', $draft, ['note_id' => $note->id], $actor->id);
+            $this->queueStoryboard($draft);
+
+            return $draft->refresh();
+        });
+    }
+
+    public function deleteNote(MarketingDraft $draft, MarketingDraftNote $note, User $actor): MarketingDraft
+    {
+        return DB::transaction(function () use ($draft, $note, $actor) {
+            $draft = $this->lockVideoDraft($draft);
+            $note->delete();
+            AuditLog::record('marketing_draft.note_deleted', $draft, ['note_id' => $note->id], $actor->id);
+            $this->queueStoryboard($draft);
+
+            return $draft->refresh();
+        });
+    }
+
+    /** Foto acuan disimpan ulang sebagai WebP di disk privat (EXIF dan lokasi dibuang), lalu storyboard disusun ulang. */
+    public function addReference(MarketingDraft $draft, UploadedFile $file, User $actor): MarketingDraft
+    {
+        return DB::transaction(function () use ($draft, $file, $actor) {
+            $draft = $this->lockVideoDraft($draft);
+            if ($draft->references()->count() >= MarketingDraft::MAX_REFERENCES) {
+                throw ValidationException::withMessages(['image' => 'Maksimal '.MarketingDraft::MAX_REFERENCES.' foto acuan per draf.']);
+            }
+
+            $path = "marketing-references/{$draft->id}/".Str::random(32).'.webp';
+            Storage::disk('local')->put($path, $this->images->toWebp($file, 1568, 85));
+            $draft->references()->create(['path' => $path, 'uploaded_by_user_id' => $actor->id]);
+            AuditLog::record('marketing_draft.reference_added', $draft, [], $actor->id);
+            $this->queueStoryboard($draft);
+
+            return $draft->refresh();
+        });
+    }
+
+    public function deleteReference(MarketingDraft $draft, MarketingDraftReference $reference, User $actor): MarketingDraft
+    {
+        return DB::transaction(function () use ($draft, $reference, $actor) {
+            $draft = $this->lockVideoDraft($draft);
+            Storage::disk('local')->delete($reference->path);
+            $reference->delete();
+            AuditLog::record('marketing_draft.reference_deleted', $draft, [], $actor->id);
+            $this->queueStoryboard($draft);
 
             return $draft->refresh();
         });
@@ -122,6 +203,43 @@ class MarketingDraftService
         $read = fn (string $key, int $default) => (int) (Setting::where('key', $key)->value('value') ?? $default);
 
         return ['posts_per_week' => $read('marketing.posts_per_week', 3), 'videos_per_week' => $read('marketing.videos_per_week', 2)];
+    }
+
+    private function queueStoryboard(MarketingDraft $draft): void
+    {
+        if ($draft->type !== 'video_script' || ! MarketingGenerator::enabled()) {
+            return;
+        }
+
+        // Mode AI penuh: AI belum dipanggil sampai foto acuan produk asli cukup.
+        if ($draft->visual_mode === 'ai' && $draft->references()->count() < MarketingDraft::MIN_AI_REFERENCES) {
+            $draft->forceFill(['storyboard_status' => MarketingDraft::STORYBOARD_WAITING, 'storyboard_error' => null])->saveQuietly();
+
+            return;
+        }
+
+        $draft->forceFill(['storyboard_status' => MarketingDraft::STORYBOARD_PENDING, 'storyboard_error' => null])->saveQuietly();
+        GenerateStoryboard::dispatch($draft->id)->afterCommit();
+    }
+
+    /** Draf yang ditolak kembali menjadi draf setelah disunting; catatan keputusan lama dibuang. */
+    private function reopenIfRejected(MarketingDraft $draft): void
+    {
+        if ($draft->status === MarketingDraft::REJECTED) {
+            $draft->forceFill(['status' => MarketingDraft::DRAFT, 'reviewed_by_user_id' => null, 'reviewed_at' => null, 'review_note' => null])->save();
+        }
+    }
+
+    private function lockVideoDraft(MarketingDraft $draft): MarketingDraft
+    {
+        $draft = MarketingDraft::lockForUpdate()->findOrFail($draft->id);
+        $this->guard($draft, MarketingDraft::EDITABLE, 'Draf yang sedang ditinjau atau sudah disetujui tidak bisa diubah. Tarik kembali dulu.');
+        if ($draft->type !== 'video_script') {
+            throw ValidationException::withMessages(['type' => 'Foto acuan dan catatan untuk AI hanya untuk draf skrip video.']);
+        }
+        $this->reopenIfRejected($draft);
+
+        return $draft;
     }
 
     /** @param list<string> $allowed */

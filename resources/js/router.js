@@ -16,7 +16,8 @@ const routes = [
     },
     {
         // Label resi untuk dicetak: halaman penuh tanpa kerangka admin.
-        path: '/admin/label/:id(\\d+)',
+        // :id = UUID public_ref pesanan (D-143), bukan ID angka.
+        path: '/admin/label/:id',
         name: 'AdminOrderLabel',
         component: () => import('./pages/admin/OrderLabel.vue'),
         meta: { requiresAuth: true, permission: 'shipments.manage' },
@@ -52,7 +53,7 @@ const routes = [
                 meta: { permission: 'products.view' },
             },
             {
-                path: 'produk/:id(\\d+)',
+                path: 'produk/:id',
                 name: 'AdminProductEdit',
                 component: () => import('./pages/admin/ProductEdit.vue'),
                 meta: { permission: 'products.view', menu: 'AdminProducts' },
@@ -142,6 +143,13 @@ const routes = [
                 meta: { permission: 'terms.manage' },
             },
             {
+                path: 'kebijakan-privasi',
+                name: 'AdminPrivacy',
+                component: () => import('./pages/admin/Terms.vue'),
+                props: { kind: 'privacy' },
+                meta: { permission: 'terms.manage' },
+            },
+            {
                 path: 'refund',
                 name: 'AdminRefunds',
                 component: () => import('./pages/admin/Refunds.vue'),
@@ -190,7 +198,7 @@ const routes = [
                 meta: { permission: 'customers.view' },
             },
             {
-                path: 'pelanggan/:id(\\d+)',
+                path: 'pelanggan/:id',
                 name: 'AdminCustomerDetail',
                 component: () => import('./pages/admin/CustomerDetail.vue'),
                 meta: { permission: 'customers.view', menu: 'AdminCustomers' },

@@ -22,7 +22,8 @@ class OrderReviewController extends Controller
     public function queue(): JsonResponse
     {
         $awaiting = Order::where('status', Order::AWAITING_APPROVAL)->orderBy('review_due_at')->limit(20)
-            ->get(['id', 'order_number', 'customer_name', 'total', 'review_due_at', 'created_at']);
+            ->get(['public_ref', 'order_number', 'customer_name', 'total', 'review_due_at', 'created_at'])
+            ->map(fn (Order $order) => ['id' => $order->public_ref] + $order->only(['order_number', 'customer_name', 'total', 'review_due_at', 'created_at']));
         $flagged = Order::awaitingReview()->where('status', '!=', Order::AWAITING_APPROVAL);
 
         return $this->success('Review queue retrieved.', [

@@ -6,7 +6,7 @@ import OrderLabelSheets from '../../components/OrderLabelSheets.vue';
 import api from '../../utils/api';
 import { apiError } from '../../utils/apiError';
 
-// Label resi untuk satu pesanan (/admin/label/:id) atau banyak sekaligus (/admin/label-massal?ids=1,2,3).
+// Label resi untuk satu pesanan (/admin/label/:id) atau banyak sekaligus (/admin/label-massal?ids=a,b,c). ID = UUID public_ref (D-143).
 // ?print=1 membuka dialog cetak otomatis setelah semua label tampil. Rincian label ada di OrderLabelSheets.
 const BULK_LIMIT = 50;
 const route = useRoute();
@@ -16,9 +16,10 @@ const error = ref('');
 const ready = ref(0);
 const loaded = ref(false);
 
+const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const ids = computed(() => (route.params.id
-    ? [Number(route.params.id)]
-    : [...new Set(String(route.query.ids || '').split(',').map(Number).filter((id) => Number.isInteger(id) && id > 0))].slice(0, BULK_LIMIT)));
+    ? [String(route.params.id)]
+    : [...new Set(String(route.query.ids || '').split(',').map((id) => id.trim()).filter((id) => UUID.test(id)))].slice(0, BULK_LIMIT)));
 const allReady = computed(() => loaded.value && ready.value >= labels.value.length);
 
 const printLabel = () => window.print();

@@ -149,8 +149,8 @@ class AdminOrderTest extends TestCase
         $response = $this->actingAs($this->staff('store-admin'))->getJson('/api/v1/admin/payments')->assertJsonPath('data.items.0.payment_status', 'paid');
 
         $this->assertStringNotContainsString('Budi', $response->getContent());
-        $this->postJson("/api/v1/admin/orders/{$order->id}/pay")->assertStatus(405);
-        $this->patchJson("/api/v1/admin/orders/{$order->id}", ['payment_status' => 'paid', 'status' => 'paid'])->assertStatus(405);
+        $this->postJson("/api/v1/admin/orders/{$order->public_ref}/pay")->assertStatus(405);
+        $this->patchJson("/api/v1/admin/orders/{$order->public_ref}", ['payment_status' => 'paid', 'status' => 'paid'])->assertStatus(405);
     }
 
     public function test_mark_paid_consumes_stock_once_and_ignores_other_status(): void
@@ -185,10 +185,10 @@ class AdminOrderTest extends TestCase
         $this->actingAs($this->staff('store-admin'));
 
         $rows = collect($this->getJson('/api/v1/admin/orders')->assertOk()->json('data.items'));
-        $this->assertSame('picked', $rows->firstWhere('id', $order->id)['carrier_status']);
-        $this->assertNull($rows->firstWhere('id', $manual->id)['carrier_status']);
+        $this->assertSame('picked', $rows->firstWhere('id', $order->public_ref)['carrier_status']);
+        $this->assertNull($rows->firstWhere('id', $manual->public_ref)['carrier_status']);
 
-        $this->getJson("/api/v1/admin/orders/{$order->id}")
+        $this->getJson("/api/v1/admin/orders/{$order->public_ref}")
             ->assertOk()
             ->assertJsonPath('data.shipment.provider', 'biteship')
             ->assertJsonPath('data.shipment.status', 'picked')
@@ -201,14 +201,14 @@ class AdminOrderTest extends TestCase
         $user = $this->staff('store-admin');
         $this->actingAs($user);
 
-        $this->postJson("/api/v1/admin/orders/{$order->id}/ship", ['waybill_id' => 'JT123'])->assertUnprocessable();
-        $this->postJson("/api/v1/admin/orders/{$order->id}/complete")->assertUnprocessable();
+        $this->postJson("/api/v1/admin/orders/{$order->public_ref}/ship", ['waybill_id' => 'JT123'])->assertUnprocessable();
+        $this->postJson("/api/v1/admin/orders/{$order->public_ref}/complete")->assertUnprocessable();
 
-        $this->postJson("/api/v1/admin/orders/{$order->id}/process")->assertOk();
-        $this->postJson("/api/v1/admin/orders/{$order->id}/process")->assertUnprocessable();
-        $this->postJson("/api/v1/admin/orders/{$order->id}/ship", ['waybill_id' => 'JT123'])->assertOk();
-        $this->postJson("/api/v1/admin/orders/{$order->id}/ship", ['waybill_id' => 'JT124'])->assertOk();
-        $this->postJson("/api/v1/admin/orders/{$order->id}/complete")->assertOk();
+        $this->postJson("/api/v1/admin/orders/{$order->public_ref}/process")->assertOk();
+        $this->postJson("/api/v1/admin/orders/{$order->public_ref}/process")->assertUnprocessable();
+        $this->postJson("/api/v1/admin/orders/{$order->public_ref}/ship", ['waybill_id' => 'JT123'])->assertOk();
+        $this->postJson("/api/v1/admin/orders/{$order->public_ref}/ship", ['waybill_id' => 'JT124'])->assertOk();
+        $this->postJson("/api/v1/admin/orders/{$order->public_ref}/complete")->assertOk();
 
         $order->refresh();
         $this->assertSame(Order::COMPLETED, $order->status);
@@ -223,7 +223,7 @@ class AdminOrderTest extends TestCase
     {
         $order = $this->order();
 
-        $this->actingAs($this->staff('store-admin'))->postJson("/api/v1/admin/orders/{$order->id}/process")->assertUnprocessable();
+        $this->actingAs($this->staff('store-admin'))->postJson("/api/v1/admin/orders/{$order->public_ref}/process")->assertUnprocessable();
     }
 
     /** @return array<string, array{string, string}> */
@@ -244,14 +244,14 @@ class AdminOrderTest extends TestCase
     {
         $order = $this->paidOrder();
 
-        $this->actingAs($this->staff($role))->postJson("/api/v1/admin/orders/{$order->id}/{$action}", ['waybill_id' => 'X1'])->assertForbidden();
+        $this->actingAs($this->staff($role))->postJson("/api/v1/admin/orders/{$order->public_ref}/{$action}", ['waybill_id' => 'X1'])->assertForbidden();
     }
 
     public function test_waybill_format_is_validated(): void
     {
         $order = $this->paidOrder();
 
-        $this->actingAs($this->staff('warehouse'))->postJson("/api/v1/admin/orders/{$order->id}/ship", ['waybill_id' => '<script>'])->assertUnprocessable();
+        $this->actingAs($this->staff('warehouse'))->postJson("/api/v1/admin/orders/{$order->public_ref}/ship", ['waybill_id' => '<script>'])->assertUnprocessable();
     }
 
     public function test_customer_request_requires_access_and_contact_url_has_only_request_number(): void
@@ -291,9 +291,9 @@ class AdminOrderTest extends TestCase
 
         $this->assertSame(2, $this->stock->fresh()->reserved);
 
-        $this->act('store-admin', "cancellations/{$request->id}/approve", [], 422);
-        $this->act('customer-service', "cancellations/{$request->id}/validate");
-        $this->act('store-admin', "cancellations/{$request->id}/approve");
+        $this->act('store-admin', "cancellations/{$request->public_id}/approve", [], 422);
+        $this->act('customer-service', "cancellations/{$request->public_id}/validate");
+        $this->act('store-admin', "cancellations/{$request->public_id}/approve");
 
         $this->assertSame(Request::APPROVED, $request->fresh()->status);
         $this->assertSame(Order::CANCELLED, $order->fresh()->status);
@@ -307,9 +307,9 @@ class AdminOrderTest extends TestCase
         $order = $this->paidOrder();
         $request = $this->cancellation($order);
 
-        $this->act('customer-service', "cancellations/{$request->id}/validate");
+        $this->act('customer-service', "cancellations/{$request->public_id}/validate");
         $this->assertSame(8, $this->stock->fresh()->quantity);
-        $this->act('store-admin', "cancellations/{$request->id}/approve");
+        $this->act('store-admin', "cancellations/{$request->public_id}/approve");
 
         $order->refresh();
         $this->assertSame(Request::APPROVED, $request->fresh()->status);
@@ -318,7 +318,7 @@ class AdminOrderTest extends TestCase
         $this->assertSame(10, $this->stock->fresh()->quantity);
         $this->assertSame('return', $this->stock->movements()->latest('id')->value('type'));
 
-        $this->act('store-admin', "cancellations/{$request->id}/refunded");
+        $this->act('store-admin', "cancellations/{$request->public_id}/refunded");
 
         $this->assertSame(Order::REFUNDED, $order->fresh()->status);
         $this->assertSame('refunded', $order->fresh()->payment_status);
@@ -328,13 +328,13 @@ class AdminOrderTest extends TestCase
     public function test_owner_can_see_cancellations_but_cannot_act_on_them(): void
     {
         $request = $this->cancellation($this->paidOrder());
-        $this->act('customer-service', "cancellations/{$request->id}/validate");
+        $this->act('customer-service', "cancellations/{$request->public_id}/validate");
 
         $owner = $this->staff('owner');
         $this->actingAs($owner)->getJson('/api/v1/admin/cancellations')->assertOk()->assertJsonPath('data.items.0.request_number', $request->request_number);
 
         foreach (['validate', 'approve', 'reject', 'courier-cancel', 'refunded'] as $action) {
-            $this->actingAs($owner)->postJson("/api/v1/admin/cancellations/{$request->id}/{$action}", ['reason' => 'x'])->assertForbidden();
+            $this->actingAs($owner)->postJson("/api/v1/admin/cancellations/{$request->public_id}/{$action}", ['reason' => 'x'])->assertForbidden();
         }
         $this->assertFalse($owner->can('orders.cancel_final'), 'Izin ACC Pemilik sudah dihapus (D-123).');
         $this->assertNotContains('api/v1/admin/cancellations/{cancellation}/final-approve', collect(Route::getRoutes()->getRoutes())->map(fn ($route) => $route->uri())->all(), 'Rute ACC Pemilik sudah dihapus.');
@@ -360,15 +360,15 @@ class AdminOrderTest extends TestCase
     {
         $request = $this->cancellation($this->paidOrder());
 
-        $this->act($role, "cancellations/{$request->id}/{$action}", ['reason' => 'x'], 403);
+        $this->act($role, "cancellations/{$request->public_id}/{$action}", ['reason' => 'x'], 403);
     }
 
     public function test_steps_cannot_be_skipped(): void
     {
         $request = $this->cancellation($this->paidOrder());
 
-        $this->act('store-admin', "cancellations/{$request->id}/approve", [], 422);
-        $this->act('store-admin', "cancellations/{$request->id}/refunded", [], 422);
+        $this->act('store-admin', "cancellations/{$request->public_id}/approve", [], 422);
+        $this->act('store-admin', "cancellations/{$request->public_id}/refunded", [], 422);
     }
 
     public function test_rejection_keeps_order_and_allows_new_request(): void
@@ -376,14 +376,14 @@ class AdminOrderTest extends TestCase
         $order = $this->paidOrder();
         $request = $this->cancellation($order);
 
-        $this->act('customer-service', "cancellations/{$request->id}/reject", [], 422);
-        $this->act('customer-service', "cancellations/{$request->id}/reject", ['reason' => 'Sudah dikemas']);
+        $this->act('customer-service', "cancellations/{$request->public_id}/reject", [], 422);
+        $this->act('customer-service', "cancellations/{$request->public_id}/reject", ['reason' => 'Sudah dikemas']);
 
         $this->assertSame(Request::REJECTED, $request->fresh()->status);
         $this->assertSame(Order::PAID, $order->fresh()->status);
         $this->assertSame(8, $this->stock->fresh()->quantity);
 
-        $this->act('customer-service', "cancellations/{$request->id}/validate", [], 422);
+        $this->act('customer-service', "cancellations/{$request->public_id}/validate", [], 422);
         $this->cancellation($order);
     }
 
@@ -392,20 +392,20 @@ class AdminOrderTest extends TestCase
         $order = $this->paidOrder();
         $request = $this->cancellation($order);
 
-        $this->act('warehouse', "orders/{$order->id}/process", [], 422);
+        $this->act('warehouse', "orders/{$order->public_ref}/process", [], 422);
 
-        $this->act('customer-service', "cancellations/{$request->id}/reject", ['reason' => 'Batal ajukan']);
-        $this->act('warehouse', "orders/{$order->id}/process");
+        $this->act('customer-service', "cancellations/{$request->public_id}/reject", ['reason' => 'Batal ajukan']);
+        $this->act('warehouse', "orders/{$order->public_ref}/process");
     }
 
     public function test_approval_fails_if_order_already_shipped(): void
     {
         $order = $this->paidOrder();
         $request = $this->cancellation($order);
-        $this->act('customer-service', "cancellations/{$request->id}/validate");
+        $this->act('customer-service', "cancellations/{$request->public_id}/validate");
         $order->forceFill(['status' => Order::SHIPPED])->save();
 
-        $this->act('store-admin', "cancellations/{$request->id}/approve", [], 422);
+        $this->act('store-admin', "cancellations/{$request->public_id}/approve", [], 422);
 
         $this->assertSame(Request::VALIDATED, $request->fresh()->status);
         $this->assertSame(Order::SHIPPED, $order->fresh()->status);
@@ -430,16 +430,16 @@ class AdminOrderTest extends TestCase
     {
         $order = $this->paidOrder();
 
-        $this->actingAs($this->staff('warehouse'))->postJson("/api/v1/admin/orders/{$order->id}/comments", ['body' => 'Sudah dikemas'])->assertCreated();
-        $this->actingAs($this->staff('owner'))->getJson("/api/v1/admin/orders/{$order->id}/comments")->assertJsonCount(1, 'data.comments');
-        $this->actingAs($this->staff('marketing'))->getJson("/api/v1/admin/orders/{$order->id}/comments")->assertForbidden();
+        $this->actingAs($this->staff('warehouse'))->postJson("/api/v1/admin/orders/{$order->public_ref}/comments", ['body' => 'Sudah dikemas'])->assertCreated();
+        $this->actingAs($this->staff('owner'))->getJson("/api/v1/admin/orders/{$order->public_ref}/comments")->assertJsonCount(1, 'data.comments');
+        $this->actingAs($this->staff('marketing'))->getJson("/api/v1/admin/orders/{$order->public_ref}/comments")->assertForbidden();
     }
 
     public function test_detail_contains_history_and_hides_secrets(): void
     {
         $order = $this->paidOrder();
 
-        $this->actingAs($this->staff('customer-service'))->getJson("/api/v1/admin/orders/{$order->id}")
+        $this->actingAs($this->staff('customer-service'))->getJson("/api/v1/admin/orders/{$order->public_ref}")
             ->assertOk()
             ->assertJsonPath('data.customer_email', 'budi@example.com')
             ->assertJsonPath('data.items.0.line_total', 100000)
@@ -454,6 +454,6 @@ class AdminOrderTest extends TestCase
         $user = User::factory()->create(['mfa_totp_confirmed_at' => null]);
         $user->assignRole('warehouse');
 
-        $this->actingAs($user)->postJson("/api/v1/admin/orders/{$order->id}/process")->assertForbidden();
+        $this->actingAs($user)->postJson("/api/v1/admin/orders/{$order->public_ref}/process")->assertForbidden();
     }
 }

@@ -239,16 +239,16 @@ class AdminDashboardTest extends TestCase
         User::factory()->create(['created_at' => now()->subMonths(2)]);
 
         $stats = collect($this->dashboard('owner')['business_stats'])->keyBy('key');
-        // Rata-rata = pendapatan kotor dibagi pesanan dibayar bulan ini (paid_at), termasuk yang kemudian dibatalkan.
-        $everPaid = Order::whereNotNull('paid_at')->get();
-        $this->assertCount(3, $everPaid);
-        $average = (int) round($everPaid->sum('total') / 3);
+        // Rata-rata = pendapatan kotor dibagi pesanan dibayar bulan ini yang tidak dibatalkan (D-131): pesanan batal keluar dari keduanya.
+        $kept = Order::whereNotNull('paid_at')->whereNull('cancelled_at')->get();
+        $this->assertCount(2, $kept);
+        $average = (int) round($kept->sum('total') / 2);
         $this->assertSame('Rp'.number_format($average, 0, ',', '.'), $stats['avg_order']['value']);
         // Dua akun baru bulan ini; akun staf yang dibuat tes tidak dihitung sebagai pelanggan.
         $this->assertSame('2', $stats['new_customers']['value']);
         // Kelompok = 3 pesanan dibayar bulan ini, 1 di antaranya dibatalkan: 33,3% dan tidak pernah lebih dari 100%.
         $this->assertSame('33,3%', $stats['cancel_rate']['value']);
-        $this->assertSame('1 dari 3 pesanan dibayar bulan ini dibatalkan', $stats['cancel_rate']['foot']);
+        $this->assertSame('1 dari 3 pesanan dibayar bulan ini dibatalkan · bulan lalu belum ada pembanding', $stats['cancel_rate']['foot']);
         $this->assertSame('Bulan lalu belum ada pembanding', $stats['avg_order']['foot']);
 
         foreach (['store-admin', 'customer-service', 'warehouse', 'marketing'] as $role) {
@@ -256,7 +256,69 @@ class AdminDashboardTest extends TestCase
         }
 
         // Super Admin memegang izin yang sama dan ikut melihatnya (keputusan pengguna).
-        $this->assertSame(['avg_order', 'new_customers', 'cancel_rate'], collect($this->dashboard('super-admin')['business_stats'])->pluck('key')->all());
+        $this->assertSame(['avg_order', 'new_customers', 'cancel_rate', 'checkout_rate', 'expiry_rate'], collect($this->dashboard('super-admin')['business_stats'])->pluck('key')->all());
+    }
+
+    public function test_checkout_expiry_and_paid_cancel_rates_follow_approved_definitions(): void
+    {
+        $this->travelTo(CarbonImmutable::parse('2026-11-10 05:00:00', 'UTC'));
+        $this->beforeApplicationDestroyed(fn () => $this->travelBack());
+
+        // Penyebut nol: tiga kartu tampil "-", tidak galat.
+        $empty = collect($this->dashboard('owner')['business_stats'])->keyBy('key');
+        foreach (['cancel_rate', 'checkout_rate', 'expiry_rate'] as $key) {
+            $this->assertSame('-', $empty[$key]['value'], $key);
+        }
+        $this->assertSame('0 dari 0 dibayar · bulan lalu belum ada pembanding', $empty['checkout_rate']['foot']);
+
+        // Satu pesanan lewat checkout sungguhan (menunggu bayar = terbuka), sisanya salinan dengan status dan waktu yang diatur.
+        $base = Order::findOrFail($this->paidOrder(1)->id);
+        $base->forceFill(['status' => Order::PENDING_PAYMENT, 'payment_status' => 'pending', 'paid_at' => null])->save();
+        $order = function (array $attributes) use ($base): Order {
+            $copy = $base->replicate()->forceFill([
+                'public_ref' => (string) str()->uuid(), 'order_number' => 'T'.str()->upper(str()->random(10)), 'idempotency_key' => str()->random(40),
+            ]);
+            foreach ($attributes as $column => $value) {
+                $copy->{$column} = $value;
+            }
+            $copy->save();
+
+            return $copy;
+        };
+        $paid = ['status' => Order::PAID, 'payment_status' => 'paid', 'paid_at' => now()];
+
+        $order($paid);
+        $order([...$paid, 'status' => Order::CANCELLED, 'payment_status' => 'refund_pending', 'cancelled_at' => now()]); // dibayar lalu batal: tetap dibayar untuk checkout
+        $order(['status' => Order::EXPIRED, 'payment_status' => 'expired']);
+        $order(['status' => Order::CANCELLED, 'payment_status' => 'cancelled', 'cancelled_at' => now()]); // batal sebelum bayar (D-138)
+        $order(['status' => Order::REJECTED, 'payment_status' => 'cancelled', 'cancelled_at' => now()]); // ditolak tinjauan (D-132)
+        $order(['status' => Order::AWAITING_APPROVAL, 'payment_status' => 'pending']); // terbuka
+        // Batas bulan zona Jakarta: 00:00 WIB 1 Nov dan 23:59:59 WIB 30 Nov masuk; 23:59:59 WIB 31 Okt dan 00:00 WIB 1 Des tidak.
+        $order(['status' => Order::EXPIRED, 'payment_status' => 'expired', 'created_at' => CarbonImmutable::parse('2026-10-31 17:00:00', 'UTC')]);
+        $order(['status' => Order::REJECTED, 'payment_status' => 'cancelled', 'created_at' => CarbonImmutable::parse('2026-11-30 16:59:59', 'UTC')]);
+        $order([...$paid, 'created_at' => CarbonImmutable::parse('2026-11-30 17:00:00', 'UTC')]); // dibuat bulan depan, dibayar bulan ini
+        // Bulan lalu: dibuat dan dibayar 23:59:59 WIB 31 Okt.
+        $october = CarbonImmutable::parse('2026-10-31 16:59:59', 'UTC');
+        $order([...$paid, 'created_at' => $october, 'paid_at' => $october]);
+
+        $data = $this->dashboard('owner');
+        $stats = collect($data['business_stats'])->keyBy('key');
+
+        // Dibuat November: 2 dibayar, 2 kedaluwarsa, 1 batal sebelum bayar, 2 ditolak = 7 selesai; 2 terbuka di luar penyebut.
+        $this->assertSame('28,6%', $stats['checkout_rate']['value']);
+        $this->assertSame('2 dari 7 dibayar · bulan lalu 100,0% · 2 masih menunggu', $stats['checkout_rate']['foot']);
+        $this->assertSame('28,6%', $stats['expiry_rate']['value']);
+        $this->assertSame('2 dari 7 kedaluwarsa · bulan lalu 0,0%', $stats['expiry_rate']['foot']);
+
+        // Dibayar November: 3 (termasuk yang dibuat bulan depan), 1 batal. Penyebutnya sama dengan KPI "Pesanan bulan ini".
+        $this->assertSame(3, $this->kpi($data, 'orders_month')['value']);
+        $this->assertSame('33,3%', $stats['cancel_rate']['value']);
+        $this->assertSame('Batal setelah bayar', $stats['cancel_rate']['label']);
+        $this->assertSame('1 dari 3 pesanan dibayar bulan ini dibatalkan · bulan lalu 0,0%', $stats['cancel_rate']['foot']);
+
+        foreach (['store-admin', 'customer-service', 'warehouse', 'marketing'] as $role) {
+            $this->assertSame([], $this->dashboard($role)['business_stats'], $role);
+        }
     }
 
     public function test_net_revenue_subtracts_money_that_actually_left_in_the_month_it_left(): void
@@ -287,7 +349,7 @@ class AdminDashboardTest extends TestCase
         $resend->forceFill(['approved_amount' => 10000, 'customer_choice' => 'resend', 'refunded_at' => now()])->save();
         $this->assertSame($gross - 25000, $kpi()['value']);
 
-        // Pembatalan pesanan terbayar: pesanan tetap ada di kotor bulan asalnya, dana dikurangi di bulan dikembalikannya.
+        // Pembatalan pesanan terbayar (D-131): pesanan keluar dari kotor, dananya tidak dikurangkan lagi dari bersih (tidak dihitung dua kali).
         $order = $first->fresh();
         $order->forceFill(['status' => Order::CANCELLED, 'payment_status' => 'refunded', 'cancelled_at' => now()])->save();
         (new OrderCancellationRequest)->forceFill([
@@ -295,15 +357,16 @@ class AdminDashboardTest extends TestCase
             'reason' => 'Salah pesan', 'channel' => 'email', 'due_at' => now()->addDays(7), 'refunded_at' => now(),
         ])->save();
         $this->assertSame($gross - 25000 - (int) $first->total, $kpi()['value']);
+        $this->assertStringContainsString('dikembalikan Rp25.000', $kpi()['foot']);
 
-        // Bulan depan: pendapatan bulan ini tidak berubah mundur, dana yang dikembalikan bulan itu menjadi miliknya.
+        // Bulan depan: kotor bulan ini tanpa pesanan batal, dana klaim yang dikembalikan bulan itu menjadi miliknya.
         $this->travelTo(CarbonImmutable::parse('2026-12-02 05:00:00', 'UTC'));
         $refund2 = $this->refund($second, Refund::REFUNDED, now()->addDays(3));
         $refund2->forceFill(['approved_amount' => 7000, 'shipping_amount' => 0, 'customer_choice' => 'refund', 'refunded_at' => now()])->save();
         $data = $this->dashboard('owner');
         $chart = collect($data['chart']['series'])->keyBy('key');
-        $this->assertSame($gross, $chart['revenue']['values'][8]);
-        $this->assertSame(25000 + (int) $first->total, $chart['refunded']['values'][8]);
+        $this->assertSame($gross - (int) $first->total, $chart['revenue']['values'][8]);
+        $this->assertSame(25000, $chart['refunded']['values'][8]);
         $this->assertSame(7000, $chart['refunded']['values'][9]);
         $this->assertSame(-7000, $this->kpi($data, 'revenue_month')['value']);
     }
@@ -338,10 +401,10 @@ class AdminDashboardTest extends TestCase
             return collect($this->actingAs($this->staff('owner'))->getJson('/api/v1/admin/dashboard')->assertOk()->json('data.business_stats'))->pluck('key')->all();
         };
 
-        $this->assertSame(['avg_order', 'new_customers', 'cancel_rate'], $keys());
+        $this->assertSame(['avg_order', 'new_customers', 'cancel_rate', 'checkout_rate', 'expiry_rate'], $keys());
 
         // Izin datang dari role, jadi dicabut dari role: hanya tile yang izinnya dicabut yang hilang.
-        $expected = ['payments.view' => ['new_customers', 'cancel_rate'], 'customers.view' => ['avg_order', 'cancel_rate'], 'orders.view' => ['avg_order', 'new_customers']];
+        $expected = ['payments.view' => ['new_customers', 'cancel_rate', 'checkout_rate', 'expiry_rate'], 'customers.view' => ['avg_order', 'cancel_rate', 'checkout_rate', 'expiry_rate'], 'orders.view' => ['avg_order', 'new_customers']];
         foreach ($expected as $permission => $remaining) {
             $role->revokePermissionTo($permission);
             $this->assertSame($remaining, $keys(), $permission);

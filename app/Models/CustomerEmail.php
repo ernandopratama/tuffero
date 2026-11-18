@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Models\Concerns\HasPublicId;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -12,6 +13,8 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 #[Fillable(['sent_by', 'to_masked', 'subject', 'status'])]
 class CustomerEmail extends Model
 {
+    use HasPublicId;
+
     public const UPDATED_AT = null;
 
     public const SENT = 'sent';

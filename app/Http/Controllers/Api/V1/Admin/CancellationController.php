@@ -21,7 +21,7 @@ class CancellationController extends Controller
         $search = $request->string('search')->trim()->toString();
         $status = $request->string('status')->trim()->toString();
 
-        $page = OrderCancellationRequest::with(['order:id,order_number,customer_name,customer_phone,status,payment_status,total', 'order.shipment:id,order_id,provider,status'])
+        $page = OrderCancellationRequest::with(['order:id,public_ref,order_number,customer_name,customer_phone,status,payment_status,total', 'order.shipment:id,order_id,provider,status'])
             ->when($status !== '', fn ($query) => $query->where('status', $status))
             ->when($search !== '', fn ($query) => $query->where(fn ($inner) => $inner
                 ->where('request_number', 'like', "%{$search}%")
@@ -33,8 +33,9 @@ class CancellationController extends Controller
 
         return $this->success('Requests retrieved.', [
             'items' => collect($page->items())->map(fn (OrderCancellationRequest $request) => [
-                ...$request->only(['id', 'request_number', 'reason', 'channel', 'status', 'due_at', 'rejection_reason', 'created_at']),
-                'order_id' => $request->order_id,
+                'id' => $request->public_id,
+                ...$request->only(['request_number', 'reason', 'channel', 'status', 'due_at', 'rejection_reason', 'created_at']),
+                'order_id' => $request->order->public_ref,
                 'order_number' => $request->order->order_number,
                 'customer_name' => $request->order->customer_name,
                 'customer_phone' => $request->order->customer_phone,

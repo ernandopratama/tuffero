@@ -57,12 +57,12 @@ class MarketingReminderTest extends TestCase
         $otherMarketing = $this->staff('marketing');
         $draft = $this->draft('draft');
 
-        $this->actingAs($marketing)->postJson("/api/v1/admin/marketing-drafts/{$draft->id}/move", ['action' => 'submit'])->assertOk();
+        $this->actingAs($marketing)->postJson("/api/v1/admin/marketing-drafts/{$draft->public_id}/move", ['action' => 'submit'])->assertOk();
         $this->assertSame('draft_submitted', $this->notifications($owner)[0]['event']);
         $this->assertSame('draft', $this->notifications($owner)[0]['kind']);
         $this->assertSame([], $this->notifications($marketing));
 
-        $this->actingAs($owner)->postJson("/api/v1/admin/marketing-drafts/{$draft->id}/decide", ['decision' => 'reject', 'note' => 'Terlalu panjang'])->assertOk();
+        $this->actingAs($owner)->postJson("/api/v1/admin/marketing-drafts/{$draft->public_id}/decide", ['decision' => 'reject', 'note' => 'Terlalu panjang'])->assertOk();
         $this->assertSame('draft_decided', $this->notifications($otherMarketing)[0]['event']);
         $this->assertStringContainsString('ditolak', $this->notifications($otherMarketing)[0]['title']);
         $this->assertSame('Terlalu panjang', $this->notifications($otherMarketing)[0]['excerpt']);
@@ -74,7 +74,7 @@ class MarketingReminderTest extends TestCase
         $others = collect(['store-admin', 'customer-service', 'warehouse'])->map(fn ($role) => $this->staff($role));
         $draft = $this->draft('draft');
 
-        $this->actingAs($this->staff('marketing'))->postJson("/api/v1/admin/marketing-drafts/{$draft->id}/move", ['action' => 'submit'])->assertOk();
+        $this->actingAs($this->staff('marketing'))->postJson("/api/v1/admin/marketing-drafts/{$draft->public_id}/move", ['action' => 'submit'])->assertOk();
 
         foreach ($others as $user) {
             $this->assertSame([], $this->notifications($user));
@@ -117,6 +117,7 @@ class MarketingReminderTest extends TestCase
         $this->assertSame(2, $summary['due']);
         $this->assertSame(['Lewat', 'Besok'], array_column($summary['due_items'], 'title'));
         $this->assertTrue($summary['due_items'][0]['overdue']);
+        $this->assertSame(MarketingDraft::where('title', 'Lewat')->value('id'), $summary['due_items'][0]['id']);
         $this->assertFalse($summary['due_items'][1]['overdue']);
         $this->assertSame('2026-11-15', $summary['today']);
     }
@@ -174,7 +175,7 @@ class MarketingReminderTest extends TestCase
         $owner->forceFill(['notification_muted' => ['draft_submitted']])->save();
         $draft = $this->draft('draft');
 
-        $this->actingAs($this->staff('marketing'))->postJson("/api/v1/admin/marketing-drafts/{$draft->id}/move", ['action' => 'submit'])->assertOk();
+        $this->actingAs($this->staff('marketing'))->postJson("/api/v1/admin/marketing-drafts/{$draft->public_id}/move", ['action' => 'submit'])->assertOk();
 
         $this->assertSame([], $this->notifications($owner));
     }

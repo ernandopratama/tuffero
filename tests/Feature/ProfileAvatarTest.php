@@ -4,6 +4,7 @@ namespace Tests\Feature;
 
 use App\Models\AuditLog;
 use App\Models\User;
+use App\Services\ImageService;
 use Database\Seeders\DatabaseSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\UploadedFile;
@@ -43,7 +44,9 @@ class ProfileAvatarTest extends TestCase
         $response = $this->upload(UploadedFile::fake()->image('saya.jpg', 1600, 900))->assertOk();
 
         $path = $user->fresh()->avatar_path;
-        $this->assertStringStartsWith("avatars/{$user->id}/", $path);
+        $this->assertMatchesRegularExpression(ImageService::RANDOM_PATH_PATTERN, $path);
+        $this->assertStringStartsWith('avatars/', $path);
+        $this->assertStringNotContainsString("/{$user->id}/", $path);
         $this->assertStringEndsWith('.webp', $path);
         [$w, $h, $type] = getimagesizefromstring(Storage::disk('public')->get($path));
         $this->assertSame([512, 512, IMAGETYPE_WEBP], [$w, $h, $type]);

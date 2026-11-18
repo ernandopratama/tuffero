@@ -16,6 +16,7 @@ use BaconQrCode\Encoder\Encoder;
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
 
 class OrderController extends Controller
@@ -50,7 +51,8 @@ class OrderController extends Controller
         $repeat = RepeatOrderService::counts($page->getCollection()->pluck('customer_phone'));
 
         return $this->paged('Orders retrieved.', $page, fn (Order $order) => [
-            ...$order->only(['id', 'order_number', 'customer_name', 'status', 'payment_status', 'shipping_status', 'total', 'created_at']),
+            'id' => $order->public_ref,
+            ...$order->only(['order_number', 'customer_name', 'status', 'payment_status', 'shipping_status', 'total', 'created_at']),
             ...RepeatOrderService::present($order->customer_phone, $repeat),
             // Status paket dari Biteship (webhook); null bila belum ada pengiriman atau resi manual.
             'carrier_status' => $order->shipment?->provider === 'biteship' ? $order->shipment->status : null,
@@ -87,8 +89,9 @@ class OrderController extends Controller
         $order->load(['items', 'shipment', 'histories.actor:id,name', 'cancellationRequests', 'reviewer:id,name']);
 
         return $this->success('Order retrieved.', [
+            'id' => $order->public_ref,
             ...$order->only([
-                'id', 'order_number', 'status', 'payment_status', 'shipping_status', 'customer_name', 'customer_email', 'customer_phone',
+                'order_number', 'status', 'payment_status', 'shipping_status', 'customer_name', 'customer_email', 'customer_phone',
                 'shipping_address', 'shipping_courier', 'shipping_service', 'subtotal', 'discount_total', 'shipping_fee', 'shipping_discount', 'shipping_voucher_code', 'total',
                 'expires_at', 'paid_at', 'cancelled_at', 'created_at',
             ]),
@@ -133,7 +136,8 @@ class OrderController extends Controller
             ->paginate($this->perPage($request));
 
         return $this->paged('Fulfillment retrieved.', $page, fn (Order $order) => [
-            ...$order->only(['id', 'order_number', 'status', 'shipping_status', 'shipping_address', 'shipping_courier', 'shipping_service', 'paid_at']),
+            'id' => $order->public_ref,
+            ...$order->only(['order_number', 'status', 'shipping_status', 'shipping_address', 'shipping_courier', 'shipping_service', 'paid_at']),
             'waybill_id' => $order->shipment?->waybill_id,
             'shipment' => $order->shipment?->only(['provider', 'status', 'waybill_id', 'note']),
             'items' => $order->items->map(fn (OrderItem $item) => [
@@ -154,13 +158,13 @@ class OrderController extends Controller
         // ?ids=1,2,3; bentuk lain (misalnya ids[]=1) dianggap kosong, bukan galat server.
         $raw = $request->query('ids');
         $ids = collect(is_string($raw) ? explode(',', $raw) : [])
-            ->map(fn (string $id) => (int) $id)->filter(fn (int $id) => $id > 0)->unique()->values();
+            ->map(fn (string $id) => trim($id))->filter(fn (string $id) => Str::isUuid($id))->unique()->values();
 
         if ($ids->isEmpty() || $ids->count() > self::BULK_LIMIT) {
             throw ValidationException::withMessages(['ids' => 'Pilih 1 sampai '.self::BULK_LIMIT.' pesanan.']);
         }
 
-        $orders = Order::with('items')->whereIn('id', $ids)->whereIn('status', [Order::PAID, Order::PROCESSING])->orderBy('paid_at')->orderBy('id')->get();
+        $orders = Order::with('items')->whereIn('public_ref', $ids)->whereIn('status', [Order::PAID, Order::PROCESSING])->orderBy('paid_at')->orderBy('id')->get();
 
         $lines = $orders->flatMap(fn (Order $order) => $order->items)
             ->groupBy('sku_snapshot')
@@ -209,7 +213,8 @@ class OrderController extends Controller
             ->paginate($this->perPage($request));
 
         return $this->paged('Shipments retrieved.', $page, fn (Order $order) => [
-            ...$order->only(['id', 'order_number', 'status', 'shipping_status', 'shipping_courier', 'shipping_service']),
+            'id' => $order->public_ref,
+            ...$order->only(['order_number', 'status', 'shipping_status', 'shipping_courier', 'shipping_service']),
             'recipient' => $order->shipping_address['recipient'] ?? null,
             'city' => $order->shipping_address['city'] ?? null,
             'waybill_id' => $order->shipment?->waybill_id,
@@ -237,8 +242,8 @@ class OrderController extends Controller
         // Dana masuk untuk pesanan yang sudah ditutup: ditandai supaya Admin Toko melihat tombol "dana sudah dikembalikan".
         $needsRefund = Order::latePaymentClosed()->whereIn('id', collect($page->items())->pluck('id'))->pluck('id')->all();
 
-        return $this->paged('Payments retrieved.', $page, fn (Order $order) => $order->only([
-            'id', 'order_number', 'payment_status', 'total', 'paid_at', 'expires_at', 'created_at',
+        return $this->paged('Payments retrieved.', $page, fn (Order $order) => ['id' => $order->public_ref] + $order->only([
+            'order_number', 'payment_status', 'total', 'paid_at', 'expires_at', 'created_at',
         ]) + ['needs_refund' => in_array($order->id, $needsRefund, true)]);
     }
 
@@ -305,6 +310,8 @@ class OrderController extends Controller
 
     /**
      * Data label pengiriman. Tanpa harga, pembayaran, dan email (D-041): label dibaca staf gudang dan kurir.
+     * Nama dan telepon penerima sengaja utuh (kurir dan gudang butuh data lengkap) dan hanya keluar dari endpoint ini.
+     * Kode sortir kurir (`routing_code`) hanya ada bila Biteship mengisinya saat order dibuat; resi manual tidak punya.
      */
     public function label(Order $order): JsonResponse
     {
@@ -323,7 +330,10 @@ class OrderController extends Controller
             'waybill_id' => $order->shipment->waybill_id,
             'note' => $order->shipment->note,
             'courier' => strtoupper($order->shipping_courier.' '.$order->shipping_service),
-            'sender' => ['name' => 'Tuffero Patisserie', 'address' => $warehouse?->address, 'postal_code' => $warehouse?->postal_code, 'phone' => $warehouse?->phone],
+            'service_code' => strtoupper((string) $order->shipping_service),
+            'routing_code' => $order->shipment->routing_code,
+            'ship_date' => ($order->shipment->shipped_at ?? $order->shipment->created_at)?->format('Y-m-d'),
+            'sender' => ['name' => 'Tuffero Patisserie', 'city' => $warehouse?->city, 'address' => $warehouse?->address, 'postal_code' => $warehouse?->postal_code, 'phone' => $warehouse?->phone],
             'recipient' => [
                 'name' => $address['recipient'] ?? $order->customer_name,
                 'phone' => $address['phone'] ?? $order->customer_phone,
@@ -331,12 +341,13 @@ class OrderController extends Controller
             ],
             'weight_gram' => (int) $order->items->sum(fn (OrderItem $item) => $item->weight_gram_snapshot * $item->quantity),
             'website' => self::WEBSITE,
-            'qr' => $this->qrRows(self::WEBSITE),
+            'qr' => $this->qrRows($order->shipment->waybill_id),
+            'qty_total' => (int) $order->items->sum('quantity'),
             'items' => $order->items->map(fn (OrderItem $item) => ['name' => $item->product_name_snapshot, 'variant' => $item->variant_name_snapshot, 'sku' => $item->sku_snapshot, 'quantity' => $item->quantity]),
         ]);
     }
 
-    /** QR asli (bukan gambar statis) sebagai baris "1" dan "0"; halaman label menggambarnya sebagai kotak hitam putih. */
+    /** QR asli (bukan gambar statis) sebagai baris "1" dan "0"; halaman label menggambarnya sebagai kotak hitam putih. Isinya nomor resi, untuk dipindai kurir. */
     private function qrRows(string $content): array
     {
         $matrix = Encoder::encode($content, ErrorCorrectionLevel::M(), 'UTF-8')->getMatrix();

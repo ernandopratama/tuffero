@@ -327,7 +327,14 @@ export const checkoutPage = () => mix(addressPicker('co'), voucherPicker(), phon
         },
         courierLogo(rate) { return COURIER_LOGOS.includes(rate.courier) ? `/images/Logo/kurir/${rate.courier}.webp` : ''; },
         courierInitials(rate) { return String(rate.courier).slice(0, 2).toUpperCase(); },
-        etdText(rate) { return rate.etd ? this.words.etd[rate.etd_unit === 'hours' ? 'hours' : 'days'].replace(':range', rate.etd) : ''; },
+        etdText(rate) {
+            if (!rate.etd) return '';
+            const unit = rate.etd_unit === 'hours' ? 'hours' : 'days';
+            // Tepat "1" memakai bentuk tunggal bila bahasanya punya (Inggris: "1 day"); Indonesia tidak membedakan.
+            const one = String(rate.etd).trim() === '1' ? this.words.etd[`${unit}One`] : null;
+
+            return (one ?? this.words.etd[unit]).replace(':range', rate.etd);
+        },
         rateClass(rate) { return this.isSelected(rate) ? 'is-selected' : ''; },
         addressLabel(address) { return `${address.label} · ${address.street}`; },
         lineLabel(item) { return `${item.quantity} × ${productName(item)}`; },

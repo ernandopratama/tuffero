@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Models\Concerns\HasPublicId;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Database\Eloquent\Model;
@@ -11,6 +12,7 @@ use Illuminate\Database\Eloquent\SoftDeletes;
 #[Fillable(['title', 'title_en', 'category', 'is_featured', 'sort_order', 'is_published'])]
 class GalleryPhoto extends Model
 {
+    use HasPublicId;
     use SoftDeletes;
 
     /** Kategori = tab ikon di halaman Galeri; kunci sama dengan `store.pages.gallery.cats`. */

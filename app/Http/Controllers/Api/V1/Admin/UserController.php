@@ -85,7 +85,7 @@ class UserController extends Controller
     private function present(User $user): array
     {
         return [
-            'id' => $user->id,
+            'id' => $user->public_id,
             'name' => $user->name,
             'email' => $user->email,
             'username' => $user->username,

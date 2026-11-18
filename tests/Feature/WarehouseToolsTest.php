@@ -58,6 +58,8 @@ class WarehouseToolsTest extends TestCase
 
     public function test_origin_postal_code_prefers_the_active_warehouse_then_falls_back_to_env(): void
     {
+        // Seeder kini mengisi kode pos gudang; kosongkan dulu untuk menguji cadangan dari env.
+        $this->warehouse->update(['postal_code' => null]);
         config(['services.biteship.origin_postal_code' => null]);
         $this->assertNull(Warehouse::originPostalCode());
 
@@ -123,7 +125,7 @@ class WarehouseToolsTest extends TestCase
     public function test_store_admin_can_set_and_clear_the_variant_threshold(): void
     {
         $admin = $this->staff('store-admin');
-        $url = "/api/v1/admin/variants/{$this->variant->id}";
+        $url = "/api/v1/admin/variants/{$this->variant->public_id}";
         $base = ['sku' => 'NAS-01', 'name' => 'Standar', 'price' => 50000, 'weight_gram' => 500];
 
         $this->actingAs($admin)->patchJson($url, [...$base, 'low_stock_threshold' => 3])->assertOk();

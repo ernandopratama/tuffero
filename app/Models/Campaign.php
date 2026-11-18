@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Models\Concerns\HasPublicId;
 use Carbon\CarbonInterface;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Builder;
@@ -16,6 +17,8 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 #[Fillable(['title', 'description', 'starts_at', 'ends_at', 'is_flash', 'is_active'])]
 class Campaign extends Model
 {
+    use HasPublicId;
+
     /**
      * Get the attributes that should be cast.
      *

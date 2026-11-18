@@ -11,7 +11,8 @@ use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 
 /**
- * CRUD Syarat dan Ketentuan toko (izin terms.manage: Admin Toko dan Super Admin). Isi hanya teks polos; tampil di toko lewat Blade
+ * CRUD Syarat dan Ketentuan dan Kebijakan Privasi toko (izin terms.manage: Admin Toko dan Super Admin). Jenisnya dari default rute
+ * (`terms` atau `privacy`); butir jenis lain di URL ini dijawab 404 supaya satu jenis tidak bisa diubah lewat rute jenis lain. Isi hanya teks polos; tampil di toko lewat Blade
  * yang meng-escape semuanya, jadi tidak ada HTML yang diterima atau dirender.
  */
 class TermsController extends Controller
@@ -20,24 +21,27 @@ class TermsController extends Controller
 
     public function __construct(private TermsService $terms) {}
 
-    public function index(): JsonResponse
+    public function index(Request $request): JsonResponse
     {
+        $type = $this->type($request);
+
         return $this->success('Terms retrieved.', [
-            'version' => $this->terms->version(),
-            'updated_at' => Setting::where('key', TermsService::VERSION_KEY)->value('updated_at'),
-            'sections' => TermsSection::orderBy('sort_order')->orderBy('id')->get()->map(fn (TermsSection $s) => $this->row($s))->values(),
+            'version' => $this->terms->version($type),
+            'updated_at' => Setting::where('key', TermsService::versionKey($type))->value('updated_at'),
+            'sections' => TermsSection::where('type', $type)->orderBy('sort_order')->orderBy('id')->get()->map(fn (TermsSection $s) => $this->row($s))->values(),
         ]);
     }
 
     public function store(Request $request): JsonResponse
     {
-        $section = $this->terms->create($this->validated($request), $request->user());
+        $section = $this->terms->create($this->validated($request), $request->user(), $this->type($request));
 
         return $this->success('Terms section created.', $this->row($section), 201);
     }
 
     public function update(Request $request, TermsSection $section): JsonResponse
     {
+        $this->owned($request, $section);
         $this->terms->update($section, $this->validated($request), $request->user());
 
         return $this->success('Terms section updated.', $this->row($section->refresh()));
@@ -45,6 +49,7 @@ class TermsController extends Controller
 
     public function destroy(Request $request, TermsSection $section): JsonResponse
     {
+        $this->owned($request, $section);
         $this->terms->delete($section, $request->user());
 
         return $this->success('Terms section deleted.');
@@ -52,11 +57,22 @@ class TermsController extends Controller
 
     public function move(Request $request, TermsSection $section): JsonResponse
     {
+        $this->owned($request, $section);
         $validated = $request->validate(['direction' => ['required', 'in:up,down']]);
 
         $this->terms->move($section, $validated['direction'], $request->user());
 
         return $this->success('Terms section moved.');
+    }
+
+    private function type(Request $request): string
+    {
+        return $request->route('type') === TermsSection::PRIVACY ? TermsSection::PRIVACY : TermsSection::TERMS;
+    }
+
+    private function owned(Request $request, TermsSection $section): void
+    {
+        abort_unless($section->type === $this->type($request), 404);
     }
 
     /** @return array{title_id: string, title_en: string, body_id: string, body_en: string, is_published: bool} */
@@ -90,6 +106,6 @@ class TermsController extends Controller
     /** @return array<string, mixed> */
     private function row(TermsSection $section): array
     {
-        return $section->only(['id', 'sort_order', 'title_id', 'title_en', 'body_id', 'body_en', 'is_published', 'updated_at']);
+        return ['id' => $section->public_id] + $section->only(['sort_order', 'title_id', 'title_en', 'body_id', 'body_en', 'is_published', 'updated_at']);
     }
 }

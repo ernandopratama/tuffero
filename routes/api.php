@@ -34,6 +34,7 @@ use App\Http\Controllers\Api\V1\Admin\ReportController;
 use App\Http\Controllers\Api\V1\Admin\ReturnBlockRuleController;
 use App\Http\Controllers\Api\V1\Admin\ReviewController;
 use App\Http\Controllers\Api\V1\Admin\RoleController;
+use App\Http\Controllers\Api\V1\Admin\SalesExportController;
 use App\Http\Controllers\Api\V1\Admin\SettingController;
 use App\Http\Controllers\Api\V1\Admin\StockController;
 use App\Http\Controllers\Api\V1\Admin\SystemHealthController;
@@ -169,6 +170,11 @@ Route::prefix('v1')->group(function () {
     Route::middleware(['web', 'auth:sanctum', 'active'])->prefix('admin')->group(function () {
         Route::get('/dashboard', [DashboardController::class, 'index']);
         Route::get('/reports', [ReportController::class, 'index'])->middleware('permission:reports.view|reports.view_summary');
+        // Rekap Laporan sebagai xlsx (D-130, D-131): retur, pesanan dibatalkan, pendapatan. Angka agregat yang sama dengan layar, tanpa data pelanggan.
+        Route::get('/reports/{kind}-export', [ReportController::class, 'export'])->whereIn('kind', ['returns', 'cancellations', 'revenue'])->middleware(['permission:reports.view', 'throttle:6,1']);
+        // Ekspor penjualan untuk finance (D-130): memuat data pelanggan, jadi izin sendiri, MFA, dan throttle.
+        Route::get('/reports/sales-export/summary', [SalesExportController::class, 'summary'])->middleware(['permission:reports.export', 'throttle:30,1']);
+        Route::get('/reports/sales-export', [SalesExportController::class, 'download'])->middleware(['permission:reports.export', 'mfa.enrolled', 'throttle:6,1']);
         Route::get('/system-health', [SystemHealthController::class, 'index'])->middleware(['permission:settings.manage', 'throttle:30,1']);
         Route::post('/system-health/log-ack', [SystemHealthController::class, 'acknowledgeLog'])->middleware(['permission:settings.manage', 'mfa.enrolled', 'throttle:6,1']);
         Route::get('/integrations', [IntegrationController::class, 'index'])->middleware('permission:settings.manage');
@@ -204,7 +210,7 @@ Route::prefix('v1')->group(function () {
         Route::get('/customer-blocks/rule', [ReturnBlockRuleController::class, 'show'])->middleware('permission:customer_blocks.view');
         Route::post('/customer-blocks/rule/request', [ReturnBlockRuleController::class, 'request'])->middleware(['permission:customer_blocks.manage', 'mfa.enrolled', 'throttle:10,1']);
         Route::post('/customer-blocks/rule/disable', [ReturnBlockRuleController::class, 'disable'])->middleware(['permission:customer_blocks.manage', 'mfa.enrolled', 'throttle:10,1']);
-        Route::post('/customer-blocks/rule/requests/{ruleRequest}/decide', [ReturnBlockRuleController::class, 'decide'])->whereNumber('ruleRequest')->middleware(['permission:customer_blocks.approve', 'mfa.enrolled', 'throttle:10,1']);
+        Route::post('/customer-blocks/rule/requests/{ruleRequest}/decide', [ReturnBlockRuleController::class, 'decide'])->whereUlid('ruleRequest')->middleware(['permission:customer_blocks.approve', 'mfa.enrolled', 'throttle:10,1']);
 
         Route::get('/customers', [CustomerController::class, 'index'])->middleware('permission:customers.view');
         Route::get('/customers/{user}', [CustomerController::class, 'show'])->middleware('permission:customers.view');
@@ -215,11 +221,11 @@ Route::prefix('v1')->group(function () {
         Route::get('/access', [RoleController::class, 'index'])->middleware('permission:roles.manage');
         Route::middleware(['permission:roles.manage', 'mfa.enrolled', 'throttle:20,1'])->group(function () {
             Route::post('/roles', [RoleController::class, 'storeRole']);
-            Route::patch('/roles/{role}', [RoleController::class, 'updateRole'])->whereNumber('role');
-            Route::delete('/roles/{role}', [RoleController::class, 'destroyRole'])->whereNumber('role');
+            Route::patch('/roles/{role}', [RoleController::class, 'updateRole'])->whereUlid('role');
+            Route::delete('/roles/{role}', [RoleController::class, 'destroyRole'])->whereUlid('role');
             Route::post('/permissions', [RoleController::class, 'storePermission']);
-            Route::patch('/permissions/{permission}', [RoleController::class, 'updatePermission'])->whereNumber('permission');
-            Route::delete('/permissions/{permission}', [RoleController::class, 'destroyPermission'])->whereNumber('permission');
+            Route::patch('/permissions/{permission}', [RoleController::class, 'updatePermission'])->whereUlid('permission');
+            Route::delete('/permissions/{permission}', [RoleController::class, 'destroyPermission'])->whereUlid('permission');
         });
 
         Route::get('/users', [UserController::class, 'index'])->middleware('permission:users.manage');
@@ -314,16 +320,16 @@ Route::prefix('v1')->group(function () {
 
         Route::middleware('permission:products.view')->group(function () {
             Route::get('/campaigns', [CampaignController::class, 'index']);
-            Route::get('/campaigns/{campaign}', [CampaignController::class, 'show'])->whereNumber('campaign');
+            Route::get('/campaigns/{campaign}', [CampaignController::class, 'show'])->whereUlid('campaign');
         });
 
         Route::middleware(['permission:campaigns.manage', 'mfa.enrolled'])->group(function () {
             Route::get('/campaign-variants', [CampaignController::class, 'variants']);
             Route::post('/campaigns', [CampaignController::class, 'store']);
-            Route::patch('/campaigns/{campaign}', [CampaignController::class, 'update'])->whereNumber('campaign');
-            Route::post('/campaigns/{campaign}/image', [CampaignController::class, 'image'])->whereNumber('campaign');
-            Route::post('/campaigns/{campaign}/items', [CampaignController::class, 'storeItem'])->whereNumber('campaign');
-            Route::patch('/campaign-items/{discount}', [CampaignController::class, 'updateItem'])->whereNumber('discount');
+            Route::patch('/campaigns/{campaign}', [CampaignController::class, 'update'])->whereUlid('campaign');
+            Route::post('/campaigns/{campaign}/image', [CampaignController::class, 'image'])->whereUlid('campaign');
+            Route::post('/campaigns/{campaign}/items', [CampaignController::class, 'storeItem'])->whereUlid('campaign');
+            Route::patch('/campaign-items/{discount}', [CampaignController::class, 'updateItem']);
         });
 
         Route::middleware(['permission:products.manage', 'mfa.enrolled'])->group(function () {
@@ -389,15 +395,18 @@ Route::prefix('v1')->group(function () {
             Route::post('/reject', [CancellationController::class, 'reject'])->middleware('permission:orders.cancel_request|orders.cancel');
         });
 
-        Route::middleware(['permission:terms.manage', 'throttle:60,1'])->prefix('terms')->group(function () {
-            Route::get('/', [TermsController::class, 'index']);
-            Route::middleware('mfa.enrolled')->group(function () {
-                Route::post('/', [TermsController::class, 'store']);
-                Route::put('/{section}', [TermsController::class, 'update']);
-                Route::delete('/{section}', [TermsController::class, 'destroy']);
-                Route::post('/{section}/move', [TermsController::class, 'move']);
+        // Syarat dan Ketentuan (/terms) dan Kebijakan Privasi (/privacy, D-139): satu izin, satu controller, jenis dari default rute.
+        foreach (['terms', 'privacy'] as $type) {
+            Route::middleware(['permission:terms.manage', 'throttle:60,1'])->prefix($type)->group(function () use ($type) {
+                Route::get('/', [TermsController::class, 'index'])->defaults('type', $type);
+                Route::middleware('mfa.enrolled')->group(function () use ($type) {
+                    Route::post('/', [TermsController::class, 'store'])->defaults('type', $type);
+                    Route::put('/{section}', [TermsController::class, 'update'])->defaults('type', $type);
+                    Route::delete('/{section}', [TermsController::class, 'destroy'])->defaults('type', $type);
+                    Route::post('/{section}/move', [TermsController::class, 'move'])->defaults('type', $type);
+                });
             });
-        });
+        }
 
         Route::middleware('permission:refunds.view')->group(function () {
             Route::get('/refunds', [AdminRefundController::class, 'index']);
@@ -437,22 +446,29 @@ Route::prefix('v1')->group(function () {
         Route::get('/news', [NewsItemController::class, 'index'])->middleware('permission:news.view');
         Route::middleware(['permission:news.manage', 'mfa.enrolled'])->group(function () {
             Route::post('/news', [NewsItemController::class, 'store']);
-            Route::patch('/news/{item}', [NewsItemController::class, 'update'])->whereNumber('item');
-            Route::post('/news/{item}/image', [NewsItemController::class, 'storeImage'])->whereNumber('item')->middleware('throttle:30,1');
-            Route::delete('/news/{item}/image', [NewsItemController::class, 'destroyImage'])->whereNumber('item');
-            Route::delete('/news/{item}', [NewsItemController::class, 'destroy'])->whereNumber('item');
+            Route::patch('/news/{item}', [NewsItemController::class, 'update'])->whereUlid('item');
+            Route::post('/news/{item}/image', [NewsItemController::class, 'storeImage'])->whereUlid('item')->middleware('throttle:30,1');
+            Route::delete('/news/{item}/image', [NewsItemController::class, 'destroyImage'])->whereUlid('item');
+            Route::delete('/news/{item}', [NewsItemController::class, 'destroy'])->whereUlid('item');
         });
 
         // Draf konten AI Marketing (D-062, D-079): semua role admin melihat, Marketing dan Super Admin menyusun, Pemilik dan Super Admin memutuskan.
         Route::get('/marketing-drafts', [MarketingDraftController::class, 'index'])->middleware('permission:marketing_drafts.view');
+        Route::get('/marketing-drafts/{draft}/references/{reference}', [MarketingDraftController::class, 'showReference'])->whereUlid(['draft', 'reference'])->middleware('permission:marketing_drafts.view');
         Route::middleware(['permission:marketing_drafts.manage', 'mfa.enrolled'])->group(function () {
             Route::post('/marketing-drafts', [MarketingDraftController::class, 'store']);
+            // Foto acuan dan catatan untuk AI pada draf video; keduanya menyusun ulang storyboard di antrean.
+            Route::post('/marketing-drafts/{draft}/references', [MarketingDraftController::class, 'storeReference'])->whereUlid('draft');
+            Route::delete('/marketing-drafts/{draft}/references/{reference}', [MarketingDraftController::class, 'destroyReference'])->whereUlid(['draft', 'reference']);
+            Route::post('/marketing-drafts/{draft}/notes', [MarketingDraftController::class, 'storeNote'])->whereUlid('draft')->middleware('throttle:marketing-ai');
+            Route::patch('/marketing-drafts/{draft}/notes/{note}', [MarketingDraftController::class, 'updateNote'])->whereUlid(['draft', 'note'])->middleware('throttle:marketing-ai');
+            Route::delete('/marketing-drafts/{draft}/notes/{note}', [MarketingDraftController::class, 'destroyNote'])->whereUlid(['draft', 'note'])->middleware('throttle:marketing-ai');
             Route::post('/marketing-drafts/generate', [MarketingDraftController::class, 'generate'])->middleware('throttle:marketing-ai');
-            Route::patch('/marketing-drafts/{draft}', [MarketingDraftController::class, 'update'])->whereNumber('draft');
-            Route::post('/marketing-drafts/{draft}/move', [MarketingDraftController::class, 'move'])->whereNumber('draft');
-            Route::delete('/marketing-drafts/{draft}', [MarketingDraftController::class, 'destroy'])->whereNumber('draft');
+            Route::patch('/marketing-drafts/{draft}', [MarketingDraftController::class, 'update'])->whereUlid('draft');
+            Route::post('/marketing-drafts/{draft}/move', [MarketingDraftController::class, 'move'])->whereUlid('draft');
+            Route::delete('/marketing-drafts/{draft}', [MarketingDraftController::class, 'destroy'])->whereUlid('draft');
         });
-        Route::post('/marketing-drafts/{draft}/decide', [MarketingDraftController::class, 'decide'])->whereNumber('draft')->middleware(['permission:marketing_drafts.approve', 'mfa.enrolled']);
+        Route::post('/marketing-drafts/{draft}/decide', [MarketingDraftController::class, 'decide'])->whereUlid('draft')->middleware(['permission:marketing_drafts.approve', 'mfa.enrolled']);
 
         Route::middleware(['permission:content.manage', 'mfa.enrolled'])->group(function () {
             Route::post('/contents', [PromoContentController::class, 'store']);

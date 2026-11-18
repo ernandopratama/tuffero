@@ -5,6 +5,7 @@ namespace Tests\Feature;
 use App\Models\AuditLog;
 use App\Models\PromoContent;
 use App\Models\User;
+use App\Services\ImageService;
 use Database\Seeders\DatabaseSeeder;
 use GuzzleHttp\Promise\PromiseInterface;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -68,8 +69,11 @@ class PromoThumbnailTest extends TestCase
 
         $response = $this->create(self::YT)->assertCreated()->assertJsonPath('data.thumbnail_status', 'fetched')->assertJsonPath('data.can_auto_thumbnail', true);
 
-        $content = PromoContent::findOrFail($response->json('data.id'));
-        $this->assertStringContainsString("promo/{$content->id}/auto-", $content->image_path);
+        $content = PromoContent::where('public_id', $response->json('data.id'))->firstOrFail();
+        $this->assertMatchesRegularExpression(ImageService::RANDOM_PATH_PATTERN, $content->image_path);
+        $this->assertStringStartsWith('promo/', $content->image_path);
+        $this->assertStringEndsWith('.jpg', $content->image_path);
+        $this->assertStringNotContainsString("/{$content->id}/", $content->image_path);
         Storage::disk('public')->assertExists($content->image_path);
         $this->assertSame('image/jpeg', getimagesizefromstring(Storage::disk('public')->get($content->image_path))['mime']);
         $this->assertSame(1, AuditLog::where('action', 'content.thumbnail_fetched')->count());
@@ -122,7 +126,7 @@ class PromoThumbnailTest extends TestCase
 
         $id = $this->create(self::YT)->assertJsonPath('data.thumbnail_status', 'fetched')->json('data.id');
 
-        $this->assertStringNotContainsString('<?php', Storage::disk('public')->get(PromoContent::findOrFail($id)->image_path));
+        $this->assertStringNotContainsString('<?php', Storage::disk('public')->get(PromoContent::where('public_id', $id)->firstOrFail()->image_path));
     }
 
     public function test_tiktok_and_instagram_links_make_no_request(): void
@@ -138,19 +142,19 @@ class PromoThumbnailTest extends TestCase
     {
         Http::fake(['img.youtube.com/*' => fn () => $this->image($this->jpeg())]);
         $id = $this->create(self::YT)->json('data.id');
-        $first = PromoContent::findOrFail($id)->image_path;
+        $first = PromoContent::where('public_id', $id)->firstOrFail()->image_path;
 
         $this->patchJson("/api/v1/admin/contents/{$id}", ['title' => 'Video', 'video_url' => 'https://youtu.be/abcDEF12345'])->assertOk()->assertJsonPath('data.thumbnail_status', 'fetched');
-        $second = PromoContent::findOrFail($id)->image_path;
+        $second = PromoContent::where('public_id', $id)->firstOrFail()->image_path;
         $this->assertNotSame($first, $second);
         Storage::disk('public')->assertMissing($first);
 
         $this->postJson("/api/v1/admin/contents/{$id}/image", ['image' => UploadedFile::fake()->image('mine.jpg', 360, 640)])->assertOk();
-        $manual = PromoContent::findOrFail($id)->image_path;
+        $manual = PromoContent::where('public_id', $id)->firstOrFail()->image_path;
         $this->assertStringNotContainsString('/auto-', $manual);
 
         $this->patchJson("/api/v1/admin/contents/{$id}", ['title' => 'Video', 'video_url' => 'https://youtu.be/zzzDEF12345'])->assertOk()->assertJsonPath('data.thumbnail_status', null);
-        $this->assertSame($manual, PromoContent::findOrFail($id)->image_path);
+        $this->assertSame($manual, PromoContent::where('public_id', $id)->firstOrFail()->image_path);
     }
 
     public function test_refresh_endpoint_overwrites_and_respects_permissions(): void
@@ -167,13 +171,13 @@ class PromoThumbnailTest extends TestCase
 
         $online = true;
         $this->postJson($url)->assertOk()->assertJsonPath('data.thumbnail_status', 'fetched');
-        $this->assertStringContainsString('/auto-', PromoContent::findOrFail($id)->image_path);
+        $this->assertStringContainsString('/auto-', PromoContent::where('public_id', $id)->firstOrFail()->image_path);
 
         foreach (['store-admin', 'owner', 'customer-service'] as $role) {
             $this->actingAs($this->staff($role))->postJson($url)->assertForbidden();
         }
 
         $insta = PromoContent::create(['type' => 'video', 'title' => 'IG', 'video_url' => 'https://www.instagram.com/reel/C1abc/', 'provider' => 'instagram', 'external_id' => 'C1abc']);
-        $this->actingAs($this->staff('super-admin'))->postJson("/api/v1/admin/contents/{$insta->id}/thumbnail")->assertUnprocessable()->assertJsonValidationErrors('video_url');
+        $this->actingAs($this->staff('super-admin'))->postJson("/api/v1/admin/contents/{$insta->public_id}/thumbnail")->assertUnprocessable()->assertJsonValidationErrors('video_url');
     }
 }

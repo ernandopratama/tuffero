@@ -3,6 +3,7 @@
 namespace Tests\Feature;
 
 use App\Models\User;
+use App\Services\RoleService;
 use App\Support\PermissionCatalog;
 use Database\Seeders\DatabaseSeeder;
 use Database\Seeders\RolePermissionSeeder;
@@ -29,6 +30,8 @@ class RoleManagementTest extends TestCase
         parent::setUp();
 
         $this->seed(DatabaseSeeder::class);
+        // Seeder membisukan event model; ID publik role dan izin diisi seperti saat halaman Role dan Izin dibuka (D-143).
+        RoleService::fillPublicIds();
     }
 
     private function staff(string $role): User
@@ -41,7 +44,8 @@ class RoleManagementTest extends TestCase
 
     private function role(string $name): Role
     {
-        return Role::findByName($name, 'web');
+        // Langsung dari DB: cache Spatie hanya menyimpan id, name, dan guard_name, tanpa public_id (D-143).
+        return Role::where(['name' => $name, 'guard_name' => 'web'])->firstOrFail();
     }
 
     public function test_catalog_covers_every_permission_checked_by_routes_and_seeded(): void
@@ -70,7 +74,7 @@ class RoleManagementTest extends TestCase
 
         $this->actingAs($user)->getJson('/api/v1/admin/access')->assertForbidden();
         $this->actingAs($user)->postJson('/api/v1/admin/roles', ['password' => self::PASSWORD, 'name' => 'tamu', 'label' => 'Tamu', 'permissions' => []])->assertForbidden();
-        $this->actingAs($user)->patchJson("/api/v1/admin/roles/{$target->id}", ['password' => self::PASSWORD, 'add' => [], 'remove' => ['news.view']])->assertForbidden();
+        $this->actingAs($user)->patchJson("/api/v1/admin/roles/{$target->public_id}", ['password' => self::PASSWORD, 'add' => [], 'remove' => ['news.view']])->assertForbidden();
         $this->actingAs($user)->postJson('/api/v1/admin/permissions', ['password' => self::PASSWORD, 'name' => 'laporan.export', 'label' => 'Ekspor'])->assertForbidden();
         $this->assertTrue($target->fresh()->permissions()->exists());
     }
@@ -80,8 +84,8 @@ class RoleManagementTest extends TestCase
         $admin = $this->staff('super-admin');
         $role = $this->role('marketing');
 
-        $this->actingAs($admin)->patchJson("/api/v1/admin/roles/{$role->id}", ['add' => [], 'remove' => ['news.view']])->assertJsonValidationErrors('password');
-        $this->actingAs($admin)->patchJson("/api/v1/admin/roles/{$role->id}", ['password' => 'salah-sekali', 'add' => [], 'remove' => ['news.view']])->assertJsonValidationErrors('password');
+        $this->actingAs($admin)->patchJson("/api/v1/admin/roles/{$role->public_id}", ['add' => [], 'remove' => ['news.view']])->assertJsonValidationErrors('password');
+        $this->actingAs($admin)->patchJson("/api/v1/admin/roles/{$role->public_id}", ['password' => 'salah-sekali', 'add' => [], 'remove' => ['news.view']])->assertJsonValidationErrors('password');
         $this->assertTrue($role->fresh()->permissions()->exists());
     }
 
@@ -90,8 +94,8 @@ class RoleManagementTest extends TestCase
         $admin = $this->staff('super-admin');
         $role = $this->role('super-admin');
 
-        $this->actingAs($admin)->patchJson("/api/v1/admin/roles/{$role->id}", ['password' => self::PASSWORD, 'add' => [], 'remove' => ['orders.view']])->assertJsonValidationErrors('role');
-        $this->actingAs($admin)->deleteJson("/api/v1/admin/roles/{$role->id}", ['password' => self::PASSWORD])->assertJsonValidationErrors('role');
+        $this->actingAs($admin)->patchJson("/api/v1/admin/roles/{$role->public_id}", ['password' => self::PASSWORD, 'add' => [], 'remove' => ['orders.view']])->assertJsonValidationErrors('role');
+        $this->actingAs($admin)->deleteJson("/api/v1/admin/roles/{$role->public_id}", ['password' => self::PASSWORD])->assertJsonValidationErrors('role');
         $this->assertSame(Permission::count(), $role->fresh()->permissions()->count());
     }
 
@@ -101,12 +105,12 @@ class RoleManagementTest extends TestCase
         $role = $this->role('store-admin');
 
         foreach (PermissionCatalog::SUPER_ADMIN_ONLY as $permission) {
-            $this->actingAs($admin)->patchJson("/api/v1/admin/roles/{$role->id}", ['password' => self::PASSWORD, 'add' => ['orders.view', $permission], 'remove' => []])->assertJsonValidationErrors('permissions');
+            $this->actingAs($admin)->patchJson("/api/v1/admin/roles/{$role->public_id}", ['password' => self::PASSWORD, 'add' => ['orders.view', $permission], 'remove' => []])->assertJsonValidationErrors('permissions');
             $this->actingAs($admin)->postJson('/api/v1/admin/roles', ['password' => self::PASSWORD, 'name' => 'naik-'.str_replace(['.', '_'], '-', $permission), 'label' => 'Naik', 'permissions' => [$permission]])->assertJsonValidationErrors('permissions');
             $this->assertFalse($role->fresh()->hasPermissionTo($permission));
         }
 
-        $this->actingAs($admin)->patchJson("/api/v1/admin/roles/{$role->id}", ['password' => self::PASSWORD, 'add' => ['tidak.ada'], 'remove' => []])->assertJsonValidationErrors('permissions');
+        $this->actingAs($admin)->patchJson("/api/v1/admin/roles/{$role->public_id}", ['password' => self::PASSWORD, 'add' => ['tidak.ada'], 'remove' => []])->assertJsonValidationErrors('permissions');
     }
 
     public function test_removing_a_permission_takes_effect_immediately_and_is_audited(): void
@@ -117,7 +121,7 @@ class RoleManagementTest extends TestCase
         $role = $this->role('store-admin');
         $this->actingAs($storeAdmin)->getJson('/api/v1/admin/orders')->assertOk();
 
-        $this->actingAs($admin)->patchJson("/api/v1/admin/roles/{$role->id}", ['password' => self::PASSWORD, 'add' => [], 'remove' => ['orders.view']])->assertOk();
+        $this->actingAs($admin)->patchJson("/api/v1/admin/roles/{$role->public_id}", ['password' => self::PASSWORD, 'add' => [], 'remove' => ['orders.view']])->assertOk();
 
         $this->actingAs($storeAdmin->fresh())->getJson('/api/v1/admin/orders')->assertForbidden();
         $this->assertDatabaseHas('audit_logs', ['action' => 'role.updated', 'auditable_id' => $role->id, 'actor_user_id' => $admin->id]);
@@ -160,9 +164,11 @@ class RoleManagementTest extends TestCase
         // Masih dipakai akun: tidak bisa dihapus (akun tanpa role dianggap pelanggan).
         $this->actingAs($admin)->deleteJson("/api/v1/admin/roles/{$id}", ['password' => self::PASSWORD])->assertJsonValidationErrors('role');
         $staff->syncRoles(['store-admin']);
+        // Log audit tetap menyimpan ID angka role (rujukan internal).
+        $numericId = Role::where('public_id', $id)->value('id');
         $this->actingAs($admin)->deleteJson("/api/v1/admin/roles/{$id}", ['password' => self::PASSWORD])->assertOk();
-        $this->assertNull(Role::find($id));
-        $this->assertDatabaseHas('audit_logs', ['action' => 'role.deleted', 'auditable_id' => $id]);
+        $this->assertNull(Role::where('public_id', $id)->first());
+        $this->assertDatabaseHas('audit_logs', ['action' => 'role.deleted', 'auditable_id' => $numericId]);
     }
 
     public function test_system_roles_cannot_be_deleted(): void
@@ -170,7 +176,7 @@ class RoleManagementTest extends TestCase
         $admin = $this->staff('super-admin');
 
         foreach (array_keys(PermissionCatalog::SYSTEM_ROLES) as $name) {
-            $this->actingAs($admin)->deleteJson('/api/v1/admin/roles/'.$this->role($name)->id, ['password' => self::PASSWORD])->assertJsonValidationErrors('role');
+            $this->actingAs($admin)->deleteJson('/api/v1/admin/roles/'.$this->role($name)->public_id, ['password' => self::PASSWORD])->assertJsonValidationErrors('role');
         }
     }
 
@@ -183,19 +189,19 @@ class RoleManagementTest extends TestCase
         $id = $this->actingAs($admin)->postJson('/api/v1/admin/permissions', ['password' => self::PASSWORD, 'name' => 'laporan.export', 'label' => 'Ekspor laporan', 'description' => '<b>uji</b>'])
             ->assertCreated()->json('data.id');
 
-        $permission = Permission::findOrFail($id);
+        $permission = Permission::where('public_id', $id)->firstOrFail();
         $this->assertSame('uji', $permission->description);
         $this->assertTrue($this->role('super-admin')->hasPermissionTo('laporan.export'));
 
-        $this->actingAs($admin)->patchJson("/api/v1/admin/roles/{$this->role('marketing')->id}", ['password' => self::PASSWORD, 'add' => ['laporan.export'], 'remove' => []])->assertOk();
+        $this->actingAs($admin)->patchJson("/api/v1/admin/roles/{$this->role('marketing')->public_id}", ['password' => self::PASSWORD, 'add' => ['laporan.export'], 'remove' => []])->assertOk();
         $this->actingAs($admin)->patchJson("/api/v1/admin/permissions/{$id}", ['password' => self::PASSWORD, 'label' => 'Ekspor data'])->assertOk();
         $this->actingAs($admin)->deleteJson("/api/v1/admin/permissions/{$id}", ['password' => self::PASSWORD])->assertOk();
         app(PermissionRegistrar::class)->forgetCachedPermissions();
         $this->assertNull(Permission::where('name', 'laporan.export')->first());
 
         $system = Permission::findByName('orders.view', 'web');
-        $this->actingAs($admin)->patchJson("/api/v1/admin/permissions/{$system->id}", ['password' => self::PASSWORD, 'label' => 'Ganti'])->assertJsonValidationErrors('permission');
-        $this->actingAs($admin)->deleteJson("/api/v1/admin/permissions/{$system->id}", ['password' => self::PASSWORD])->assertJsonValidationErrors('permission');
+        $this->actingAs($admin)->patchJson("/api/v1/admin/permissions/{$system->public_id}", ['password' => self::PASSWORD, 'label' => 'Ganti'])->assertJsonValidationErrors('permission');
+        $this->actingAs($admin)->deleteJson("/api/v1/admin/permissions/{$system->public_id}", ['password' => self::PASSWORD])->assertJsonValidationErrors('permission');
         $this->assertNotNull(Permission::where('name', 'orders.view')->first());
     }
 
@@ -214,7 +220,7 @@ class RoleManagementTest extends TestCase
     {
         $storeAdmin = $this->staff('store-admin');
 
-        $this->actingAs($storeAdmin)->patchJson("/api/v1/admin/users/{$storeAdmin->id}", ['role' => 'super-admin'])->assertForbidden();
+        $this->actingAs($storeAdmin)->patchJson("/api/v1/admin/users/{$storeAdmin->public_id}", ['role' => 'super-admin'])->assertForbidden();
         $this->assertFalse($storeAdmin->fresh()->hasRole('super-admin'));
     }
 
@@ -225,8 +231,8 @@ class RoleManagementTest extends TestCase
         $role = $this->role('customer-service');
 
         // Keduanya membuka halaman dengan izin yang sama; yang pertama menambah, yang kedua mencabut izin lain.
-        $this->actingAs($first)->patchJson("/api/v1/admin/roles/{$role->id}", ['password' => self::PASSWORD, 'add' => ['vouchers.view'], 'remove' => []])->assertOk();
-        $this->actingAs($second)->patchJson("/api/v1/admin/roles/{$role->id}", ['password' => self::PASSWORD, 'add' => [], 'remove' => ['emails.send']])->assertOk();
+        $this->actingAs($first)->patchJson("/api/v1/admin/roles/{$role->public_id}", ['password' => self::PASSWORD, 'add' => ['vouchers.view'], 'remove' => []])->assertOk();
+        $this->actingAs($second)->patchJson("/api/v1/admin/roles/{$role->public_id}", ['password' => self::PASSWORD, 'add' => [], 'remove' => ['emails.send']])->assertOk();
 
         $role = $role->fresh();
         $this->assertTrue($role->hasPermissionTo('vouchers.view'));
@@ -239,7 +245,7 @@ class RoleManagementTest extends TestCase
         $role = $this->role('store-admin');
 
         foreach (['Users.Manage', 'USERS.MANAGE', 'roles.Manage'] as $name) {
-            $this->actingAs($admin)->patchJson("/api/v1/admin/roles/{$role->id}", ['password' => self::PASSWORD, 'add' => [$name], 'remove' => []])->assertJsonValidationErrors('permissions');
+            $this->actingAs($admin)->patchJson("/api/v1/admin/roles/{$role->public_id}", ['password' => self::PASSWORD, 'add' => [$name], 'remove' => []])->assertJsonValidationErrors('permissions');
         }
         $this->assertFalse($role->fresh()->hasPermissionTo('users.manage'));
         $this->assertFalse($role->fresh()->hasPermissionTo('roles.manage'));
@@ -253,7 +259,7 @@ class RoleManagementTest extends TestCase
         $id = $this->actingAs($admin)->postJson('/api/v1/admin/roles', ['password' => self::PASSWORD, 'name' => 'admin-cabang', 'label' => 'Admin Cabang', 'permissions' => []])->assertCreated()->json('data.id');
         $this->actingAs($admin)->patchJson("/api/v1/admin/roles/{$id}", ['password' => self::PASSWORD, 'label' => 'Pemilik', 'add' => [], 'remove' => []])->assertJsonValidationErrors('label');
         $this->actingAs($admin)->patchJson("/api/v1/admin/roles/{$id}", ['password' => self::PASSWORD, 'label' => 'Admin Cabang Batu', 'add' => [], 'remove' => []])->assertOk();
-        $this->assertSame('Admin Cabang Batu', Role::findOrFail($id)->label);
+        $this->assertSame('Admin Cabang Batu', Role::where('public_id', $id)->firstOrFail()->label);
     }
 
     public function test_super_admin_keeps_every_permission_after_seeder_reruns(): void
@@ -286,7 +292,7 @@ class RoleManagementTest extends TestCase
         $admin->assignRole('super-admin');
         $role = $this->role('marketing');
 
-        $this->actingAs($admin)->patchJson("/api/v1/admin/roles/{$role->id}", ['password' => self::PASSWORD, 'add' => [], 'remove' => ['news.view']])->assertForbidden();
+        $this->actingAs($admin)->patchJson("/api/v1/admin/roles/{$role->public_id}", ['password' => self::PASSWORD, 'add' => [], 'remove' => ['news.view']])->assertForbidden();
         $this->assertTrue($role->fresh()->hasPermissionTo('news.view'));
     }
 

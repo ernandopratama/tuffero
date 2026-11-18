@@ -212,12 +212,12 @@ class CampaignTest extends TestCase
             'is_flash' => true, 'is_active' => true,
         ])->assertCreated()->assertJsonPath('data.slug', 'flash-sale-1111')->assertJsonPath('data.status', 'upcoming')->json('data.id');
 
-        $this->postJson("/api/v1/admin/campaigns/{$id}/items", ['variant_id' => $this->variant->id, 'audience' => 'all', 'type' => 'percent', 'value' => 25, 'is_active' => true])
+        $this->postJson("/api/v1/admin/campaigns/{$id}/items", ['variant_id' => $this->variant->public_id, 'audience' => 'all', 'type' => 'percent', 'value' => 25, 'is_active' => true])
             ->assertCreated()->assertJsonPath('data.items.0.sku', 'NAS-UJI-01')->assertJsonPath('data.items_count', 1);
-        $this->postJson("/api/v1/admin/campaigns/{$id}/items", ['variant_id' => $this->variant->id, 'audience' => 'all', 'type' => 'percent', 'value' => 10, 'is_active' => true])
+        $this->postJson("/api/v1/admin/campaigns/{$id}/items", ['variant_id' => $this->variant->public_id, 'audience' => 'all', 'type' => 'percent', 'value' => 10, 'is_active' => true])
             ->assertUnprocessable()->assertJsonValidationErrors('variant_id');
 
-        $itemId = VariantDiscount::where('campaign_id', $id)->value('id');
+        $itemId = VariantDiscount::where('campaign_id', Campaign::where('public_id', $id)->value('id'))->value('public_id');
         $this->patchJson("/api/v1/admin/campaign-items/{$itemId}", ['audience' => 'all', 'type' => 'percent', 'value' => 30, 'is_active' => false])
             ->assertOk()->assertJsonPath('data.items.0.value', 30)->assertJsonPath('data.items.0.is_active', false);
 
@@ -238,7 +238,7 @@ class CampaignTest extends TestCase
         $this->assertSame('promo-sama', $first->json('data.slug'));
         $this->assertSame('promo-sama-2', $second->json('data.slug'));
 
-        $this->postJson('/api/v1/admin/campaigns/'.$first->json('data.id').'/items', ['variant_id' => $this->variant->id, 'audience' => 'all', 'type' => 'percent', 'value' => 60, 'is_active' => true])
+        $this->postJson('/api/v1/admin/campaigns/'.$first->json('data.id').'/items', ['variant_id' => $this->variant->public_id, 'audience' => 'all', 'type' => 'percent', 'value' => 60, 'is_active' => true])
             ->assertUnprocessable()->assertJsonValidationErrors('value');
         $this->postJson('/api/v1/admin/campaigns', [...$body, 'ends_at' => now()->subDay()->toIso8601String()])->assertUnprocessable()->assertJsonValidationErrors('ends_at');
     }
@@ -249,8 +249,8 @@ class CampaignTest extends TestCase
         $campaign = $this->campaign();
         $this->actingAs($this->staff());
 
-        $this->post("/api/v1/admin/campaigns/{$campaign->id}/image", ['image' => UploadedFile::fake()->create('x.svg', 10, 'image/svg+xml')], ['Accept' => 'application/json'])->assertUnprocessable();
-        $this->post("/api/v1/admin/campaigns/{$campaign->id}/image", ['image' => UploadedFile::fake()->image('banner.jpg', 1200, 400)], ['Accept' => 'application/json'])->assertOk();
+        $this->post("/api/v1/admin/campaigns/{$campaign->public_id}/image", ['image' => UploadedFile::fake()->create('x.svg', 10, 'image/svg+xml')], ['Accept' => 'application/json'])->assertUnprocessable();
+        $this->post("/api/v1/admin/campaigns/{$campaign->public_id}/image", ['image' => UploadedFile::fake()->image('banner.jpg', 1200, 400)], ['Accept' => 'application/json'])->assertOk();
 
         $path = $campaign->fresh()->image_path;
         Storage::disk('public')->assertExists($path);
@@ -285,7 +285,7 @@ class CampaignTest extends TestCase
         $this->actingAs($admin)->getJson('/api/v1/admin/campaign-variants?search=NAS-UJI')->assertOk()->assertJsonPath('data.items.0.sku', 'NAS-UJI-01')->assertJsonPath('data.items.0.label', 'Nastar Uji');
         $this->getJson('/api/v1/admin/campaign-variants?search=tidakada')->assertOk()->assertJsonCount(0, 'data.items');
 
-        $this->postJson('/api/v1/admin/vouchers', ['code' => 'KAMPANYE5', 'type' => 'fixed', 'value' => 5000, 'min_subtotal' => 0, 'is_active' => true, 'campaign_id' => $campaign->id])->assertCreated();
+        $this->postJson('/api/v1/admin/vouchers', ['code' => 'KAMPANYE5', 'type' => 'fixed', 'value' => 5000, 'min_subtotal' => 0, 'is_active' => true, 'campaign_id' => $campaign->public_id])->assertCreated();
         $this->assertSame($campaign->id, Voucher::where('code', 'KAMPANYE5')->value('campaign_id'));
         $this->postJson('/api/v1/admin/vouchers', ['code' => 'SALAHKAMP', 'type' => 'fixed', 'value' => 5000, 'min_subtotal' => 0, 'is_active' => true, 'campaign_id' => 99999])->assertUnprocessable()->assertJsonValidationErrors('campaign_id');
     }
@@ -295,7 +295,7 @@ class CampaignTest extends TestCase
         $this->item($this->campaign());
         $this->variant->discounts()->create(['audience' => 'guest', 'type' => 'percent', 'value' => 5, 'is_active' => true]);
 
-        $this->actingAs($this->staff())->getJson("/api/v1/admin/products/{$this->variant->product_id}")
+        $this->actingAs($this->staff())->getJson("/api/v1/admin/products/{$this->variant->product->public_id}")
             ->assertOk()->assertJsonCount(1, 'data.variants.0.discounts')->assertJsonPath('data.variants.0.discounts.0.audience', 'guest');
     }
 }

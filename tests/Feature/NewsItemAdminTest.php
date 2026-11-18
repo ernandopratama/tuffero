@@ -93,7 +93,7 @@ class NewsItemAdminTest extends TestCase
             ->assertJsonPath('data.status', 'draft');
 
         $this->deleteJson("/api/v1/admin/news/{$id}")->assertOk();
-        $this->assertSoftDeleted('news_items', ['id' => $id]);
+        $this->assertSoftDeleted('news_items', ['public_id' => $id]);
 
         foreach (['news.created', 'news.updated', 'news.deleted'] as $action) {
             $this->assertSame(1, AuditLog::where('action', $action)->count(), $action);
@@ -155,7 +155,7 @@ class NewsItemAdminTest extends TestCase
         $this->actingAs($this->staff('marketing'));
         $item = $this->make();
 
-        $first = $this->post("/api/v1/admin/news/{$item->id}/image", ['image' => UploadedFile::fake()->image('a.jpg', 2400, 1200)], ['Accept' => 'application/json'])
+        $first = $this->post("/api/v1/admin/news/{$item->public_id}/image", ['image' => UploadedFile::fake()->image('a.jpg', 2400, 1200)], ['Accept' => 'application/json'])
             ->assertOk()->json('data.image_url');
 
         $this->assertStringEndsWith('.webp', $first);
@@ -165,10 +165,10 @@ class NewsItemAdminTest extends TestCase
         $this->assertSame(IMAGETYPE_WEBP, getimagesizefromstring(Storage::disk('public')->get($stored))[2]);
         $this->assertLessThanOrEqual(1280, max($w, $h), 'sisi terpanjang dibatasi');
 
-        $this->post("/api/v1/admin/news/{$item->id}/image", ['image' => UploadedFile::fake()->image('b.png', 800, 400)], ['Accept' => 'application/json'])->assertOk();
+        $this->post("/api/v1/admin/news/{$item->public_id}/image", ['image' => UploadedFile::fake()->image('b.png', 800, 400)], ['Accept' => 'application/json'])->assertOk();
         Storage::disk('public')->assertMissing($stored);
 
-        $this->deleteJson("/api/v1/admin/news/{$item->id}/image")->assertOk()->assertJsonPath('data.image_url', null);
+        $this->deleteJson("/api/v1/admin/news/{$item->public_id}/image")->assertOk()->assertJsonPath('data.image_url', null);
         $this->assertSame(0, count(Storage::disk('public')->allFiles('news')));
     }
 
@@ -176,7 +176,7 @@ class NewsItemAdminTest extends TestCase
     {
         $this->actingAs($this->staff('marketing'));
         $item = $this->make();
-        $url = "/api/v1/admin/news/{$item->id}/image";
+        $url = "/api/v1/admin/news/{$item->public_id}/image";
         $json = ['Accept' => 'application/json'];
 
         $this->post($url, ['image' => UploadedFile::fake()->image('x.webp', 400, 400)], $json)->assertUnprocessable()->assertJsonValidationErrors('image');
@@ -192,9 +192,9 @@ class NewsItemAdminTest extends TestCase
         $item = $this->make();
         $this->actingAs($this->staff('store-admin'));
 
-        $this->post("/api/v1/admin/news/{$item->id}/image", ['image' => UploadedFile::fake()->image('a.jpg')], ['Accept' => 'application/json'])->assertForbidden();
-        $this->patchJson("/api/v1/admin/news/{$item->id}", $this->payload())->assertForbidden();
-        $this->deleteJson("/api/v1/admin/news/{$item->id}")->assertForbidden();
+        $this->post("/api/v1/admin/news/{$item->public_id}/image", ['image' => UploadedFile::fake()->image('a.jpg')], ['Accept' => 'application/json'])->assertForbidden();
+        $this->patchJson("/api/v1/admin/news/{$item->public_id}", $this->payload())->assertForbidden();
+        $this->deleteJson("/api/v1/admin/news/{$item->public_id}")->assertForbidden();
         $this->assertNotSoftDeleted('news_items', ['id' => $item->id]);
     }
 }

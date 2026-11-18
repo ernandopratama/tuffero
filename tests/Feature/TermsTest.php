@@ -94,16 +94,16 @@ class TermsTest extends TestCase
         $created = $this->version();
         $this->assertNotSame($before, $created);
         $this->assertSame(11, TermsSection::count());
-        $this->assertSame(TermsSection::max('sort_order'), TermsSection::find($id)->sort_order, 'butir baru di urutan terakhir');
+        $this->assertSame(TermsSection::max('sort_order'), TermsSection::where('public_id', $id)->first()->sort_order, 'butir baru di urutan terakhir');
 
         $this->actingAs($admin)->putJson("/api/v1/admin/terms/{$id}", $this->payload(['title_id' => 'Garansi rasa baru', 'is_published' => false]))->assertOk();
         $updated = $this->version();
         $this->assertNotSame($created, $updated);
-        $this->assertSame(['Garansi rasa baru', false], [TermsSection::find($id)->title_id, TermsSection::find($id)->is_published]);
+        $this->assertSame(['Garansi rasa baru', false], [TermsSection::where('public_id', $id)->first()->title_id, TermsSection::where('public_id', $id)->first()->is_published]);
 
         $this->actingAs($admin)->deleteJson("/api/v1/admin/terms/{$id}")->assertOk();
         $this->assertNotSame($updated, $this->version());
-        $this->assertNull(TermsSection::find($id));
+        $this->assertNull(TermsSection::where('public_id', $id)->first());
 
         // Nomor urut harian naik satu per perubahan: .1 sudah dipakai migrasi, jadi tiga perubahan berikutnya .2 sampai .4.
         $this->assertSame(now()->format('Y-m-d').'.4', $this->version());
@@ -144,11 +144,11 @@ class TermsTest extends TestCase
         $admin = $this->staff('store-admin');
         $id = $this->actingAs($admin)->postJson('/api/v1/admin/terms', $this->payload(['title_id' => 'Judul <i>miring</i>', 'body_id' => 'Isi <script>alert(1)</script>aman']))->assertCreated()->json('data.id');
 
-        $this->assertSame('Judul miring', TermsSection::find($id)->title_id);
-        $this->assertSame('Isi alert(1)aman', TermsSection::find($id)->body_id);
+        $this->assertSame('Judul miring', TermsSection::where('public_id', $id)->first()->title_id);
+        $this->assertSame('Isi alert(1)aman', TermsSection::where('public_id', $id)->first()->body_id);
 
         // Lapis kedua: isi yang masuk lewat jalur lain (mis. langsung ke database) tetap di-escape saat tampil.
-        TermsSection::find($id)->update(['body_id' => '<script>window.hacked=1</script><b>tebal</b>']);
+        TermsSection::where('public_id', $id)->first()->update(['body_id' => '<script>window.hacked=1</script><b>tebal</b>']);
         $html = $this->get('/kontak')->assertOk()->getContent();
 
         $this->assertStringNotContainsString('<script>window.hacked', $html);
@@ -161,14 +161,14 @@ class TermsTest extends TestCase
         $order = fn () => TermsSection::orderBy('sort_order')->orderBy('id')->pluck('title_id')->all();
         $original = $order();
 
-        $this->actingAs($admin)->postJson('/api/v1/admin/terms/'.TermsSection::orderBy('sort_order')->skip(1)->first()->id.'/move', ['direction' => 'up'])->assertOk();
+        $this->actingAs($admin)->postJson('/api/v1/admin/terms/'.TermsSection::orderBy('sort_order')->skip(1)->first()->public_id.'/move', ['direction' => 'up'])->assertOk();
         $this->assertSame([$original[1], $original[0], ...array_slice($original, 2)], $order());
 
         $last = TermsSection::orderBy('sort_order')->orderBy('id')->get()->last();
-        $this->actingAs($admin)->postJson("/api/v1/admin/terms/{$last->id}/move", ['direction' => 'down'])->assertOk();
+        $this->actingAs($admin)->postJson("/api/v1/admin/terms/{$last->public_id}/move", ['direction' => 'down'])->assertOk();
         $this->assertSame($last->title_id, collect($order())->last(), 'butir terakhir tidak bisa turun lagi');
 
-        $this->actingAs($admin)->postJson("/api/v1/admin/terms/{$last->id}/move", ['direction' => 'samping'])->assertUnprocessable();
+        $this->actingAs($admin)->postJson("/api/v1/admin/terms/{$last->public_id}/move", ['direction' => 'samping'])->assertUnprocessable();
     }
 
     public function test_the_contact_page_shows_published_sections_in_order_with_version_in_both_languages(): void

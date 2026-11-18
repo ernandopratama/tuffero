@@ -67,7 +67,7 @@ class ArrangeOrderTest extends TestCase
 
     private function arrange(Order $order, array $body, int $status = 200, string $role = 'warehouse'): void
     {
-        $this->actingAs($this->staff($role))->postJson("/api/v1/admin/orders/{$order->id}/arrange", $body)->assertStatus($status);
+        $this->actingAs($this->staff($role))->postJson("/api/v1/admin/orders/{$order->public_ref}/arrange", $body)->assertStatus($status);
     }
 
     private function webhook(string $status): void
@@ -115,7 +115,7 @@ class ArrangeOrderTest extends TestCase
         $this->assertSame(Order::PROCESSING, $order->status);
         $this->assertDatabaseHas('shipments', ['order_id' => $order->id, 'provider' => 'manual', 'waybill_id' => 'JT123', 'note' => 'Dititip satpam', 'status' => 'ready', 'shipped_at' => null]);
 
-        $this->actingAs($this->staff())->postJson("/api/v1/admin/orders/{$order->id}/mark-shipped")->assertOk();
+        $this->actingAs($this->staff())->postJson("/api/v1/admin/orders/{$order->public_ref}/mark-shipped")->assertOk();
 
         $order->refresh();
         $this->assertSame(Order::SHIPPED, $order->status);
@@ -128,7 +128,7 @@ class ArrangeOrderTest extends TestCase
         $order = $this->paidOrder();
         app(OrderStatusService::class)->startProcessing($order, $this->staff());
 
-        $this->actingAs($this->staff())->postJson("/api/v1/admin/orders/{$order->id}/mark-shipped")->assertUnprocessable();
+        $this->actingAs($this->staff())->postJson("/api/v1/admin/orders/{$order->public_ref}/mark-shipped")->assertUnprocessable();
         $this->assertSame(Order::PROCESSING, $order->fresh()->status);
     }
 
@@ -177,11 +177,11 @@ class ArrangeOrderTest extends TestCase
         $order = $this->paidOrder();
         $this->actingAs($this->staff());
 
-        $this->getJson("/api/v1/admin/orders/{$order->id}/label")->assertUnprocessable();
+        $this->getJson("/api/v1/admin/orders/{$order->public_ref}/label")->assertUnprocessable();
 
         $this->arrange($order, ['method' => 'manual', 'waybill_id' => 'JT123', 'note' => 'Hati-hati']);
 
-        $response = $this->actingAs($this->staff())->getJson("/api/v1/admin/orders/{$order->id}/label")
+        $response = $this->actingAs($this->staff())->getJson("/api/v1/admin/orders/{$order->public_ref}/label")
             ->assertOk()
             ->assertJsonPath('data.waybill_id', 'JT123')
             ->assertJsonPath('data.note', 'Hati-hati')
@@ -190,9 +190,15 @@ class ArrangeOrderTest extends TestCase
             ->assertJsonPath('data.weight_gram', 1000)
             ->assertJsonPath('data.items.0.quantity', 2)
             ->assertJsonPath('data.website', 'https://tuffero.com')
-            ->assertJsonCount(25, 'data.qr');
+            ->assertJsonPath('data.service_code', 'EZ')
+            ->assertJsonPath('data.ship_date', now()->format('Y-m-d'))
+            ->assertJsonPath('data.qty_total', 2)
+            ->assertJsonCount(21, 'data.qr');
 
-        $this->assertMatchesRegularExpression('/^[01]{25}$/', $response->json('data.qr.0'));
+        // QR memuat nomor resi (bukan alamat situs), supaya kurir memindai data yang sama dengan barcode.
+        $this->assertMatchesRegularExpression('/^[01]{21}$/', $response->json('data.qr.0'));
+        $this->assertNull($response->json('data.routing_code'), 'resi manual tidak punya kode sortir');
+        $this->assertArrayNotHasKey('cod', $response->json('data'));
 
         $body = $response->getContent();
         $this->assertStringNotContainsString('budi@example.com', $body);

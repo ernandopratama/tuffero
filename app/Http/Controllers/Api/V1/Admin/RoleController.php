@@ -45,7 +45,7 @@ class RoleController extends Controller
 
         $role = $this->roles->createRole($data['name'], trim(strip_tags($data['label'])), $data['permissions'], $request->user());
 
-        return $this->success('Role created.', ['id' => $role->id], 201);
+        return $this->success('Role created.', ['id' => $role->getAttribute('public_id')], 201);
     }
 
     public function updateRole(Request $request, Role $role): JsonResponse
@@ -84,7 +84,7 @@ class RoleController extends Controller
 
         $permission = $this->roles->createPermission($data['name'], trim(strip_tags($data['label'])), $this->text($data['description'] ?? null), $request->user());
 
-        return $this->success('Permission created.', ['id' => $permission->id], 201);
+        return $this->success('Permission created.', ['id' => $permission->getAttribute('public_id')], 201);
     }
 
     public function updatePermission(Request $request, Permission $permission): JsonResponse

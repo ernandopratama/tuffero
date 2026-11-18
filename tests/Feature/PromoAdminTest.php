@@ -108,7 +108,7 @@ class PromoAdminTest extends TestCase
         $voucher = $this->voucher();
 
         $this->actingAs($this->staff('marketing'))
-            ->patchJson("/api/v1/admin/vouchers/{$voucher->id}", $this->voucherData(['used_count' => 50]))
+            ->patchJson("/api/v1/admin/vouchers/{$voucher->public_id}", $this->voucherData(['used_count' => 50]))
             ->assertOk();
 
         $this->assertSame(0, $voucher->fresh()->used_count);
@@ -146,8 +146,8 @@ class PromoAdminTest extends TestCase
         $this->actingAs($this->staff('marketing'));
 
         $this->postJson('/api/v1/admin/vouchers', $this->voucherData())->assertUnprocessable()->assertJsonValidationErrors('code');
-        $this->patchJson("/api/v1/admin/vouchers/{$voucher->id}", $this->voucherData(['quota' => 4]))->assertUnprocessable()->assertJsonValidationErrors('quota');
-        $this->patchJson("/api/v1/admin/vouchers/{$voucher->id}", $this->voucherData(['quota' => 5]))->assertOk();
+        $this->patchJson("/api/v1/admin/vouchers/{$voucher->public_id}", $this->voucherData(['quota' => 4]))->assertUnprocessable()->assertJsonValidationErrors('quota');
+        $this->patchJson("/api/v1/admin/vouchers/{$voucher->public_id}", $this->voucherData(['quota' => 5]))->assertOk();
     }
 
     /** @return array<string, array{string, bool}> */
@@ -209,7 +209,7 @@ class PromoAdminTest extends TestCase
         Storage::fake('public');
         $this->actingAs($this->staff('marketing'));
         $content = $this->content(['type' => 'banner', 'body' => null]);
-        $url = "/api/v1/admin/contents/{$content->id}";
+        $url = "/api/v1/admin/contents/{$content->public_id}";
 
         $this->patchJson($url, ['title' => 'Promo', 'is_published' => true])->assertUnprocessable()->assertJsonValidationErrors('is_published');
 
@@ -228,7 +228,7 @@ class PromoAdminTest extends TestCase
     {
         $owner = $this->staff('owner');
         $voucher = $this->voucher();
-        $url = "/api/v1/admin/vouchers/{$voucher->id}/comments";
+        $url = "/api/v1/admin/vouchers/{$voucher->public_id}/comments";
 
         $this->actingAs($owner)->postJson($url, ['body' => '<b>Saran</b> kuota dinaikkan'])
             ->assertCreated()
@@ -248,19 +248,19 @@ class PromoAdminTest extends TestCase
         $warehouse = $this->staff('warehouse'); // tidak punya vouchers.view
         $inactive = $this->staff('store-admin');
         $inactive->forceFill(['is_active' => false])->save();
-        $url = '/api/v1/admin/vouchers/'.$this->voucher()->id.'/comments';
+        $url = '/api/v1/admin/vouchers/'.$this->voucher()->public_id.'/comments';
 
         $this->actingAs($owner);
 
         $mentionable = collect($this->getJson($url)->assertOk()->json('data.mentionable'))->pluck('id');
-        $this->assertTrue($mentionable->contains($marketing->id));
-        $this->assertFalse($mentionable->contains($owner->id), 'Pembuat tidak bisa menandai dirinya sendiri.');
-        $this->assertFalse($mentionable->contains($warehouse->id));
-        $this->assertFalse($mentionable->contains($inactive->id));
+        $this->assertTrue($mentionable->contains($marketing->public_id));
+        $this->assertFalse($mentionable->contains($owner->public_id), 'Pembuat tidak bisa menandai dirinya sendiri.');
+        $this->assertFalse($mentionable->contains($warehouse->public_id));
+        $this->assertFalse($mentionable->contains($inactive->public_id));
 
-        $this->postJson($url, ['body' => "@{$marketing->name} tolong cek", 'mentions' => [$marketing->id, $marketing->id]])
+        $this->postJson($url, ['body' => "@{$marketing->name} tolong cek", 'mentions' => [$marketing->public_id, $marketing->public_id]])
             ->assertCreated()
-            ->assertJsonPath('data.mentions', [['id' => $marketing->id, 'name' => $marketing->name]]);
+            ->assertJsonPath('data.mentions', [['id' => $marketing->public_id, 'name' => $marketing->name]]);
 
         $this->postJson($url, ['body' => 'x', 'mentions' => [$warehouse->id]])->assertUnprocessable()->assertJsonValidationErrors('mentions.0');
         $this->postJson($url, ['body' => 'x', 'mentions' => [$owner->id]])->assertUnprocessable();
@@ -272,7 +272,7 @@ class PromoAdminTest extends TestCase
     public function test_comments_are_paged_by_five_newest_first(): void
     {
         $owner = $this->staff('owner');
-        $url = '/api/v1/admin/vouchers/'.$this->voucher()->id.'/comments';
+        $url = '/api/v1/admin/vouchers/'.$this->voucher()->public_id.'/comments';
         $this->actingAs($owner);
 
         foreach (range(1, 7) as $n) {
@@ -302,15 +302,15 @@ class PromoAdminTest extends TestCase
         $content = $this->content();
 
         $this->actingAs($this->staff('customer-service'))
-            ->postJson("/api/v1/admin/vouchers/{$voucher->id}/comments", ['body' => 'x'])
+            ->postJson("/api/v1/admin/vouchers/{$voucher->public_id}/comments", ['body' => 'x'])
             ->assertForbidden();
 
         $this->actingAs($this->staff('store-admin'))
-            ->getJson("/api/v1/admin/contents/{$content->id}/comments")
+            ->getJson("/api/v1/admin/contents/{$content->public_id}/comments")
             ->assertForbidden();
 
         $this->actingAs($this->staff('owner'))
-            ->postJson("/api/v1/admin/contents/{$content->id}/comments", ['body' => ''])
+            ->postJson("/api/v1/admin/contents/{$content->public_id}/comments", ['body' => ''])
             ->assertUnprocessable();
     }
 

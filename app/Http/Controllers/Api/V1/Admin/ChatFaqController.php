@@ -35,6 +35,6 @@ class ChatFaqController extends Controller
     /** @return array<string, mixed> */
     private function present(ChatFaq $faq): array
     {
-        return $faq->only(['id', 'title', 'title_en', 'keywords', 'answer_id', 'answer_en', 'sort_order', 'is_active', 'is_suggested']);
+        return ['id' => $faq->public_id] + $faq->only(['title', 'title_en', 'keywords', 'answer_id', 'answer_en', 'sort_order', 'is_active', 'is_suggested']);
     }
 }

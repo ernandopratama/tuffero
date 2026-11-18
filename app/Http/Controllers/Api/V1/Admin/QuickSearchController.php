@@ -71,8 +71,8 @@ class QuickSearchController extends Controller
                         ->orWhereHas('shipment', fn ($shipment) => $shipment->where('waybill_id', 'like', "%{$term}%"));
                 }
             })
-            ->latest('id')->limit(self::LIMIT)->get(['id', 'order_number', 'customer_name', 'status'])
-            ->map(fn (Order $order) => ['id' => $order->id, 'title' => $order->order_number, 'subtitle' => $order->customer_name, 'status' => $order->status, 'search' => $order->order_number])
+            ->latest('id')->limit(self::LIMIT)->get(['id', 'public_ref', 'order_number', 'customer_name', 'status'])
+            ->map(fn (Order $order) => ['id' => $order->public_ref, 'title' => $order->order_number, 'subtitle' => $order->customer_name, 'status' => $order->status, 'search' => $order->order_number])
             ->all();
     }
 
@@ -92,7 +92,7 @@ class QuickSearchController extends Controller
                 }
             })
             ->latest('id')->limit(self::LIMIT)->get()
-            ->map(fn (Refund $refund) => ['id' => $refund->id, 'title' => $refund->refund_number, 'subtitle' => $refund->order->customer_name.' · '.$refund->order->order_number, 'status' => $refund->status, 'search' => $refund->refund_number])
+            ->map(fn (Refund $refund) => ['id' => $refund->public_ref, 'title' => $refund->refund_number, 'subtitle' => $refund->order->customer_name.' · '.$refund->order->order_number, 'status' => $refund->status, 'search' => $refund->refund_number])
             ->all();
     }
 
@@ -110,7 +110,7 @@ class QuickSearchController extends Controller
                 }
             })
             ->latest('id')->limit(self::LIMIT)->get()
-            ->map(fn (OrderCancellationRequest $request) => ['id' => $request->id, 'title' => $request->request_number, 'subtitle' => $request->order->customer_name.' · '.$request->order->order_number, 'status' => $request->status, 'search' => $request->request_number])
+            ->map(fn (OrderCancellationRequest $request) => ['id' => $request->public_id, 'title' => $request->request_number, 'subtitle' => $request->order->customer_name.' · '.$request->order->order_number, 'status' => $request->status, 'search' => $request->request_number])
             ->all();
     }
 }

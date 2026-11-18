@@ -139,6 +139,7 @@ class DashboardService
      * Angka bisnis bulan ini untuk Pemilik. Setiap angka memeriksa izinnya sendiri. Definisi (usulan, belum ada di Decision Log):
      * nilai rata-rata pesanan = pendapatan kotor bulan ini dibagi pesanan dibayar bulan ini (RevenueService); pelanggan baru = akun tanpa role yang dibuat
      * bulan ini; rasio batal = dari pesanan yang dibayar bulan ini (`paid_at`), berapa persen yang kini berstatus dibatalkan (`cancelled_at`).
+     * Batal setelah bayar, rasio checkout, dan rasio kedaluwarsa disetujui Ernando 18 Nov 2026 (D-141).
      *
      * @return list<array{key: string, label: string, value: string, foot: string}>
      */
@@ -148,16 +149,16 @@ class DashboardService
         $range = $this->monthRange(0);
         $tiles = [];
 
-        $paidCount = Order::whereBetween('paid_at', $range)->count();
+        $paidCount = app(RevenueService::class)->paidCount($range);
 
         if ($user->can('payments.view')) {
             // Pendapatan kotor dibagi pesanan dibayar, kelompok yang sama dengan KPI pendapatan dan rasio batal (RevenueService).
             $revenue = app(RevenueService::class);
             $previousRange = $this->monthRange(1);
-            $previousCount = Order::whereBetween('paid_at', $previousRange)->count();
+            $previousCount = $revenue->paidCount($previousRange);
             $tiles[] = [
                 'key' => 'avg_order', 'label' => 'Nilai rata-rata pesanan',
-                'value' => $paidCount > 0 ? $rupiah((int) round($revenue->gross($range) / $paidCount)) : '-',
+                'value' => $revenue->paidCount($range) > 0 ? $rupiah((int) round($revenue->gross($range) / $revenue->paidCount($range))) : '-',
                 'foot' => $previousCount > 0 ? 'Bulan lalu '.$rupiah((int) round($revenue->gross($previousRange) / $previousCount)) : 'Bulan lalu belum ada pembanding',
             ];
         }
@@ -171,19 +172,72 @@ class DashboardService
         }
 
         if ($user->can('orders.view')) {
-            // Satu kelompok: pesanan yang dibayar bulan ini (paid_at, apa pun status bayarnya sekarang), sama dengan KPI "Pesanan bulan ini".
+            $percent = fn (int $part, int $whole) => $whole > 0 ? number_format($part / $whole * 100, 1, ',', '').'%' : '-';
+            $versus = fn (int $part, int $whole) => $whole > 0 ? 'bulan lalu '.$percent($part, $whole) : 'bulan lalu belum ada pembanding';
+
+            // Batal setelah bayar (D-141): kelompok = pesanan yang dibayar bulan ini (paid_at, apa pun status bayarnya sekarang), sama dengan KPI "Pesanan bulan ini".
             // Pembatalan pesanan terbayar mengubah payment_status menjadi refund_pending, jadi tidak boleh memakai filter 'paid' di sini.
-            $cohort = Order::whereBetween('paid_at', $range);
-            $cohortCount = (clone $cohort)->count();
-            $cancelled = (clone $cohort)->whereNotNull('cancelled_at')->count();
+            [$cohortCount, $cancelled] = $this->paidCohort($range);
+            [$previousCohort, $previousCancelled] = $this->paidCohort($this->monthRange(1));
             $tiles[] = [
-                'key' => 'cancel_rate', 'label' => 'Rasio pembatalan',
-                'value' => $cohortCount > 0 ? number_format($cancelled / $cohortCount * 100, 1, ',', '').'%' : '-',
-                'foot' => $cancelled.' dari '.$cohortCount.' pesanan dibayar bulan ini dibatalkan',
+                'key' => 'cancel_rate', 'label' => 'Batal setelah bayar',
+                'value' => $percent($cancelled, $cohortCount),
+                'foot' => $cancelled.' dari '.$cohortCount.' pesanan dibayar bulan ini dibatalkan · '.$versus($previousCancelled, $previousCohort),
+            ];
+
+            // Rasio checkout dan kedaluwarsa (D-141): kelompok = pesanan yang dibuat bulan ini, penyebut = yang sudah selesai nasibnya.
+            $created = $this->createdCohort($range);
+            $previous = $this->createdCohort($this->monthRange(1));
+            $waiting = $created['open'] > 0 ? ' · '.$created['open'].' masih menunggu' : '';
+            $tiles[] = [
+                'key' => 'checkout_rate', 'label' => 'Rasio checkout',
+                'value' => $percent($created['paid'], $created['decided']),
+                'foot' => $created['paid'].' dari '.$created['decided'].' dibayar · '.$versus($previous['paid'], $previous['decided']).$waiting,
+            ];
+            $tiles[] = [
+                'key' => 'expiry_rate', 'label' => 'Rasio kedaluwarsa',
+                'value' => $percent($created['expired'], $created['decided']),
+                'foot' => $created['expired'].' dari '.$created['decided'].' kedaluwarsa · '.$versus($previous['expired'], $previous['decided']),
             ];
         }
 
         return $tiles;
+    }
+
+    /**
+     * Pesanan dibayar dalam rentang dan berapa yang kemudian dibatalkan, satu kueri.
+     *
+     * @param  array{0: CarbonImmutable, 1: CarbonImmutable}  $range
+     * @return array{0: int, 1: int}
+     */
+    private function paidCohort(array $range): array
+    {
+        $row = Order::whereBetween('paid_at', $range)
+            ->selectRaw('COUNT(*) AS total, COALESCE(SUM(CASE WHEN cancelled_at IS NOT NULL THEN 1 ELSE 0 END), 0) AS cancelled')
+            ->toBase()->first();
+
+        return [(int) $row->total, (int) $row->cancelled];
+    }
+
+    /**
+     * Nasib pesanan yang dibuat dalam rentang, satu kueri. Terbuka (menunggu bayar atau tinjau) belum punya nasib, jadi keluar dari penyebut;
+     * dibayar + kedaluwarsa + batal sebelum bayar + ditolak = `decided`.
+     *
+     * @param  array{0: CarbonImmutable, 1: CarbonImmutable}  $range
+     * @return array{paid: int, expired: int, open: int, decided: int}
+     */
+    private function createdCohort(array $range): array
+    {
+        $row = Order::whereBetween('created_at', $range)
+            ->selectRaw(
+                'COUNT(*) AS total, COALESCE(SUM(CASE WHEN paid_at IS NOT NULL THEN 1 ELSE 0 END), 0) AS paid, '
+                .'COALESCE(SUM(CASE WHEN status = ? THEN 1 ELSE 0 END), 0) AS expired, '
+                .'COALESCE(SUM(CASE WHEN paid_at IS NULL AND status IN (?, ?) THEN 1 ELSE 0 END), 0) AS open_count',
+                [Order::EXPIRED, Order::PENDING_PAYMENT, Order::AWAITING_APPROVAL],
+            )
+            ->toBase()->first();
+
+        return ['paid' => (int) $row->paid, 'expired' => (int) $row->expired, 'open' => (int) $row->open_count, 'decided' => (int) $row->total - (int) $row->open_count];
     }
 
     // ---------- perhatian ----------

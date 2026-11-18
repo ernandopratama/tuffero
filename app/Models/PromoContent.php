@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Models\Concerns\HasPublicId;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Attributes\Scope;
 use Illuminate\Database\Eloquent\Builder;
@@ -13,6 +14,7 @@ use Illuminate\Database\Eloquent\SoftDeletes;
 #[Fillable(['type', 'title', 'body', 'video_url', 'provider', 'external_id', 'sort_order', 'starts_at', 'ends_at', 'is_published'])]
 class PromoContent extends Model
 {
+    use HasPublicId;
     use SoftDeletes;
 
     /** Hasil pengambilan thumbnail otomatis pada permintaan ini ('fetched', 'failed', 'unsupported'); tidak disimpan. */

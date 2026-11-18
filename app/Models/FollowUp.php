@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Models\Concerns\HasPublicId;
 use Carbon\CarbonInterface;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Model;
@@ -17,6 +18,8 @@ use Illuminate\Database\Eloquent\Relations\MorphTo;
 #[Fillable(['created_by', 'note', 'due_on'])]
 class FollowUp extends Model
 {
+    use HasPublicId;
+
     /** @return array<string, string> */
     protected function casts(): array
     {

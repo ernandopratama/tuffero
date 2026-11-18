@@ -16,8 +16,8 @@ class AdjustStockRequest extends FormRequest
     public function rules(): array
     {
         return [
-            'warehouse_id' => ['required', 'integer', Rule::exists('warehouses', 'id')->where('is_active', true)],
-            'product_variant_id' => ['required', 'integer', Rule::exists('product_variants', 'id')->whereNull('deleted_at')],
+            'warehouse_id' => ['required', 'string', 'ulid', Rule::exists('warehouses', 'public_id')->where('is_active', true)],
+            'product_variant_id' => ['required', 'string', 'ulid', Rule::exists('product_variants', 'public_id')->whereNull('deleted_at')],
             'type' => ['required', Rule::in(['restock', 'adjustment'])],
             'quantity_change' => ['required', 'integer', 'not_in:0', 'min:-1000000', 'max:1000000'],
             'note' => ['required', 'string', 'max:255'],

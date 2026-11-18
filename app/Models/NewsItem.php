@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Models\Concerns\HasPublicId;
 use Carbon\CarbonInterface;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Attributes\Scope;
@@ -18,6 +19,7 @@ use Illuminate\Database\Eloquent\SoftDeletes;
 #[Fillable(['kind', 'title', 'title_en', 'body', 'body_en', 'cta_label', 'cta_label_en', 'cta_url', 'starts_at', 'ends_at', 'sort_order', 'is_published'])]
 class NewsItem extends Model
 {
+    use HasPublicId;
     use SoftDeletes;
 
     /** Jenis = lencana kecil di kartu popup. */

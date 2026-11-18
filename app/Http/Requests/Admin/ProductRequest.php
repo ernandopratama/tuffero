@@ -17,8 +17,8 @@ class ProductRequest extends FormRequest
     {
         return [
             'name' => [$this->isMethod('post') ? 'required' : 'sometimes', 'required', 'string', 'max:150'],
-            'product_category_id' => ['sometimes', 'nullable', 'integer', Rule::exists('product_categories', 'id')->where('is_active', true)],
-            'product_type_id' => ['sometimes', 'nullable', 'integer', Rule::exists('product_types', 'id')->where('is_active', true)],
+            'product_category_id' => ['sometimes', 'nullable', 'string', 'ulid', Rule::exists('product_categories', 'public_id')->where('is_active', true)],
+            'product_type_id' => ['sometimes', 'nullable', 'string', 'ulid', Rule::exists('product_types', 'public_id')->where('is_active', true)],
             'description' => ['sometimes', 'nullable', 'string', 'max:5000'],
             'name_en' => ['sometimes', 'nullable', 'string', 'max:150'],
             'description_en' => ['sometimes', 'nullable', 'string', 'max:5000'],

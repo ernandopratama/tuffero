@@ -60,7 +60,7 @@ class CampaignController extends Controller
     public function storeItem(CampaignItemRequest $request, Campaign $campaign): JsonResponse
     {
         $data = $request->validated();
-        $variant = ProductVariant::findOrFail($data['variant_id']);
+        $variant = ProductVariant::where('public_id', $data['variant_id'])->firstOrFail();
         unset($data['variant_id']);
 
         $this->campaigns->addItem($campaign, $variant, $data, $request->user());
@@ -90,7 +90,7 @@ class CampaignController extends Controller
             ->orderBy('sku')->limit(20)->get();
 
         return $this->success('Variants retrieved.', ['items' => $items->map(fn (ProductVariant $variant) => [
-            'id' => $variant->id, 'sku' => $variant->sku, 'label' => $this->label($variant), 'price' => $variant->price,
+            'id' => $variant->public_id, 'sku' => $variant->sku, 'label' => $this->label($variant), 'price' => $variant->price,
         ])->values()]);
     }
 
@@ -102,8 +102,8 @@ class CampaignController extends Controller
         return [
             ...$this->present($campaign),
             'items' => $campaign->discounts->sortBy('id')->values()->map(fn (VariantDiscount $item) => [
-                'id' => $item->id,
-                'variant_id' => $item->product_variant_id,
+                'id' => $item->public_id,
+                'variant_id' => $item->variant->public_id,
                 'sku' => $item->variant->sku,
                 'label' => $this->label($item->variant),
                 'price' => $item->variant->price,
@@ -129,7 +129,8 @@ class CampaignController extends Controller
         };
 
         return [
-            ...$campaign->only(['id', 'slug', 'title', 'description', 'starts_at', 'ends_at', 'is_flash', 'is_active']),
+            'id' => $campaign->public_id,
+            ...$campaign->only(['slug', 'title', 'description', 'starts_at', 'ends_at', 'is_flash', 'is_active']),
             'status' => $status,
             'image_url' => $campaign->image_path ? '/storage/'.$campaign->image_path : null,
             'items_count' => $campaign->discounts_count ?? $campaign->discounts()->count(),

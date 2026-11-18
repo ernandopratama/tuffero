@@ -3,6 +3,7 @@
 namespace App\Models;
 
 use App\Http\Requests\Store\CheckoutRequest;
+use Carbon\CarbonInterface;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Attributes\Hidden;
 use Illuminate\Database\Eloquent\Builder;
@@ -15,6 +16,8 @@ use Illuminate\Support\Facades\DB;
 
 /**
  * @property array<string, string> $shipping_address
+ * @property CarbonInterface $created_at
+ * @property CarbonInterface|null $paid_at
  * @property-read Shipment|null $shipment
  */
 #[Fillable([
@@ -145,6 +148,15 @@ class Order extends Model
     public function canBeCancelled(): bool
     {
         return in_array($this->status, [self::AWAITING_APPROVAL, self::PENDING_PAYMENT, self::PAID, self::PROCESSING], true);
+    }
+
+    /**
+     * Rute admin `{order}` memakai UUID `public_ref`, bukan ID angka (D-143). `public_ref` bukan token akses: toko tetap
+     * memeriksa sesi atau token pesanan, admin tetap memeriksa izin.
+     */
+    public function getRouteKeyName(): string
+    {
+        return 'public_ref';
     }
 
     /**

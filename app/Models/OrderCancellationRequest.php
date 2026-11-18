@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Models\Concerns\HasPublicId;
 use Carbon\CarbonInterface;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Model;
@@ -19,6 +20,8 @@ use Illuminate\Database\Eloquent\Relations\MorphMany;
 #[Fillable(['request_number', 'reason', 'channel', 'status', 'due_at'])]
 class OrderCancellationRequest extends Model
 {
+    use HasPublicId;
+
     public const SUBMITTED = 'submitted';
 
     public const VALIDATED = 'validated';

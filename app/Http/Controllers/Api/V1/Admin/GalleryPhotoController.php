@@ -68,7 +68,8 @@ class GalleryPhotoController extends Controller
     private function present(GalleryPhoto $photo): array
     {
         return [
-            ...$photo->only(['id', 'title', 'title_en', 'category', 'is_featured', 'sort_order', 'is_published']),
+            'id' => $photo->public_id,
+            ...$photo->only(['title', 'title_en', 'category', 'is_featured', 'sort_order', 'is_published']),
             'image_url' => $photo->imageUrl(),
         ];
     }

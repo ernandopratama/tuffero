@@ -55,7 +55,7 @@ class VoucherRequest extends FormRequest
             // Boleh dipakai bersama voucher lain dalam satu pesanan (maksimal 2, D-078).
             'stackable' => ['sometimes', 'boolean'],
             // Voucher kampanye hanya berlaku selama kampanyenya berjalan (D-073).
-            'campaign_id' => ['sometimes', 'nullable', 'integer', 'exists:campaigns,id'],
+            'campaign_id' => ['sometimes', 'nullable', 'string', 'ulid', 'exists:campaigns,public_id'],
             'per_customer_limit' => ['sometimes', 'nullable', 'integer', 'min:1', 'max:100'],
             'value' => $isShipping
                 ? ['required', 'integer', 'min:'.Voucher::SHIPPING_MIN, 'max:'.Voucher::SHIPPING_MAX]

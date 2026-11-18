@@ -88,13 +88,13 @@ class CustomerBlockController extends Controller
     private function present(CustomerBlock $block, $numbers): array
     {
         return [
-            'id' => $block->id,
+            'id' => $block->public_id,
             'source' => $block->source,
             'phone' => $block->phone_masked,
             'customer_name' => $block->customer_name,
             'address_summary' => $block->address_summary,
             'ip_address' => $block->ip_address,
-            'orders' => collect($block->order_ids)->map(fn (int $id) => $numbers[$id] ?? "#{$id}")->values(),
+            'orders' => collect($block->order_ids)->map(fn (int $id) => $numbers[$id] ?? '-')->values(),
             'note' => $block->note,
             'is_active' => $block->isActive(),
             'blocked_at' => $block->created_at,

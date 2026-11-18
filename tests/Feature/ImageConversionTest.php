@@ -45,7 +45,7 @@ class ImageConversionTest extends TestCase
     {
         $this->actingAs($this->staff('store-admin'));
         $product = Product::create(['name' => 'Nastar', 'slug' => 'nastar']);
-        $url = "/api/v1/admin/products/{$product->id}/images";
+        $url = "/api/v1/admin/products/{$product->public_id}/images";
 
         $this->postJson($url, ['image' => UploadedFile::fake()->image('a.jpg', 3000, 2000), 'alt' => 'Foto'])->assertCreated();
         $this->postJson($url, ['image' => UploadedFile::fake()->image('b.png', 800, 800), 'alt' => 'Foto'])->assertCreated();
@@ -65,10 +65,10 @@ class ImageConversionTest extends TestCase
         $campaign = new Campaign(['title' => 'Promo', 'starts_at' => now(), 'ends_at' => now()->addDay(), 'is_active' => true]);
         $campaign->forceFill(['slug' => 'promo'])->save();
 
-        $this->post("/api/v1/admin/campaigns/{$campaign->id}/image", ['image' => UploadedFile::fake()->image('banner.png', 1200, 400)], ['Accept' => 'application/json'])->assertOk();
+        $this->post("/api/v1/admin/campaigns/{$campaign->public_id}/image", ['image' => UploadedFile::fake()->image('banner.png', 1200, 400)], ['Accept' => 'application/json'])->assertOk();
 
         $this->assertWebp($campaign->fresh()->image_path);
-        $this->post("/api/v1/admin/campaigns/{$campaign->id}/image", ['image' => UploadedFile::fake()->image('x.webp', 600, 200)], ['Accept' => 'application/json'])->assertUnprocessable();
+        $this->post("/api/v1/admin/campaigns/{$campaign->public_id}/image", ['image' => UploadedFile::fake()->image('x.webp', 600, 200)], ['Accept' => 'application/json'])->assertUnprocessable();
     }
 
     public function test_gallery_photo_is_stored_as_webp(): void
@@ -78,7 +78,7 @@ class ImageConversionTest extends TestCase
         $id = $this->post('/api/v1/admin/gallery-photos', ['title' => 'Foto', 'category' => 'nastar', 'image' => UploadedFile::fake()->image('foto.jpeg', 900, 900)], ['Accept' => 'application/json'])
             ->assertCreated()->json('data.id');
 
-        $this->assertWebp(GalleryPhoto::findOrFail($id)->image_path);
+        $this->assertWebp(GalleryPhoto::where('public_id', $id)->firstOrFail()->image_path);
         $this->post('/api/v1/admin/gallery-photos', ['title' => 'Foto', 'category' => 'nastar', 'image' => UploadedFile::fake()->image('foto.webp', 900, 900)], ['Accept' => 'application/json'])
             ->assertUnprocessable();
     }

@@ -102,7 +102,7 @@ class FulfillmentToolsTest extends TestCase
         $a = $this->paidOrder(['NAS-01' => 2, 'KAS-01' => 1]);
         $b = $this->paidOrder(['NAS-01' => 3]);
 
-        $response = $this->actingAs($this->staff('warehouse'))->getJson("/api/v1/admin/fulfillment/pick-list?ids={$a->id},{$b->id}")->assertOk();
+        $response = $this->actingAs($this->staff('warehouse'))->getJson("/api/v1/admin/fulfillment/pick-list?ids={$a->public_ref},{$b->public_ref}")->assertOk();
 
         $lines = collect($response->json('data.lines'))->keyBy('sku');
         $this->assertSame(5, $lines['NAS-01']['quantity']);
@@ -123,7 +123,7 @@ class FulfillmentToolsTest extends TestCase
         $done->forceFill(['status' => Order::COMPLETED])->save();
         $warehouse = $this->staff('warehouse');
 
-        $this->actingAs($warehouse)->getJson("/api/v1/admin/fulfillment/pick-list?ids={$open->id},{$done->id}")->assertOk()
+        $this->actingAs($warehouse)->getJson("/api/v1/admin/fulfillment/pick-list?ids={$open->public_ref},{$done->public_ref}")->assertOk()
             ->assertJsonPath('data.skipped', 1)->assertJsonCount(1, 'data.orders');
 
         $this->actingAs($warehouse)->getJson('/api/v1/admin/fulfillment/pick-list')->assertJsonValidationErrors('ids');

@@ -58,6 +58,7 @@ const MENU = [
             { label: 'Pengguna', icon: 'users', any: ['users.manage'], to: { name: 'AdminUsers' } },
             { label: 'Role dan Izin', short: 'Role', icon: 'shield', any: ['roles.manage'], to: { name: 'AdminRoles' } },
             { label: 'Syarat dan Ketentuan', short: 'S&K', icon: 'document', any: ['terms.manage'], to: { name: 'AdminTerms' } },
+            { label: 'Kebijakan Privasi', short: 'Privasi', icon: 'shield', any: ['terms.manage'], to: { name: 'AdminPrivacy' } },
             { label: 'Pengaturan', icon: 'sliders', any: ['settings.manage', 'settings.manage_contact'], to: { name: 'AdminSettings' } },
         ],
     },

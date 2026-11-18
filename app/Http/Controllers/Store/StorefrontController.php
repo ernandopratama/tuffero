@@ -131,29 +131,37 @@ class StorefrontController extends Controller
     }
 
     /**
-     * S&K dari dashboard (butir tayang, urut). Tanpa butir tayang, teks bawaan di berkas bahasa dipakai. Versi dan tanggalnya ditampilkan
-     * supaya jelas teks mana yang disetujui pelanggan saat mengajukan refund.
+     * S&K dan Kebijakan Privasi dari dashboard (butir tayang, urut, D-139). Dokumen tanpa butir tayang memakai teks bawaan di berkas
+     * bahasa, jadi halaman tidak pernah kosong. Versi dan tanggal tiap dokumen ditampilkan supaya jelas teks mana yang berlaku;
+     * versi S&K juga yang disetujui pelanggan saat mengajukan refund.
      *
      * @param  array<string, mixed>  $p
-     * @return array{version: string, date: string}|null
+     * @return array<string, array{version: string, date: string}> menurut id dokumen ('syarat', 'privasi'); hanya dokumen dari dashboard
      */
-    private function terms(array &$p): ?array
+    private function terms(array &$p): array
     {
-        $sections = TermsSection::published()->get();
+        $en = app()->getLocale() === 'en';
+        $types = ['syarat' => TermsSection::TERMS, 'privasi' => TermsSection::PRIVACY];
+        $versions = [];
 
-        if ($sections->isEmpty()) {
-            return null;
+        foreach ($p['legal']['docs'] as $i => $doc) {
+            $type = $types[$doc['id']] ?? null;
+            $sections = $type ? TermsSection::published($type)->get() : collect();
+
+            if ($sections->isEmpty()) {
+                continue;
+            }
+
+            $p['legal']['docs'][$i]['items'] = $sections->map(fn (TermsSection $s) => $en ? [$s->title_en, $s->body_en] : [$s->title_id, $s->body_id])->all();
+
+            $updated = Setting::where('key', TermsService::versionKey($type))->value('updated_at');
+            $versions[$doc['id']] = [
+                'version' => app(TermsService::class)->version($type),
+                'date' => ($updated ? Carbon::parse($updated) : now())->locale($en ? 'en' : 'id')->translatedFormat('j F Y'),
+            ];
         }
 
-        $en = app()->getLocale() === 'en';
-        $p['legal']['docs'][0]['items'] = $sections->map(fn (TermsSection $s) => $en ? [$s->title_en, $s->body_en] : [$s->title_id, $s->body_id])->all();
-
-        $updated = Setting::where('key', TermsService::VERSION_KEY)->value('updated_at');
-
-        return [
-            'version' => app(TermsService::class)->version(),
-            'date' => ($updated ? Carbon::parse($updated) : now())->locale($en ? 'en' : 'id')->translatedFormat('j F Y'),
-        ];
+        return $versions;
     }
 
     public function catalog(): View

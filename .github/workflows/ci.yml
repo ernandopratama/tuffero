@@ -129,3 +129,55 @@ jobs:
         run: |
           php artisan migrate --force
           php artisan db:seed --force
+
+  # Tes konkurensi stok (BR-10, TRX-04): beberapa proses PHP berlomba memakai stok yang sama pada database sungguhan.
+  # SQLite pada job "Tests" tidak menguji kunci baris (lockForUpdate), jadi tes ini dipisah (phpunit.concurrency.xml, grup
+  # concurrency) dan berjalan di MariaDB 10.6 (dev) serta MySQL 8.4 (production). Database khusus tuffero_concurrency_test;
+  # tes menolak database lain (tests/Concurrency/Boot.php). Tidak memakai secret.
+  concurrency:
+    name: Stock concurrency (${{ matrix.db }})
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        db: ['mariadb:10.6', 'mysql:8.4']
+    services:
+      db:
+        image: ${{ matrix.db }}
+        env:
+          MYSQL_ROOT_PASSWORD: root
+          MYSQL_DATABASE: tuffero_concurrency_test
+        ports:
+          - 3306:3306
+        options: >-
+          --health-cmd="mysqladmin ping -h 127.0.0.1 -proot --silent"
+          --health-interval=5s
+          --health-timeout=5s
+          --health-retries=20
+    env:
+      CONCURRENCY_DB_HOST: 127.0.0.1
+      CONCURRENCY_DB_PORT: 3306
+      CONCURRENCY_DB_DATABASE: tuffero_concurrency_test
+      CONCURRENCY_DB_USERNAME: root
+      CONCURRENCY_DB_PASSWORD: root
+      CONCURRENCY_ROUNDS: 20
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: shivammathur/setup-php@v2
+        with:
+          php-version: ${{ env.PHP_VERSION }}
+          extensions: mbstring, intl, gd, zip, pdo_mysql
+          coverage: none
+
+      - name: Install Composer dependencies
+        run: composer install --no-interaction --prefer-dist --no-progress
+
+      # .env hanya untuk APP_KEY; koneksi database datang dari CONCURRENCY_DB_*.
+      - name: Prepare environment
+        run: |
+          cp .env.example .env
+          php artisan key:generate
+
+      - name: Run concurrency tests
+        run: vendor/bin/phpunit -c phpunit.concurrency.xml

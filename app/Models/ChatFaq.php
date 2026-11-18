@@ -2,12 +2,15 @@
 
 namespace App\Models;
 
+use App\Models\Concerns\HasPublicId;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Model;
 
 #[Fillable(['title', 'title_en', 'keywords', 'answer_id', 'answer_en', 'sort_order', 'is_active', 'is_suggested'])]
 class ChatFaq extends Model
 {
+    use HasPublicId;
+
     public const MAX_KEYWORDS = 20;
 
     public const MIN_KEYWORD_LENGTH = 3;

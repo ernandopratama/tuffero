@@ -75,7 +75,7 @@ class MarketingDraftTest extends TestCase
         $this->actingAs($this->staff('owner'))->postJson(self::URL."/{$id}/decide", ['decision' => 'approve', 'note' => 'Bagus'])->assertOk()->assertJsonPath('data.status', 'approved');
         $this->actingAs($marketing)->postJson(self::URL."/{$id}/move", ['action' => 'post'])->assertOk()->assertJsonPath('data.status', 'posted');
 
-        $this->assertNotNull(MarketingDraft::find($id)->posted_at);
+        $this->assertNotNull(MarketingDraft::where('public_id', $id)->first()->posted_at);
         foreach (['submit', 'approved', 'post'] as $suffix) {
             $this->assertDatabaseHas('audit_logs', ['action' => 'marketing_draft.'.$suffix]);
         }
@@ -85,8 +85,8 @@ class MarketingDraftTest extends TestCase
     {
         $draft = $this->draft('in_review');
 
-        $this->actingAs($this->staff('marketing'))->postJson(self::URL."/{$draft->id}/decide", ['decision' => 'approve'])->assertForbidden();
-        $this->actingAs($this->staff('owner'))->postJson(self::URL."/{$this->draft()->id}/move", ['action' => 'submit'])->assertForbidden();
+        $this->actingAs($this->staff('marketing'))->postJson(self::URL."/{$draft->public_id}/decide", ['decision' => 'approve'])->assertForbidden();
+        $this->actingAs($this->staff('owner'))->postJson(self::URL."/{$this->draft()->public_id}/move", ['action' => 'submit'])->assertForbidden();
         $this->assertSame('in_review', $draft->fresh()->status);
     }
 
@@ -95,10 +95,10 @@ class MarketingDraftTest extends TestCase
         $draft = $this->draft('in_review');
         $owner = $this->staff('owner');
 
-        $this->actingAs($owner)->postJson(self::URL."/{$draft->id}/decide", ['decision' => 'reject'])->assertUnprocessable()->assertJsonValidationErrors('note');
-        $this->actingAs($owner)->postJson(self::URL."/{$draft->id}/decide", ['decision' => 'reject', 'note' => 'Terlalu panjang'])->assertOk()->assertJsonPath('data.status', 'rejected');
+        $this->actingAs($owner)->postJson(self::URL."/{$draft->public_id}/decide", ['decision' => 'reject'])->assertUnprocessable()->assertJsonValidationErrors('note');
+        $this->actingAs($owner)->postJson(self::URL."/{$draft->public_id}/decide", ['decision' => 'reject', 'note' => 'Terlalu panjang'])->assertOk()->assertJsonPath('data.status', 'rejected');
 
-        $this->actingAs($this->staff('marketing'))->patchJson(self::URL."/{$draft->id}", $this->payload(['title' => 'Revisi']))->assertOk()->assertJsonPath('data.status', 'draft')->assertJsonPath('data.review_note', null);
+        $this->actingAs($this->staff('marketing'))->patchJson(self::URL."/{$draft->public_id}", $this->payload(['title' => 'Revisi']))->assertOk()->assertJsonPath('data.status', 'draft')->assertJsonPath('data.review_note', null);
     }
 
     public function test_invalid_transitions_are_refused(): void
@@ -108,17 +108,17 @@ class MarketingDraftTest extends TestCase
 
         // Tidak bisa diposting sebelum disetujui, tidak bisa diputuskan sebelum diajukan, tidak bisa disunting saat ditinjau atau disetujui.
         $draft = $this->draft('draft');
-        $this->actingAs($marketing)->postJson(self::URL."/{$draft->id}/move", ['action' => 'post'])->assertUnprocessable();
-        $this->actingAs($owner)->postJson(self::URL."/{$draft->id}/decide", ['decision' => 'approve'])->assertUnprocessable();
+        $this->actingAs($marketing)->postJson(self::URL."/{$draft->public_id}/move", ['action' => 'post'])->assertUnprocessable();
+        $this->actingAs($owner)->postJson(self::URL."/{$draft->public_id}/decide", ['decision' => 'approve'])->assertUnprocessable();
 
         foreach (['in_review', 'approved', 'posted'] as $status) {
             $locked = $this->draft($status);
-            $this->actingAs($marketing)->patchJson(self::URL."/{$locked->id}", $this->payload(['title' => 'Ubah']))->assertUnprocessable();
-            $this->actingAs($marketing)->deleteJson(self::URL."/{$locked->id}")->assertUnprocessable();
+            $this->actingAs($marketing)->patchJson(self::URL."/{$locked->public_id}", $this->payload(['title' => 'Ubah']))->assertUnprocessable();
+            $this->actingAs($marketing)->deleteJson(self::URL."/{$locked->public_id}")->assertUnprocessable();
             $this->assertSame('Nastar Lebaran', $locked->fresh()->title);
         }
 
-        $this->actingAs($marketing)->postJson(self::URL."/{$draft->id}/move", ['action' => 'approve'])->assertUnprocessable();
+        $this->actingAs($marketing)->postJson(self::URL."/{$draft->public_id}/move", ['action' => 'approve'])->assertUnprocessable();
     }
 
     public function test_decision_is_final_for_a_second_request(): void
@@ -126,8 +126,8 @@ class MarketingDraftTest extends TestCase
         $draft = $this->draft('in_review');
         $owner = $this->staff('owner');
 
-        $this->actingAs($owner)->postJson(self::URL."/{$draft->id}/decide", ['decision' => 'approve'])->assertOk();
-        $this->actingAs($owner)->postJson(self::URL."/{$draft->id}/decide", ['decision' => 'reject', 'note' => 'Terlambat'])->assertUnprocessable();
+        $this->actingAs($owner)->postJson(self::URL."/{$draft->public_id}/decide", ['decision' => 'approve'])->assertOk();
+        $this->actingAs($owner)->postJson(self::URL."/{$draft->public_id}/decide", ['decision' => 'reject', 'note' => 'Terlambat'])->assertUnprocessable();
         $this->assertSame('approved', $draft->fresh()->status);
     }
 
@@ -144,7 +144,7 @@ class MarketingDraftTest extends TestCase
     {
         $id = $this->actingAs($this->staff('marketing'))->postJson(self::URL, $this->payload(['status' => 'approved', 'created_by_user_id' => 999, 'posted_at' => now()->toDateTimeString()]))->assertCreated()->json('data.id');
 
-        $draft = MarketingDraft::find($id);
+        $draft = MarketingDraft::where('public_id', $id)->first();
         $this->assertSame('draft', $draft->status);
         $this->assertNull($draft->posted_at);
         $this->assertNotSame(999, $draft->created_by_user_id);
@@ -155,7 +155,7 @@ class MarketingDraftTest extends TestCase
         $marketing = $this->staff('marketing');
         $id = $this->actingAs($marketing)->postJson(self::URL, $this->payload(['title' => '**Judul**', 'body' => "## Tren\n**Tebal** dan __lain__\n* satu\n* dua\n[Tokopedia](https://tokopedia.com/x)"]))->assertCreated()->json('data.id');
 
-        $draft = MarketingDraft::find($id);
+        $draft = MarketingDraft::where('public_id', $id)->first();
         $this->assertSame('Judul', $draft->title);
         $this->assertSame("Tren\nTebal dan lain\n- satu\n- dua\nTokopedia (https://tokopedia.com/x)", $draft->body);
 
@@ -188,7 +188,7 @@ class MarketingDraftTest extends TestCase
     {
         $draft = $this->draft('draft');
 
-        $this->actingAs($this->staff('marketing'))->deleteJson(self::URL."/{$draft->id}")->assertOk();
+        $this->actingAs($this->staff('marketing'))->deleteJson(self::URL."/{$draft->public_id}")->assertOk();
 
         $this->assertSoftDeleted('marketing_drafts', ['id' => $draft->id]);
         $this->assertDatabaseHas('audit_logs', ['action' => 'marketing_draft.deleted']);

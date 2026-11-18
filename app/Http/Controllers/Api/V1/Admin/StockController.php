@@ -36,8 +36,8 @@ class StockController extends Controller
 
     public function index(Request $request): JsonResponse
     {
-        $warehouses = Warehouse::where('is_active', true)->orderBy('id')->get(['id', 'code', 'name']);
-        $warehouseId = $request->integer('warehouse_id') ?: $warehouses->first()?->id;
+        $warehouses = Warehouse::where('is_active', true)->orderBy('id')->get(['id', 'public_id', 'code', 'name']);
+        $warehouseId = $this->warehouseKey($request->query('warehouse_id')) ?: $warehouses->first()?->id;
         $search = $request->string('search')->trim()->toString();
         $defaultLimit = DashboardService::lowStockLimit();
 
@@ -66,13 +66,13 @@ class StockController extends Controller
             ->paginate($this->perPage($request));
 
         return $this->success('Stock retrieved.', [
-            'warehouses' => $warehouses,
-            'warehouse_id' => $warehouseId,
+            'warehouses' => $warehouses->map(fn (Warehouse $w) => ['id' => $w->public_id, 'code' => $w->code, 'name' => $w->name])->values(),
+            'warehouse_id' => $warehouses->firstWhere('id', $warehouseId)?->public_id,
             'items' => $page->getCollection()->map(function (ProductVariant $variant) use ($defaultLimit) {
                 $stock = $variant->stocks->first();
 
                 return [
-                    'variant_id' => $variant->id,
+                    'variant_id' => $variant->public_id,
                     'sku' => $variant->sku,
                     'product' => $variant->product->name,
                     'variant' => $variant->name,
@@ -91,15 +91,17 @@ class StockController extends Controller
     public function movements(Request $request): JsonResponse
     {
         $validated = $request->validate([
-            'warehouse_id' => ['required', 'integer'],
-            'variant_id' => ['required', 'integer'],
+            'warehouse_id' => ['required', 'string', 'ulid'],
+            'variant_id' => ['required', 'string', 'ulid'],
         ]);
 
-        $stock = InventoryStock::where(['warehouse_id' => $validated['warehouse_id'], 'product_variant_id' => $validated['variant_id']])->first();
+        $variantId = ProductVariant::withTrashed()->where('public_id', $validated['variant_id'])->value('id');
+        $warehouseId = $this->warehouseKey($validated['warehouse_id']);
+        $stock = $variantId && $warehouseId ? InventoryStock::where(['warehouse_id' => $warehouseId, 'product_variant_id' => $variantId])->first() : null;
 
         $items = $stock
             ? $stock->movements()->with('actor:id,name')->orderByDesc('id')->limit(50)->get()->map(fn (StockMovement $movement) => [
-                'id' => $movement->id,
+                'id' => $movement->public_id,
                 'type' => $movement->type,
                 'quantity_change' => $movement->quantity_change,
                 'quantity_after' => $movement->quantity_after,
@@ -119,7 +121,7 @@ class StockController extends Controller
 
         return $this->success('Stock history retrieved.', [
             'items' => $page->getCollection()->map(fn ($row) => [
-                'id' => $row->id,
+                'id' => $row->public_id,
                 'created_at' => Carbon::parse($row->created_at)->toIso8601String(),
                 'warehouse' => $row->warehouse,
                 'sku' => $row->sku,
@@ -170,7 +172,7 @@ class StockController extends Controller
     private function historyQuery(Request $request): Builder
     {
         $filters = $request->validate([
-            'warehouse_id' => ['nullable', 'integer'],
+            'warehouse_id' => ['nullable', 'string', 'ulid'],
             'type' => ['nullable', Rule::in(array_keys(self::TYPE_LABELS))],
             'from' => ['nullable', 'date'],
             'to' => ['nullable', 'date', 'after_or_equal:from'],
@@ -187,7 +189,7 @@ class StockController extends Controller
             ->leftJoin('users', 'users.id', '=', 'stock_movements.actor_user_id')
             ->leftJoin('orders', 'orders.id', '=', 'stock_movements.order_id')
             ->select('stock_movements.*', 'warehouses.name as warehouse', 'product_variants.sku', 'product_variants.name as variant', 'products.name as product', 'users.name as actor_name', 'orders.order_number')
-            ->when($filters['warehouse_id'] ?? null, fn ($q, $id) => $q->where('inventory_stocks.warehouse_id', $id))
+            ->when($filters['warehouse_id'] ?? null, fn ($q, $id) => $q->where('inventory_stocks.warehouse_id', (int) $this->warehouseKey($id)))
             ->when($filters['type'] ?? null, fn ($q, $type) => $q->where('stock_movements.type', $type))
             ->when($filters['from'] ?? null, fn ($q, $from) => $q->where('stock_movements.created_at', '>=', Carbon::parse($from)->startOfDay()))
             ->when($filters['to'] ?? null, fn ($q, $to) => $q->where('stock_movements.created_at', '<=', Carbon::parse($to)->endOfDay()))
@@ -202,8 +204,8 @@ class StockController extends Controller
         $validated = $request->validated();
 
         $stock = $inventory->adjust(
-            $validated['warehouse_id'],
-            $validated['product_variant_id'],
+            (int) $this->warehouseKey($validated['warehouse_id']),
+            (int) ProductVariant::where('public_id', $validated['product_variant_id'])->value('id'),
             $validated['type'],
             $validated['quantity_change'],
             $validated['note'],
@@ -215,5 +217,11 @@ class StockController extends Controller
             'reserved' => $stock->reserved,
             'available' => $stock->quantity - $stock->reserved,
         ]);
+    }
+
+    /** ID publik gudang ke ID internal; null bila kosong atau tidak dikenal (D-143). */
+    private function warehouseKey(mixed $publicId): ?int
+    {
+        return is_string($publicId) && $publicId !== '' ? Warehouse::where('public_id', $publicId)->value('id') : null;
     }
 }

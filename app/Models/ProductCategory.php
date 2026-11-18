@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Models\Concerns\HasPublicId;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\HasMany;
@@ -10,6 +11,8 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 #[Fillable(['slug', 'name_id', 'name_en', 'sort_order', 'is_active', 'color'])]
 class ProductCategory extends Model
 {
+    use HasPublicId;
+
     /** Palet warna yang boleh dipilih; tampilannya ada di resources/js/utils/categoryColors.js. */
     public const COLORS = ['gold', 'rose', 'orange', 'green', 'teal', 'blue', 'indigo', 'purple', 'pink', 'brown'];
 

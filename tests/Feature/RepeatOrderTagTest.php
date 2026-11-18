@@ -75,7 +75,7 @@ class RepeatOrderTagTest extends TestCase
     /** @return array<string, mixed> */
     private function detail(Order $order): array
     {
-        return $this->actingAs($this->staff('store-admin'))->getJson("/api/v1/admin/orders/{$order->id}")->assertOk()->json('data');
+        return $this->actingAs($this->staff('store-admin'))->getJson("/api/v1/admin/orders/{$order->public_ref}")->assertOk()->json('data');
     }
 
     public function test_the_fifth_completed_order_tags_the_phone_in_order_list_and_detail(): void
@@ -88,7 +88,7 @@ class RepeatOrderTagTest extends TestCase
         $this->assertTrue($this->detail($fifth)['repeat_order']);
 
         $row = collect($this->actingAs($this->staff('store-admin'))->getJson('/api/v1/admin/orders')->assertOk()->json('data.items'))
-            ->firstWhere('id', $fifth->id);
+            ->firstWhere('id', $fifth->public_ref);
         $this->assertTrue($row['repeat_order']);
         $this->assertSame(5, $row['completed_orders']);
     }
@@ -123,9 +123,9 @@ class RepeatOrderTagTest extends TestCase
         $customer = User::factory()->create(['phone' => '+6281234567890']);
         $admin = $this->staff('store-admin');
 
-        $row = collect($this->actingAs($admin)->getJson('/api/v1/admin/customers')->assertOk()->json('data.items'))->firstWhere('id', $customer->id);
+        $row = collect($this->actingAs($admin)->getJson('/api/v1/admin/customers')->assertOk()->json('data.items'))->firstWhere('id', $customer->public_id);
         $this->assertTrue($row['repeat_order']);
-        $this->actingAs($admin)->getJson("/api/v1/admin/customers/{$customer->id}")->assertOk()
+        $this->actingAs($admin)->getJson("/api/v1/admin/customers/{$customer->public_id}")->assertOk()
             ->assertJsonPath('data.repeat_order', true)->assertJsonPath('data.completed_orders', 5);
     }
 

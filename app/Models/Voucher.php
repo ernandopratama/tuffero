@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Models\Concerns\HasPublicId;
 use Carbon\CarbonInterface;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Model;
@@ -18,6 +19,8 @@ use Illuminate\Database\Eloquent\Relations\MorphMany;
 #[Fillable(['code', 'description', 'type', 'kind', 'audience', 'value', 'min_subtotal', 'max_discount', 'quota', 'per_customer_limit', 'limit_period', 'starts_at', 'ends_at', 'is_active', 'is_listed', 'requires_claim', 'stackable', 'provinces', 'budget', 'signup_grant', 'claim_valid_days', 'campaign_id'])]
 class Voucher extends Model
 {
+    use HasPublicId;
+
     public const KIND_ORDER = 'order';
 
     public const KIND_SHIPPING = 'shipping';

@@ -79,7 +79,8 @@ class PromoContentController extends Controller
     private function present(PromoContent $content): array
     {
         return [
-            ...$content->only(['id', 'type', 'title', 'body', 'video_url', 'provider', 'sort_order', 'starts_at', 'ends_at', 'is_published']),
+            'id' => $content->public_id,
+            ...$content->only(['type', 'title', 'body', 'video_url', 'provider', 'sort_order', 'starts_at', 'ends_at', 'is_published']),
             'image_url' => $content->image_path ? '/storage/'.$content->image_path : null,
             'can_auto_thumbnail' => $content->provider === 'youtube' && (bool) $content->external_id,
             'thumbnail_status' => $content->thumbnailStatus,

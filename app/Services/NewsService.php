@@ -48,7 +48,7 @@ class NewsService
     public function setImage(NewsItem $item, UploadedFile $file, User $actor): NewsItem
     {
         $old = $item->image_path;
-        $path = $this->images->storeWebp($file, "news/{$item->id}", 1280);
+        $path = $this->images->storeWebp($file, 'news', 1280);
 
         DB::transaction(function () use ($item, $path, $actor) {
             $item->forceFill(['image_path' => $path])->save();
@@ -120,7 +120,7 @@ class NewsService
         $hasLink = $n->cta_url && $n->textFor('cta_label', $locale);
 
         return [
-            'key' => 'n'.$n->id,
+            'key' => 'n'.$n->public_id,
             'stamp' => $n->updated_at?->timestamp,
             'badge' => $words['kinds'][$n->kind] ?? $words['kinds']['news'],
             'kind' => $n->kind,
@@ -136,7 +136,7 @@ class NewsService
     private function fromCampaign(Campaign $c, bool $live, string $locale, array $words): array
     {
         return [
-            'key' => 'c'.$c->id,
+            'key' => 'c'.$c->public_id,
             'stamp' => $c->updated_at?->timestamp,
             'badge' => $c->is_flash ? $words['flash'] : $words['campaign'],
             'kind' => $c->is_flash ? 'flash' : 'campaign',

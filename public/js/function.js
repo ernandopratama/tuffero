@@ -331,7 +331,13 @@
 			mainClass: 'mfp-fade',
 			removalDelay: 160,
 			preloader: false,
-			fixedContentPos: true
+			fixedContentPos: true,
+			// YouTube lewat youtube-nocookie (tanpa cookie sebelum diputar), sama dengan latar hero dan Galeri.
+			iframe: {
+				patterns: {
+					youtube: { index: 'youtube.com/', id: 'v=', src: 'https://www.youtube-nocookie.com/embed/%id%?autoplay=1&rel=0' }
+				}
+			}
 		});
 	}
 

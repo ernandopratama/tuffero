@@ -199,7 +199,7 @@ onMounted(load);
                   <span v-if="row.platform" class="rounded-full bg-secondary-tint-12 px-2 py-0.5 text-label-sm">{{ PLATFORMS[row.platform] }}</span>
                   <span v-if="ORIGINS[row.origin]" class="inline-flex items-center gap-1 rounded-full bg-accent-tint-15 px-2 py-0.5 text-label-sm text-primary"><AdminIcon name="sparkles" :size="12" />{{ ORIGINS[row.origin] }}</span>
                 </div>
-                <p class="mt-1.5 break-words font-heading text-body-md">{{ row.title }}</p>
+                <p class="mt-1.5 break-words font-heading text-body-md"><span class="font-sans text-label-sm tabular-nums text-secondary">Draf #{{ row.id }}</span> {{ row.title }}</p>
               </div>
               <svg class="mt-1 size-5 shrink-0 text-secondary transition-transform duration-[160ms] ease-out-strong group-open:rotate-90" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 6l6 6-6 6" /></svg>
             </summary>

@@ -18,7 +18,7 @@ class RolePermissionSeeder extends Seeder
      */
     private const ROLES = [
         'owner' => [
-            'audit.view', 'reports.view', 'products.view', 'vouchers.view', 'content.view', 'stock.view',
+            'audit.view', 'reports.view', 'reports.export', 'products.view', 'vouchers.view', 'content.view', 'stock.view',
             'customers.view', 'customers.deactivate', 'customer_blocks.view', 'customer_blocks.approve',
             'orders.view', 'orders.review_alert', 'cancellations.view', 'shipments.view', 'payments.view',
             'refunds.view', 'refunds.decide', 'comments.create', 'news.view', 'marketing_drafts.approve',

@@ -36,7 +36,7 @@ class CustomerEmailController extends Controller
         return $this->success('Emails retrieved.', [
             'to' => $to ? CustomerEmail::mask($to) : null,
             'items' => $target->customerEmails()->with('sender:id,name')->latest('id')->limit(5)->get()->map(fn (CustomerEmail $email) => [
-                'id' => $email->id,
+                'id' => $email->public_id,
                 'subject' => $email->subject,
                 'status' => $email->status,
                 'sent_by' => $email->sender->name,

@@ -4,7 +4,6 @@ namespace App\Services;
 
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Storage;
-use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
 
 /**
@@ -20,18 +19,39 @@ class ImageService
 
     private const ALLOWED_TYPES = [IMAGETYPE_JPEG, IMAGETYPE_PNG];
 
+    /** Path baru tersimpan seperti ini; dipakai juga perintah `images:randomize-paths` untuk mengenali path lama. */
+    public const RANDOM_PATH_PATTERN = '#^[a-z]+/[0-9a-f]{2}/(auto-)?[0-9a-f]{40}\.(webp|jpg)$#';
+
     /**
      * Simpan sebagai WebP di disk publik dan kembalikan path relatifnya.
      *
-     * @param  string  $directory  Folder di disk publik, misalnya "products/12"
+     * @param  string  $area  Jenis gambar, misalnya "products"; folder dan nama berkas di bawahnya acak (lihat randomPath)
      * @param  int  $maxSide  Sisi terpanjang maksimum (piksel); gambar lebih kecil tidak diperbesar
      */
-    public function storeWebp(UploadedFile $file, string $directory, int $maxSide = 1600, int $quality = 82, bool $square = false): string
+    public function storeWebp(UploadedFile $file, string $area, int $maxSide = 1600, int $quality = 82, bool $square = false): string
     {
-        $path = trim($directory, '/').'/'.Str::random(32).'.webp';
+        $path = self::randomPath($area, 'webp');
         Storage::disk('public')->put($path, $this->toWebp($file, $maxSide, $quality, $square));
 
         return $path;
+    }
+
+    /**
+     * Path acak tanpa ID database dan tanpa nama asli: "products/3f/3f9a…(40 hex).webp". Nama 160 bit acak tidak bisa
+     * ditebak; subfolder dua huruf pertamanya hanya membagi berkas, jadi tidak ada folder kosong per data. Huruf kecil
+     * supaya aman di sistem berkas yang tidak peka huruf besar-kecil. Awalan "auto-" menandai thumbnail video otomatis
+     * (VideoThumbnailService::isAuto).
+     */
+    public static function randomPath(string $area, string $extension, string $prefix = ''): string
+    {
+        // Area dan ekstensi berasal dari kode, bukan dari pengguna; tetap dibatasi agar tidak ada "../" atau garis miring.
+        if (! preg_match('/^[a-z]+$/', $area) || ! in_array($extension, ['webp', 'jpg'], true) || ! in_array($prefix, ['', 'auto-'], true)) {
+            throw new \InvalidArgumentException('Area atau ekstensi gambar tidak valid.');
+        }
+
+        $name = bin2hex(random_bytes(20));
+
+        return "{$area}/".substr($name, 0, 2)."/{$prefix}{$name}.{$extension}";
     }
 
     /** Isi berkas WebP hasil konversi. Isi berkas diperiksa sendiri; ekstensi dan MIME dari klien tidak dipercaya. */

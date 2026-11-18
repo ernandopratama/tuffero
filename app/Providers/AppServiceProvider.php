@@ -26,8 +26,11 @@ use Illuminate\Cache\RateLimiting\Limit;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\RateLimiter;
 use Illuminate\Support\Facades\Route;
+use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\ServiceProvider;
 use Illuminate\Support\Str;
+use Spatie\Permission\Models\Permission;
+use Spatie\Permission\Models\Role;
 
 class AppServiceProvider extends ServiceProvider
 {
@@ -64,6 +67,27 @@ class AppServiceProvider extends ServiceProvider
         Route::model('order', Order::class);
         Route::model('refund', Refund::class);
         Route::model('cancellation', OrderCancellationRequest::class);
+
+        // Role dan izin memakai model bawaan Spatie (bukan HasPublicId), jadi ID publik diisi di sini dan rute
+        // {role}/{permission} mencarinya lewat public_id (D-143). ID angka tidak diterima.
+        foreach ([Role::class, Permission::class] as $model) {
+            $model::creating(function ($row) {
+                // Migrasi lama membuat izin sebelum kolom public_id ada; "sudah ada" diingat, "belum" dicek ulang.
+                static $ready = [];
+                $table = $row->getTable();
+                if (! ($ready[$table] ?? false)) {
+                    if (! Schema::hasColumn($table, 'public_id')) {
+                        return;
+                    }
+                    $ready[$table] = true;
+                }
+                if (! $row->getAttribute('public_id')) {
+                    $row->setAttribute('public_id', strtolower((string) Str::ulid()));
+                }
+            });
+        }
+        Route::bind('role', fn (string $value) => Role::where('public_id', $value)->firstOrFail());
+        Route::bind('permission', fn (string $value) => Permission::where('public_id', $value)->firstOrFail());
 
         RateLimiter::for('login', function (Request $request) {
             $login = $request->input('login', $request->input('email'));

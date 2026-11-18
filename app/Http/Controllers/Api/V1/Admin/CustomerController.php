@@ -99,7 +99,7 @@ class CustomerController extends Controller
     private function present(User $user, array $repeat): array
     {
         return [
-            'id' => $user->id,
+            'id' => $user->public_id,
             'name' => $user->name,
             'email' => $user->email,
             'email_verified' => $user->email_verified_at !== null,

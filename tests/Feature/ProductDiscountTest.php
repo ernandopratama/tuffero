@@ -173,13 +173,13 @@ class ProductDiscountTest extends TestCase
         $admin = $this->staff();
         $body = ['audience' => 'all', 'type' => 'percent', 'value' => 60, 'is_active' => true];
 
-        $this->actingAs($admin)->postJson("/api/v1/admin/variants/{$this->variant->id}/discounts", $body)->assertUnprocessable()->assertJsonValidationErrors('value');
-        $this->postJson("/api/v1/admin/variants/{$this->variant->id}/discounts", [...$body, 'type' => 'fixed', 'value' => 50001])->assertUnprocessable();
-        $this->postJson("/api/v1/admin/variants/{$this->variant->id}/discounts", [...$body, 'type' => 'fixed', 'value' => 50000])->assertCreated();
+        $this->actingAs($admin)->postJson("/api/v1/admin/variants/{$this->variant->public_id}/discounts", $body)->assertUnprocessable()->assertJsonValidationErrors('value');
+        $this->postJson("/api/v1/admin/variants/{$this->variant->public_id}/discounts", [...$body, 'type' => 'fixed', 'value' => 50001])->assertUnprocessable();
+        $this->postJson("/api/v1/admin/variants/{$this->variant->public_id}/discounts", [...$body, 'type' => 'fixed', 'value' => 50000])->assertCreated();
 
         Setting::where('key', 'discount.max_percent')->update(['value' => '70']);
-        $this->postJson("/api/v1/admin/variants/{$this->variant->id}/discounts", $body)->assertCreated();
-        $this->getJson("/api/v1/admin/products/{$this->variant->product_id}")->assertJsonPath('data.max_discount_percent', 70);
+        $this->postJson("/api/v1/admin/variants/{$this->variant->public_id}/discounts", $body)->assertCreated();
+        $this->getJson("/api/v1/admin/products/{$this->variant->product->public_id}")->assertJsonPath('data.max_discount_percent', 70);
     }
 
     public function test_inactive_not_started_and_expired_discounts_are_ignored(): void
@@ -251,14 +251,14 @@ class ProductDiscountTest extends TestCase
     {
         $admin = $this->staff();
 
-        $id = $this->actingAs($admin)->postJson("/api/v1/admin/variants/{$this->variant->id}/discounts", [
+        $id = $this->actingAs($admin)->postJson("/api/v1/admin/variants/{$this->variant->public_id}/discounts", [
             'audience' => 'member', 'type' => 'percent', 'value' => 15, 'is_active' => true,
         ])->assertCreated()->json('data.id');
 
         $this->patchJson("/api/v1/admin/discounts/{$id}", ['audience' => 'member', 'type' => 'percent', 'value' => 25, 'is_active' => false])
             ->assertOk()->assertJsonPath('data.value', 25)->assertJsonPath('data.is_active', false);
 
-        $this->getJson("/api/v1/admin/products/{$this->variant->product_id}")
+        $this->getJson("/api/v1/admin/products/{$this->variant->product->public_id}")
             ->assertJsonPath('data.variants.0.discounts.0.audience', 'member')->assertJsonPath('data.variants.0.discounts.0.value', 25);
         $this->assertSame(['discount.updated', 'discount.created'], AuditLog::whereIn('action', ['discount.created', 'discount.updated'])->orderByDesc('id')->pluck('action')->all());
     }
@@ -281,7 +281,7 @@ class ProductDiscountTest extends TestCase
     {
         $body = ['audience' => 'all', 'type' => 'percent', 'value' => 10, 'is_active' => true, ...$overrides];
 
-        $this->actingAs($this->staff())->postJson("/api/v1/admin/variants/{$this->variant->id}/discounts", $body)
+        $this->actingAs($this->staff())->postJson("/api/v1/admin/variants/{$this->variant->public_id}/discounts", $body)
             ->assertUnprocessable()->assertJsonValidationErrors($field);
     }
 
@@ -294,13 +294,13 @@ class ProductDiscountTest extends TestCase
     #[DataProvider('roleAccess')]
     public function test_only_roles_that_manage_products_can_create_discounts(string $role, int $status): void
     {
-        $this->actingAs($this->staff($role))->postJson("/api/v1/admin/variants/{$this->variant->id}/discounts", [
+        $this->actingAs($this->staff($role))->postJson("/api/v1/admin/variants/{$this->variant->public_id}/discounts", [
             'audience' => 'all', 'type' => 'percent', 'value' => 10, 'is_active' => true,
         ])->assertStatus($status);
     }
 
     public function test_guest_cannot_reach_the_admin_endpoints(): void
     {
-        $this->postJson("/api/v1/admin/variants/{$this->variant->id}/discounts", [])->assertUnauthorized();
+        $this->postJson("/api/v1/admin/variants/{$this->variant->public_id}/discounts", [])->assertUnauthorized();
     }
 }

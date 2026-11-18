@@ -18,7 +18,7 @@ class CampaignItemRequest extends DiscountRequest
         unset($rules['starts_at'], $rules['ends_at']);
 
         if ($this->isMethod('post')) {
-            $rules['variant_id'] = ['required', 'integer', 'exists:product_variants,id,deleted_at,NULL'];
+            $rules['variant_id'] = ['required', 'string', 'ulid', 'exists:product_variants,public_id,deleted_at,NULL'];
         }
 
         return $rules;
@@ -31,7 +31,7 @@ class CampaignItemRequest extends DiscountRequest
             return $discount->variant->price;
         }
 
-        return (int) ProductVariant::whereKey($this->integer('variant_id'))->value('price') ?: 1000000000;
+        return (int) ProductVariant::where('public_id', (string) $this->input('variant_id'))->value('price') ?: 1000000000;
     }
 
     /** @return array<string, string> */

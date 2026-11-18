@@ -56,7 +56,7 @@ class AccountController extends Controller
                 'status' => $order->status,
                 'total' => $order->total,
                 'item_count' => (int) $order->getAttribute('items_sum_quantity'),
-                'created_at' => $order->created_at?->toIso8601String(),
+                'created_at' => $order->created_at->toIso8601String(),
             ])->values(),
             'meta' => ['current_page' => $page->currentPage(), 'last_page' => $page->lastPage(), 'total' => $page->total()],
         ]);

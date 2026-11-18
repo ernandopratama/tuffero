@@ -125,13 +125,15 @@ Schedule::command('notifications:prune')->daily();
 Schedule::call(fn () => LoginFailure::where('created_at', '<', now()->subDays(LoginFailure::KEEP_DAYS))->delete())->name('login-failures:prune')->daily();
 Schedule::call(fn () => WebhookRejection::where('created_at', '<', now()->subDays(WebhookRejection::KEEP_DAYS))->delete())->name('webhook-rejections:prune')->daily();
 
-Artisan::command('admin:create-super-admin {email} {name}', function (string $email, string $name) {
+Artisan::command('admin:create-super-admin {email} {name} {--role=super-admin : super-admin atau owner}', function (string $email, string $name) {
+    $role = (string) $this->option('role');
     $password = $this->secret('Password (minimal 12 karakter, huruf besar, huruf kecil, angka)');
 
-    $validator = Validator::make(compact('email', 'name', 'password'), [
+    $validator = Validator::make(compact('email', 'name', 'password', 'role'), [
         'email' => ['required', 'email', 'max:255', 'unique:users,email'],
         'name' => ['required', 'string', 'max:255'],
         'password' => ['required', 'string', Password::min(12)->mixedCase()->numbers()],
+        'role' => ['required', 'in:super-admin,owner'],
     ]);
 
     if ($validator->fails()) {
@@ -142,22 +144,22 @@ Artisan::command('admin:create-super-admin {email} {name}', function (string $em
         return 1;
     }
 
-    DB::transaction(function () use ($email, $name, $password) {
+    DB::transaction(function () use ($email, $name, $password, $role) {
         $user = User::create(compact('email', 'name', 'password'));
-        $user->assignRole('super-admin');
+        $user->assignRole($role);
 
         AuditLog::create([
             'action' => 'user.created',
             'auditable_type' => User::class,
             'auditable_id' => $user->id,
-            'changes' => ['role' => 'super-admin', 'source' => 'artisan'],
+            'changes' => ['role' => $role, 'source' => 'artisan'],
         ]);
     });
 
-    $this->info('Akun Super Admin dibuat.');
+    $this->info("Akun {$role} dibuat. MFA wajib didaftarkan saat login pertama.");
 
     return 0;
-})->purpose('Create a Super Admin account (run db:seed first)');
+})->purpose('Create a Super Admin (default) or Owner account with --role=owner (run db:seed first)');
 
 Artisan::command('admin:reset-mfa {email}', function (string $email, MfaService $mfa) {
     $user = User::where('email', $email)->first();

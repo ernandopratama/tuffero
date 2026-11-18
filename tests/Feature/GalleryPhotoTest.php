@@ -69,7 +69,7 @@ class GalleryPhotoTest extends TestCase
         $id = $this->post('/api/v1/admin/gallery-photos', $this->payload(), ['Accept' => 'application/json'])
             ->assertCreated()->assertJsonPath('data.title', 'Nastar Baru')->json('data.id');
 
-        $photo = GalleryPhoto::find($id);
+        $photo = GalleryPhoto::where('public_id', $id)->first();
         $this->assertStringStartsWith('gallery/', $photo->image_path);
         $this->assertStringEndsWith('.webp', $photo->image_path);
         Storage::disk('public')->assertExists($photo->image_path);
@@ -86,7 +86,7 @@ class GalleryPhotoTest extends TestCase
         Storage::disk('public')->assertExists($photo->image_path);
 
         $this->deleteJson("/api/v1/admin/gallery-photos/{$id}")->assertOk();
-        $this->assertSoftDeleted('gallery_photos', ['id' => $id]);
+        $this->assertSoftDeleted('gallery_photos', ['public_id' => $id]);
 
         foreach (['gallery.created', 'gallery.updated', 'gallery.image_changed', 'gallery.deleted'] as $action) {
             $this->assertTrue(AuditLog::where('action', $action)->exists(), $action);
@@ -98,7 +98,7 @@ class GalleryPhotoTest extends TestCase
         $this->actingAs($this->staff('super-admin'));
         $seeded = GalleryPhoto::first();
 
-        $this->post("/api/v1/admin/gallery-photos/{$seeded->id}/image", ['image' => UploadedFile::fake()->image('x.jpg', 600, 600)], ['Accept' => 'application/json'])->assertOk();
+        $this->post("/api/v1/admin/gallery-photos/{$seeded->public_id}/image", ['image' => UploadedFile::fake()->image('x.jpg', 600, 600)], ['Accept' => 'application/json'])->assertOk();
 
         $this->assertFileExists(public_path('images/Produk/gallery/Nastar Sultan 3.webp'));
         $this->assertNull($seeded->refresh()->full_path);
@@ -110,7 +110,7 @@ class GalleryPhotoTest extends TestCase
 
         $id = $this->post('/api/v1/admin/gallery-photos', $this->payload(['image' => UploadedFile::fake()->image('besar.jpg', 4000, 2000)]), ['Accept' => 'application/json'])->json('data.id');
 
-        [$w, $h] = getimagesizefromstring(Storage::disk('public')->get(GalleryPhoto::find($id)->image_path));
+        [$w, $h] = getimagesizefromstring(Storage::disk('public')->get(GalleryPhoto::where('public_id', $id)->first()->image_path));
         $this->assertSame(1600, $w);
         $this->assertSame(800, $h);
     }
@@ -129,7 +129,7 @@ class GalleryPhotoTest extends TestCase
         // Berkas rusak yang berekstensi gambar ditolak.
         $this->post('/api/v1/admin/gallery-photos', $this->payload(['image' => UploadedFile::fake()->createWithContent('x.jpg', 'bukan gambar')]), $headers)->assertUnprocessable();
 
-        $id = GalleryPhoto::first()->id;
+        $id = GalleryPhoto::first()->public_id;
         $this->patchJson("/api/v1/admin/gallery-photos/{$id}", ['title' => 'x', 'category' => 'nastar', 'image' => 'x'])->assertUnprocessable()->assertJsonValidationErrors('image');
         $this->assertSame(28, GalleryPhoto::count());
     }
@@ -150,10 +150,10 @@ class GalleryPhotoTest extends TestCase
             'marketing lihat' => ['marketing', 'getJson', '/api/v1/admin/gallery-photos', 200],
             'super admin lihat' => ['super-admin', 'getJson', '/api/v1/admin/gallery-photos', 200],
             'pemilik lihat' => ['owner', 'getJson', '/api/v1/admin/gallery-photos', 200],
-            'pemilik tidak ubah' => ['owner', 'patchJson', '/api/v1/admin/gallery-photos/1', 403],
-            'pemilik tidak hapus' => ['owner', 'deleteJson', '/api/v1/admin/gallery-photos/1', 403],
+            'pemilik tidak ubah' => ['owner', 'patchJson', '/api/v1/admin/gallery-photos/{photo}', 403],
+            'pemilik tidak hapus' => ['owner', 'deleteJson', '/api/v1/admin/gallery-photos/{photo}', 403],
             'admin toko tidak lihat' => ['store-admin', 'getJson', '/api/v1/admin/gallery-photos', 403],
-            'admin toko tidak hapus' => ['store-admin', 'deleteJson', '/api/v1/admin/gallery-photos/1', 403],
+            'admin toko tidak hapus' => ['store-admin', 'deleteJson', '/api/v1/admin/gallery-photos/{photo}', 403],
             'cs tidak lihat' => ['customer-service', 'getJson', '/api/v1/admin/gallery-photos', 403],
         ];
     }
@@ -161,13 +161,14 @@ class GalleryPhotoTest extends TestCase
     #[DataProvider('accessProvider')]
     public function test_access_by_role(string $role, string $method, string $url, int $status): void
     {
+        $url = str_replace('{photo}', (string) GalleryPhoto::first()?->public_id, $url);
         $this->actingAs($this->staff($role))->{$method}($url)->assertStatus($status);
     }
 
     public function test_guest_cannot_manage(): void
     {
         $this->getJson('/api/v1/admin/gallery-photos')->assertUnauthorized();
-        $this->deleteJson('/api/v1/admin/gallery-photos/1')->assertUnauthorized();
+        $this->deleteJson('/api/v1/admin/gallery-photos/'.GalleryPhoto::first()->public_id)->assertUnauthorized();
     }
 
     public function test_english_page_uses_english_title_with_indonesian_fallback(): void

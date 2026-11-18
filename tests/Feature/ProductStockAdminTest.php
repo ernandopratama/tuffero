@@ -56,8 +56,8 @@ class ProductStockAdminTest extends TestCase
     private function adjustBody(ProductVariant $variant, int $change, string $type = 'adjustment'): array
     {
         return [
-            'warehouse_id' => Warehouse::where('code', 'MLG')->value('id'),
-            'product_variant_id' => $variant->id,
+            'warehouse_id' => Warehouse::where('code', 'MLG')->value('public_id'),
+            'product_variant_id' => $variant->public_id,
             'type' => $type,
             'quantity_change' => $change,
             'note' => 'Hitung ulang gudang',
@@ -136,16 +136,16 @@ class ProductStockAdminTest extends TestCase
 
         $this->assertSame(50, $variant->fresh()->max_order_quantity);
 
-        $this->patchJson("/api/v1/admin/products/{$product->id}", ['badges' => ['Terlaris', 'Edisi Ramadan']])
+        $this->patchJson("/api/v1/admin/products/{$product->public_id}", ['badges' => ['Terlaris', 'Edisi Ramadan']])
             ->assertOk()->assertJsonPath('data.badges', ['Terlaris', 'Edisi Ramadan']);
-        $this->patchJson("/api/v1/admin/products/{$product->id}", ['badges' => ['A', 'B', 'C', 'D', 'E', 'F']])->assertUnprocessable();
-        $this->patchJson("/api/v1/admin/products/{$product->id}", ['badges' => ['Sama', 'Sama']])->assertUnprocessable();
-        $this->patchJson("/api/v1/admin/products/{$product->id}", ['badges' => [str_repeat('x', 31)]])->assertUnprocessable();
+        $this->patchJson("/api/v1/admin/products/{$product->public_id}", ['badges' => ['A', 'B', 'C', 'D', 'E', 'F']])->assertUnprocessable();
+        $this->patchJson("/api/v1/admin/products/{$product->public_id}", ['badges' => ['Sama', 'Sama']])->assertUnprocessable();
+        $this->patchJson("/api/v1/admin/products/{$product->public_id}", ['badges' => [str_repeat('x', 31)]])->assertUnprocessable();
 
-        $this->patchJson("/api/v1/admin/variants/{$variant->id}", $this->variantData(['max_order_quantity' => 20]))
+        $this->patchJson("/api/v1/admin/variants/{$variant->public_id}", $this->variantData(['max_order_quantity' => 20]))
             ->assertOk()->assertJsonPath('data.variants.0.max_order_quantity', 20);
-        $this->patchJson("/api/v1/admin/variants/{$variant->id}", $this->variantData(['max_order_quantity' => 0]))->assertUnprocessable();
-        $this->patchJson("/api/v1/admin/variants/{$variant->id}", $this->variantData(['max_order_quantity' => 1000]))->assertUnprocessable();
+        $this->patchJson("/api/v1/admin/variants/{$variant->public_id}", $this->variantData(['max_order_quantity' => 0]))->assertUnprocessable();
+        $this->patchJson("/api/v1/admin/variants/{$variant->public_id}", $this->variantData(['max_order_quantity' => 1000]))->assertUnprocessable();
     }
 
     public function test_publish_requires_an_active_variant(): void
@@ -153,15 +153,15 @@ class ProductStockAdminTest extends TestCase
         $this->actingAs($this->staff('store-admin'));
         $product = $this->product(['product_category_id' => ProductCategory::where('slug', 'nastar')->value('id')]);
 
-        $this->patchJson("/api/v1/admin/products/{$product->id}", ['is_published' => true])
+        $this->patchJson("/api/v1/admin/products/{$product->public_id}", ['is_published' => true])
             ->assertUnprocessable()
             ->assertJsonValidationErrors('is_published');
 
         $variant = $product->variants()->create($this->variantData(['is_active' => false]));
-        $this->patchJson("/api/v1/admin/products/{$product->id}", ['is_published' => true])->assertUnprocessable();
+        $this->patchJson("/api/v1/admin/products/{$product->public_id}", ['is_published' => true])->assertUnprocessable();
 
         $variant->update(['is_active' => true]);
-        $this->patchJson("/api/v1/admin/products/{$product->id}", ['is_published' => true])->assertOk();
+        $this->patchJson("/api/v1/admin/products/{$product->public_id}", ['is_published' => true])->assertOk();
         $this->assertTrue($product->fresh()->is_published);
     }
 
@@ -171,12 +171,12 @@ class ProductStockAdminTest extends TestCase
         $product = $this->product(['is_published' => true]);
         $variant = $product->variants()->create($this->variantData());
 
-        $this->patchJson("/api/v1/admin/variants/{$variant->id}", $this->variantData(['is_active' => false]))
+        $this->patchJson("/api/v1/admin/variants/{$variant->public_id}", $this->variantData(['is_active' => false]))
             ->assertUnprocessable()
             ->assertJsonValidationErrors('is_active');
 
         $product->variants()->create($this->variantData(['sku' => 'NAS-TOP-02']));
-        $this->patchJson("/api/v1/admin/variants/{$variant->id}", $this->variantData(['is_active' => false]))->assertOk();
+        $this->patchJson("/api/v1/admin/variants/{$variant->public_id}", $this->variantData(['is_active' => false]))->assertOk();
     }
 
     /** @return array<string, array{array<string, mixed>, string}> */
@@ -197,7 +197,7 @@ class ProductStockAdminTest extends TestCase
     {
         $this->actingAs($this->staff('store-admin'));
 
-        $this->postJson("/api/v1/admin/products/{$this->product()->id}/variants", $this->variantData($overrides))
+        $this->postJson("/api/v1/admin/products/{$this->product()->public_id}/variants", $this->variantData($overrides))
             ->assertUnprocessable()
             ->assertJsonValidationErrors($field);
     }
@@ -207,7 +207,7 @@ class ProductStockAdminTest extends TestCase
         $this->actingAs($this->staff('store-admin'));
         $this->variant()->delete();
 
-        $this->postJson("/api/v1/admin/products/{$this->product()->id}/variants", $this->variantData())
+        $this->postJson("/api/v1/admin/products/{$this->product()->public_id}/variants", $this->variantData())
             ->assertUnprocessable()
             ->assertJsonValidationErrors('sku');
     }
@@ -217,7 +217,7 @@ class ProductStockAdminTest extends TestCase
         Storage::fake('public');
         $this->actingAs($this->staff('store-admin'));
         $product = $this->product();
-        $url = "/api/v1/admin/products/{$product->id}/images";
+        $url = "/api/v1/admin/products/{$product->public_id}/images";
 
         $path = $this->postJson($url, ['image' => UploadedFile::fake()->image('a.jpg', 100, 100), 'alt' => 'Foto nastar'])
             ->assertCreated()
@@ -241,10 +241,10 @@ class ProductStockAdminTest extends TestCase
         Storage::fake('public');
         $this->actingAs($this->staff('store-admin'));
         $product = $this->product();
-        $this->postJson("/api/v1/admin/products/{$product->id}/images", ['image' => UploadedFile::fake()->image('a.jpg'), 'alt' => 'Foto'])->assertCreated();
+        $this->postJson("/api/v1/admin/products/{$product->public_id}/images", ['image' => UploadedFile::fake()->image('a.jpg'), 'alt' => 'Foto'])->assertCreated();
         $image = $product->images()->firstOrFail();
 
-        $this->deleteJson("/api/v1/admin/images/{$image->id}")->assertOk()->assertJsonCount(0, 'data.images');
+        $this->deleteJson("/api/v1/admin/images/{$image->public_id}")->assertOk()->assertJsonCount(0, 'data.images');
 
         Storage::disk('public')->assertMissing($image->path);
         $this->assertSame(1, AuditLog::where('action', 'product.image_removed')->count());
@@ -272,7 +272,7 @@ class ProductStockAdminTest extends TestCase
         $this->assertSame('Hitung ulang gudang', $movement->note);
         $this->assertSame(2, AuditLog::where('action', 'stock.adjusted')->count());
 
-        $this->getJson('/api/v1/admin/stock/movements?'.http_build_query(['warehouse_id' => $stock->warehouse_id, 'variant_id' => $variant->id]))
+        $this->getJson('/api/v1/admin/stock/movements?'.http_build_query(['warehouse_id' => Warehouse::whereKey($stock->warehouse_id)->value('public_id'), 'variant_id' => $variant->public_id]))
             ->assertOk()
             ->assertJsonCount(2, 'data.items')
             ->assertJsonPath('data.items.0.actor', $user->name);
@@ -287,7 +287,7 @@ class ProductStockAdminTest extends TestCase
 
         $this->getJson('/api/v1/admin/products?status=published')->assertJsonCount(1, 'data.items')->assertJsonPath('data.items.0.name', 'Tayang');
         $this->getJson('/api/v1/admin/products?status=draft')->assertJsonCount(1, 'data.items')->assertJsonPath('data.items.0.name', 'Konsep');
-        $this->getJson('/api/v1/admin/products?category_id='.$category->id)->assertJsonCount(1, 'data.items')->assertJsonPath('data.items.0.name', 'Tayang');
+        $this->getJson('/api/v1/admin/products?category_id='.$category->public_id)->assertJsonCount(1, 'data.items')->assertJsonPath('data.items.0.name', 'Tayang');
         $this->getJson('/api/v1/admin/products?status=bogus')->assertJsonCount(2, 'data.items');
     }
 

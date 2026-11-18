@@ -44,7 +44,8 @@ class WarehouseController extends Controller
     private function present(Warehouse $warehouse): array
     {
         return [
-            ...$warehouse->only(['id', 'code', 'name', 'city', 'address', 'postal_code', 'latitude', 'longitude', 'phone', 'is_active']),
+            'id' => $warehouse->public_id,
+            ...$warehouse->only(['code', 'name', 'city', 'address', 'postal_code', 'latitude', 'longitude', 'phone', 'is_active']),
             // Biteship menolak membuat pengiriman bila salah satu kosong (BiteshipShipmentService).
             'shipping_ready' => filled($warehouse->address) && filled($warehouse->postal_code) && filled($warehouse->phone),
         ];

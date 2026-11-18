@@ -67,7 +67,7 @@ class LatePaymentRefundTest extends TestCase
 
     private function mark(User $user, Order $order, ?string $note = 'Transfer ke rekening pemesan, ref 123456')
     {
-        return $this->actingAs($user)->postJson("/api/v1/admin/orders/{$order->id}/late-payment-refunded", $note === null ? [] : ['note' => $note]);
+        return $this->actingAs($user)->postJson("/api/v1/admin/orders/{$order->public_ref}/late-payment-refunded", $note === null ? [] : ['note' => $note]);
     }
 
     public function test_store_admin_marks_the_refund_with_a_note_and_nothing_else_changes(): void
@@ -140,7 +140,7 @@ class LatePaymentRefundTest extends TestCase
     {
         $order = $this->lateOrder();
 
-        $this->postJson("/api/v1/admin/orders/{$order->id}/late-payment-refunded", ['note' => 'x'])->assertUnauthorized();
+        $this->postJson("/api/v1/admin/orders/{$order->public_ref}/late-payment-refunded", ['note' => 'x'])->assertUnauthorized();
 
         foreach (['owner', 'customer-service', 'warehouse', 'marketing'] as $role) {
             $this->mark($this->staff($role), $order)->assertForbidden();
@@ -159,11 +159,11 @@ class LatePaymentRefundTest extends TestCase
 
         $flags = fn () => collect($this->actingAs($admin)->getJson('/api/v1/admin/payments')->assertOk()->json('data.items'))->pluck('needs_refund', 'id');
 
-        $this->assertTrue($flags()[$late->id]);
-        $this->assertFalse($flags()[$plain->id]);
+        $this->assertTrue($flags()[$late->public_ref]);
+        $this->assertFalse($flags()[$plain->public_ref]);
 
         $this->mark($admin, $late)->assertOk();
-        $this->assertFalse($flags()[$late->id]);
+        $this->assertFalse($flags()[$late->public_ref]);
     }
 
     public function test_dashboard_and_stuck_order_check_stop_flagging_it_after_marking(): void

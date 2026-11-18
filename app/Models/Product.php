@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Models\Concerns\HasPublicId;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -11,7 +12,7 @@ use Illuminate\Database\Eloquent\SoftDeletes;
 #[Fillable(['name', 'name_en', 'slug', 'product_category_id', 'product_type_id', 'description', 'description_en', 'translation_mode', 'badges', 'is_published'])]
 class Product extends Model
 {
-    use SoftDeletes;
+    use HasPublicId, SoftDeletes;
 
     /**
      * Get the attributes that should be cast.

@@ -169,7 +169,7 @@ class RefundController extends Controller
     private function row(Refund $refund): array
     {
         return [
-            'id' => $refund->id,
+            'id' => $refund->public_ref,
             'refund_number' => $refund->refund_number,
             'order_number' => $refund->order->order_number,
             'customer_name' => $refund->order->customer_name,

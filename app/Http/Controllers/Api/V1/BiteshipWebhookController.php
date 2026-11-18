@@ -10,13 +10,14 @@ use Illuminate\Http\Request;
 
 /**
  * Webhook Biteship. Tanpa sesi dan CSRF; keaslian dibuktikan rahasia bersama di header X-Biteship-Secret
- * (diatur di dashboard Biteship, bagian autentikasi webhook) atau parameter ?secret= bila header tidak bisa diatur.
+ * (diatur di dashboard Biteship, bagian autentikasi webhook). Parameter ?secret= sengaja tidak diterima: rahasia di URL
+ * bisa tercatat di log server dan proxy.
  */
 class BiteshipWebhookController extends Controller
 {
     public function __invoke(Request $request, BiteshipShipmentService $biteship, OrderStatusService $orders): JsonResponse
     {
-        $secret = $request->header('X-Biteship-Secret') ?? $request->query('secret');
+        $secret = $request->header('X-Biteship-Secret');
 
         return $biteship->handleWebhook($request->all(), is_string($secret) ? $secret : null, $orders)
             ? response()->json(['status' => 'ok'])

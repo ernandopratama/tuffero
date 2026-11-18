@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Models\Concerns\HasPublicId;
 use Carbon\CarbonInterface;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Model;
@@ -14,6 +15,8 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 #[Fillable(['audience', 'type', 'value', 'starts_at', 'ends_at', 'is_active'])]
 class VariantDiscount extends Model
 {
+    use HasPublicId;
+
     /**
      * Get the attributes that should be cast.
      *

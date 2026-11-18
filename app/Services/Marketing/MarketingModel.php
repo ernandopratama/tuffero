@@ -9,9 +9,10 @@ interface MarketingModel
 {
     /**
      * @param  bool  $search  izinkan pencarian web (riset tren) agar klaim membawa sumber
+     * @param  list<array{media_type: string, data: string}>  $images  foto acuan (base64), dikirim sebelum teks prompt
      * @return array{text: string, sources: list<array{title: string, url: string}>}
      *
      * @throws MarketingModelException bila layanan model tidak bisa dihubungi, menolak, atau tidak memberi jawaban yang bisa dipakai
      */
-    public function generate(string $system, string $prompt, bool $search): array;
+    public function generate(string $system, string $prompt, bool $search, array $images = []): array;
 }

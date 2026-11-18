@@ -113,7 +113,7 @@ class ProductReviewTest extends TestCase
     public function test_only_super_admin_can_manage_but_every_role_can_view(): void
     {
         $review = ProductReview::create(['product_id' => $this->product->id, 'author_name' => 'Sari P.', 'rating' => 4]);
-        $body = ['product_id' => $this->product->id, 'author_name' => 'Tamu', 'rating' => 5, 'body' => 'Bagus'];
+        $body = ['product_id' => $this->product->public_id, 'author_name' => 'Tamu', 'rating' => 5, 'body' => 'Bagus'];
 
         foreach (['owner', 'store-admin', 'customer-service', 'warehouse', 'marketing', 'super-admin'] as $role) {
             $this->actingAs($this->staff($role))->getJson('/api/v1/admin/product-reviews')->assertOk()->assertJsonPath('data.meta.total', 1);
@@ -122,8 +122,8 @@ class ProductReviewTest extends TestCase
         foreach (['owner', 'store-admin', 'customer-service', 'warehouse', 'marketing'] as $role) {
             $this->actingAs($this->staff($role));
             $this->postJson('/api/v1/admin/product-reviews', $body)->assertForbidden();
-            $this->patchJson("/api/v1/admin/product-reviews/{$review->id}", ['author_name' => 'X', 'rating' => 1])->assertForbidden();
-            $this->deleteJson("/api/v1/admin/product-reviews/{$review->id}")->assertForbidden();
+            $this->patchJson("/api/v1/admin/product-reviews/{$review->public_id}", ['author_name' => 'X', 'rating' => 1])->assertForbidden();
+            $this->deleteJson("/api/v1/admin/product-reviews/{$review->public_id}")->assertForbidden();
         }
 
         $this->assertSame(1, ProductReview::count());
@@ -133,11 +133,11 @@ class ProductReviewTest extends TestCase
     public function test_super_admin_creates_updates_hides_and_deletes_with_audit(): void
     {
         $this->actingAs($this->staff('super-admin'));
-        $id = $this->postJson('/api/v1/admin/product-reviews', ['product_id' => $this->product->id, 'author_name' => 'Tamu', 'rating' => 5, 'body' => 'Bagus'])->assertCreated()->json('data.id');
+        $id = $this->postJson('/api/v1/admin/product-reviews', ['product_id' => $this->product->public_id, 'author_name' => 'Tamu', 'rating' => 5, 'body' => 'Bagus'])->assertCreated()->json('data.id');
 
         $this->patchJson("/api/v1/admin/product-reviews/{$id}", ['author_name' => 'Tamu', 'rating' => 3, 'is_published' => false])->assertOk()->assertJsonPath('data.rating', 3);
         $this->patchJson("/api/v1/admin/product-reviews/{$id}", ['product_id' => 999, 'author_name' => 'Tamu', 'rating' => 3])->assertUnprocessable();
-        $this->postJson('/api/v1/admin/product-reviews', ['product_id' => $this->product->id, 'author_name' => 'Tamu', 'rating' => 9])->assertUnprocessable();
+        $this->postJson('/api/v1/admin/product-reviews', ['product_id' => $this->product->public_id, 'author_name' => 'Tamu', 'rating' => 9])->assertUnprocessable();
 
         $this->deleteJson("/api/v1/admin/product-reviews/{$id}")->assertOk();
         $this->assertDatabaseMissing('product_reviews', ['id' => $id]);

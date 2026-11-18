@@ -1,5 +1,5 @@
 <script setup>
-import { onMounted, reactive, ref } from 'vue';
+import { computed, onMounted, reactive, ref, watch } from 'vue';
 import AdminIcon from '../../components/AdminIcon.vue';
 import AppModal from '../../components/ui/AppModal.vue';
 import IconAction from '../../components/ui/IconAction.vue';
@@ -8,8 +8,15 @@ import api from '../../utils/api';
 import { apiError } from '../../utils/apiError';
 import { formatDate } from '../../utils/datetime';
 
-// Syarat dan Ketentuan toko (Admin Toko dan Super Admin). Teks polos dua bahasa; tampil di /kontak#syarat. Setiap perubahan menaikkan
-// versi, dan versi itu dicatat di tiap pengajuan refund sebagai S&K yang disetujui pelanggan.
+// Syarat dan Ketentuan atau Kebijakan Privasi toko (Admin Toko dan Super Admin, D-139), satu halaman untuk dua jenis (prop `kind`).
+// Teks polos dua bahasa; tampil di /kontak#syarat atau /kontak#privasi. Setiap perubahan menaikkan versi jenisnya. Versi S&K dicatat di
+// tiap pengajuan refund; versi Privasi terpisah dan tidak memengaruhinya.
+const props = defineProps({ kind: { type: String, default: 'terms' } });
+const CONFIG = {
+    terms: { api: '/admin/terms', title: 'Syarat dan Ketentuan', short: 'S&K', anchor: 'syarat', description: 'Teks yang tampil di halaman Kontak toko (Indonesia dan Inggris). Setiap perubahan menaikkan versi, dan versi itu dicatat di tiap pengajuan refund.', empty: 'Belum ada butir. Toko memakai teks bawaan sampai ada butir yang tayang.', deleteNote: 'Butir ini dihapus dari Syarat dan Ketentuan di toko dan versi dinaikkan. Pengajuan refund yang sudah ada tetap mencatat versi lamanya. Tindakan ini tidak bisa dibatalkan.' },
+    privacy: { api: '/admin/privacy', title: 'Kebijakan Privasi', short: 'Privasi', anchor: 'privasi', description: 'Teks yang tampil di halaman Kontak toko (Indonesia dan Inggris). Setiap perubahan menaikkan versi Privasi, terpisah dari versi Syarat dan Ketentuan.', empty: 'Belum ada butir yang tayang. Toko memakai teks bawaan sampai ada butir yang tayang.', deleteNote: 'Butir ini dihapus dari Kebijakan Privasi di toko dan versi Privasi dinaikkan. Tindakan ini tidak bisa dibatalkan.' },
+};
+const cfg = computed(() => CONFIG[props.kind] || CONFIG.terms);
 const press = 'transition-[transform,background-color] duration-[160ms] ease-out-strong focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary active:scale-[0.97] disabled:opacity-60 disabled:active:scale-100';
 const field = 'mt-1 w-full rounded-2xl border border-secondary bg-surface px-3 py-2 text-body-md focus:outline-2 focus:outline-primary';
 
@@ -31,7 +38,7 @@ const deleteError = ref('');
 async function load() {
     loadError.value = '';
     try {
-        const { data } = await api.get('/admin/terms');
+        const { data } = await api.get(cfg.value.api);
         sections.value = data.data.sections;
         version.value = data.data.version;
         updatedAt.value = data.data.updated_at;
@@ -53,7 +60,7 @@ async function save() {
     busy.value = true;
     formError.value = '';
     try {
-        await (editing.value ? api.put(`/admin/terms/${editing.value.id}`, form) : api.post('/admin/terms', form));
+        await (editing.value ? api.put(`${cfg.value.api}/${editing.value.id}`, form) : api.post(cfg.value.api, form));
         formDialog.value.close();
         await load();
     } catch (e) {
@@ -73,7 +80,7 @@ function askDelete(section) {
 async function remove() {
     busy.value = true;
     try {
-        await api.delete(`/admin/terms/${deleting.value.id}`);
+        await api.delete(`${cfg.value.api}/${deleting.value.id}`);
         deleteDialog.value.close();
         await load();
     } catch (e) {
@@ -87,7 +94,7 @@ async function remove() {
 async function move(section, direction) {
     busy.value = true;
     try {
-        await api.post(`/admin/terms/${section.id}/move`, { direction }, { toast: false });
+        await api.post(`${cfg.value.api}/${section.id}/move`, { direction }, { toast: false });
         await load();
     } catch (e) {
         loadError.value = apiError(e).message;
@@ -97,18 +104,20 @@ async function move(section, direction) {
 }
 
 onMounted(load);
+// Dua rute memakai komponen yang sama, jadi Vue Router bisa memakai ulang instansinya saat pindah jenis: muat ulang bila jenis berubah.
+watch(() => props.kind, () => { sections.value = []; loading.value = true; load(); });
 </script>
 
 <template>
   <div class="flex flex-wrap items-end justify-between gap-space-md">
-    <PageHeader title="Syarat dan Ketentuan" description="Teks yang tampil di halaman Kontak toko (Indonesia dan Inggris). Setiap perubahan menaikkan versi, dan versi itu dicatat di tiap pengajuan refund." />
+    <PageHeader :title="cfg.title" :description="cfg.description" />
     <button type="button" :class="`inline-flex min-h-11 items-center gap-1.5 rounded-full bg-accent px-5 text-label-md hover:bg-accent-hover ${press}`" @click="openForm()"><AdminIcon name="plus" :size="16" />Tambah butir</button>
   </div>
 
-  <section class="mt-space-lg flex flex-wrap items-center gap-x-4 gap-y-2 rounded-2xl border border-border bg-surface px-5 py-4 shadow-card" aria-label="Versi S&K">
+  <section class="mt-space-lg flex flex-wrap items-center gap-x-4 gap-y-2 rounded-2xl border border-border bg-surface px-5 py-4 shadow-card" :aria-label="`Versi ${cfg.short}`">
     <span class="rounded-full bg-accent-tint-20 px-3 py-1 text-label-md">Versi {{ version || '-' }}</span>
     <span class="text-body-sm text-secondary">Diperbarui {{ formatDate(updatedAt) }}</span>
-    <a href="/kontak#syarat" target="_blank" rel="noopener noreferrer" :class="`ml-auto inline-flex min-h-10 items-center gap-1.5 rounded-full border border-secondary px-4 text-label-md hover:bg-accent-tint-15 ${press}`"><AdminIcon name="eye" :size="16" />Lihat di toko</a>
+    <a :href="`/kontak#${cfg.anchor}`" target="_blank" rel="noopener noreferrer" :class="`ml-auto inline-flex min-h-10 items-center gap-1.5 rounded-full border border-secondary px-4 text-label-md hover:bg-accent-tint-15 ${press}`"><AdminIcon name="eye" :size="16" />Lihat di toko</a>
   </section>
 
   <div v-if="loading" role="status" aria-label="Memuat" class="mt-space-md space-y-3">
@@ -120,9 +129,9 @@ onMounted(load);
     <button type="button" :class="`rounded-full border border-on-error-surface px-4 py-1.5 text-label-md hover:bg-error/10 ${press}`" @click="load">Coba lagi</button>
   </div>
 
-  <p v-else-if="!sections.length" class="mt-space-md rounded-2xl border border-border bg-surface p-6 text-center text-body-sm text-secondary shadow-card">Belum ada butir. Toko memakai teks bawaan sampai ada butir yang tayang.</p>
+  <p v-else-if="!sections.length" class="mt-space-md rounded-2xl border border-border bg-surface p-6 text-center text-body-sm text-secondary shadow-card">{{ cfg.empty }}</p>
 
-  <ol v-else class="mt-space-md space-y-3" aria-label="Butir Syarat dan Ketentuan">
+  <ol v-else class="mt-space-md space-y-3" :aria-label="`Butir ${cfg.title}`">
     <li v-for="(section, i) in sections" :key="section.id" class="flex gap-3 rounded-2xl border border-border bg-surface p-4 shadow-card sm:gap-4 sm:p-5">
       <span class="grid size-9 shrink-0 place-items-center rounded-full bg-secondary-tint-12 text-label-md" aria-hidden="true">{{ i + 1 }}</span>
       <div class="min-w-0 flex-1">
@@ -167,7 +176,7 @@ onMounted(load);
   </AppModal>
 
   <AppModal ref="deleteDialog" variant="delete" size="md" title="Hapus butir" :subtitle="deleting?.title_id">
-    <p class="text-body-sm">Butir ini dihapus dari Syarat dan Ketentuan di toko dan versi dinaikkan. Pengajuan refund yang sudah ada tetap mencatat versi lamanya. Tindakan ini tidak bisa dibatalkan.</p>
+    <p class="text-body-sm">{{ cfg.deleteNote }}</p>
     <p v-if="deleteError" role="alert" class="mt-3 text-body-sm text-error">{{ deleteError }}</p>
     <template #footer>
       <button type="button" :disabled="busy" :class="`inline-flex min-h-10 items-center rounded-full border border-secondary px-4 text-label-md hover:bg-accent-tint-15 ${press}`" @click="deleteDialog.close()">Batal</button>

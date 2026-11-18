@@ -78,11 +78,11 @@ class PromoVideoTest extends TestCase
             'type' => 'video', 'title' => 'Video', 'video_url' => 'https://youtu.be/dQw4w9WgXcQ', 'provider' => 'tiktok', 'external_id' => 'palsu',
         ])->assertCreated()->assertJsonPath('data.provider', 'youtube')->json('data.id');
 
-        $this->assertSame('dQw4w9WgXcQ', PromoContent::find($id)->external_id);
+        $this->assertSame('dQw4w9WgXcQ', PromoContent::where('public_id', $id)->first()->external_id);
 
         $this->patchJson("/api/v1/admin/contents/{$id}", ['title' => 'Video', 'video_url' => 'https://www.instagram.com/reel/C1abc/'])
             ->assertOk()->assertJsonPath('data.provider', 'instagram');
-        $this->assertSame('C1abc', PromoContent::find($id)->external_id);
+        $this->assertSame('C1abc', PromoContent::where('public_id', $id)->first()->external_id);
     }
 
     public function test_admin_list_can_be_scoped_to_video_or_promo(): void
@@ -123,7 +123,7 @@ class PromoVideoTest extends TestCase
     public function test_delete_is_soft_audited_and_limited_to_content_managers(): void
     {
         $content = $this->video();
-        $url = "/api/v1/admin/contents/{$content->id}";
+        $url = "/api/v1/admin/contents/{$content->public_id}";
 
         foreach (['store-admin', 'owner', 'customer-service', 'warehouse'] as $role) {
             $this->actingAs($this->staff($role))->deleteJson($url)->assertForbidden();
@@ -136,18 +136,18 @@ class PromoVideoTest extends TestCase
         $this->assertSoftDeleted($content);
         $this->assertSame($marketing->id, AuditLog::where('action', 'content.deleted')->value('actor_user_id'));
         $this->getJson('/api/v1/admin/contents')->assertJsonCount(0, 'data.items');
-        $this->actingAs($this->staff('super-admin'))->deleteJson("/api/v1/admin/contents/{$this->video()->id}")->assertOk();
+        $this->actingAs($this->staff('super-admin'))->deleteJson("/api/v1/admin/contents/{$this->video()->public_id}")->assertOk();
     }
 
     public function test_delete_requires_login_and_mfa(): void
     {
         $content = $this->video();
 
-        $this->deleteJson("/api/v1/admin/contents/{$content->id}")->assertUnauthorized();
+        $this->deleteJson("/api/v1/admin/contents/{$content->public_id}")->assertUnauthorized();
 
         $noMfa = User::factory()->create(['mfa_totp_confirmed_at' => null]);
         $noMfa->assignRole('marketing');
-        $this->actingAs($noMfa)->deleteJson("/api/v1/admin/contents/{$content->id}")->assertForbidden();
+        $this->actingAs($noMfa)->deleteJson("/api/v1/admin/contents/{$content->public_id}")->assertForbidden();
     }
 
     public function test_gallery_shows_only_live_videos_with_thumbnail_in_order(): void

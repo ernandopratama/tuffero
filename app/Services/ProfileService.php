@@ -87,7 +87,7 @@ class ProfileService
     public function setAvatar(User $user, UploadedFile $file): User
     {
         $old = $user->avatar_path;
-        $path = $this->images->storeWebp($file, "avatars/{$user->id}", 512, 85, true);
+        $path = $this->images->storeWebp($file, 'avatars', 512, 85, true);
 
         DB::transaction(function () use ($user, $path) {
             $user->forceFill(['avatar_path' => $path])->save();

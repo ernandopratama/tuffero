@@ -23,7 +23,7 @@
 				</div>
 				<div class="tf-footer-col">
 					<h3>{{ $t['footer']['helpTitle'] }}</h3>
-					<ul><li><a href="#">{{ $t['top']['track'] }}</a></li><li><a href="{{ $site->route('contact') }}">{{ $t['top']['help'] }}</a></li></ul>
+					<ul><li><a href="{{ $site->route('track') }}">{{ $t['top']['track'] }}</a></li><li><a href="{{ $site->route('contact') }}">{{ $t['top']['help'] }}</a></li></ul>
 				</div>
 				<div class="tf-footer-col">
 					<h3>{{ $t['footer']['contactTitle'] }}</h3>

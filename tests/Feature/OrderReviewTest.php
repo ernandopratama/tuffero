@@ -81,7 +81,7 @@ class OrderReviewTest extends TestCase
         $order = $this->awaitingOrder();
         $admin = $this->staff('store-admin');
 
-        $this->actingAs($admin)->postJson("/api/v1/admin/orders/{$order->id}/approve", ['note' => 'Pelanggan lama'])->assertOk();
+        $this->actingAs($admin)->postJson("/api/v1/admin/orders/{$order->public_ref}/approve", ['note' => 'Pelanggan lama'])->assertOk();
 
         $order->refresh();
         $this->assertSame(Order::PENDING_PAYMENT, $order->status);
@@ -92,7 +92,7 @@ class OrderReviewTest extends TestCase
         $this->assertDatabaseHas('audit_logs', ['action' => 'order.approved', 'auditable_id' => $order->id]);
 
         // Tidak bisa disetujui dua kali.
-        $this->actingAs($admin)->postJson("/api/v1/admin/orders/{$order->id}/approve")->assertUnprocessable();
+        $this->actingAs($admin)->postJson("/api/v1/admin/orders/{$order->public_ref}/approve")->assertUnprocessable();
     }
 
     public function test_reject_requires_reason_and_releases_stock(): void
@@ -100,8 +100,8 @@ class OrderReviewTest extends TestCase
         $order = $this->awaitingOrder();
         $admin = $this->staff('store-admin');
 
-        $this->actingAs($admin)->postJson("/api/v1/admin/orders/{$order->id}/reject", ['note' => '  '])->assertJsonValidationErrors('note');
-        $this->actingAs($admin)->postJson("/api/v1/admin/orders/{$order->id}/reject", ['note' => 'Alamat tidak valid'])->assertOk();
+        $this->actingAs($admin)->postJson("/api/v1/admin/orders/{$order->public_ref}/reject", ['note' => '  '])->assertJsonValidationErrors('note');
+        $this->actingAs($admin)->postJson("/api/v1/admin/orders/{$order->public_ref}/reject", ['note' => 'Alamat tidak valid'])->assertOk();
 
         $order->refresh();
         $this->assertSame(Order::REJECTED, $order->status);
@@ -115,9 +115,9 @@ class OrderReviewTest extends TestCase
         $order = $this->awaitingOrder();
 
         foreach (['owner', 'customer-service', 'warehouse', 'marketing'] as $role) {
-            $this->actingAs($this->staff($role))->postJson("/api/v1/admin/orders/{$order->id}/approve")->assertForbidden();
+            $this->actingAs($this->staff($role))->postJson("/api/v1/admin/orders/{$order->public_ref}/approve")->assertForbidden();
         }
-        $this->actingAs($this->staff('super-admin'))->postJson("/api/v1/admin/orders/{$order->id}/reject", ['note' => 'Uji'])->assertOk();
+        $this->actingAs($this->staff('super-admin'))->postJson("/api/v1/admin/orders/{$order->public_ref}/reject", ['note' => 'Uji'])->assertOk();
     }
 
     public function test_review_queue_is_visible_to_store_admin_owner_and_super_admin_only(): void
@@ -143,9 +143,9 @@ class OrderReviewTest extends TestCase
         $order->update(['status' => Order::PENDING_PAYMENT]);
         $admin = $this->staff('store-admin');
 
-        $this->actingAs($admin)->postJson("/api/v1/admin/orders/{$order->id}/reviewed")->assertOk();
+        $this->actingAs($admin)->postJson("/api/v1/admin/orders/{$order->public_ref}/reviewed")->assertOk();
         $this->assertNotNull($order->fresh()->reviewed_at);
-        $this->actingAs($admin)->postJson("/api/v1/admin/orders/{$order->id}/reviewed")->assertUnprocessable();
+        $this->actingAs($admin)->postJson("/api/v1/admin/orders/{$order->public_ref}/reviewed")->assertUnprocessable();
     }
 
     public function test_awaiting_order_past_deadline_is_closed_and_stock_released(): void

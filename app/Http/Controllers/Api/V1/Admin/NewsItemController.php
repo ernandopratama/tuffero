@@ -75,7 +75,8 @@ class NewsItemController extends Controller
         };
 
         return [
-            ...$item->only(['id', 'kind', 'title', 'title_en', 'body', 'body_en', 'cta_label', 'cta_label_en', 'cta_url', 'starts_at', 'ends_at', 'sort_order', 'is_published']),
+            'id' => $item->public_id,
+            ...$item->only(['kind', 'title', 'title_en', 'body', 'body_en', 'cta_label', 'cta_label_en', 'cta_url', 'starts_at', 'ends_at', 'sort_order', 'is_published']),
             'status' => $status,
             'image_url' => $item->imageUrl(),
         ];

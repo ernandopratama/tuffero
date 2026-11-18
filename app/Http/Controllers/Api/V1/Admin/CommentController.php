@@ -38,12 +38,12 @@ class CommentController extends Controller
         }
         $page = $query->paginate(self::PER_PAGE);
         $comments = collect($page->items());
-        $names = User::whereIn('id', $comments->pluck('mentions')->flatten()->filter()->unique())->pluck('name', 'id');
+        $names = $this->people($comments->pluck('mentions')->flatten()->filter()->unique());
         $csIds = $this->canWriteCs($request) ? $this->mentionable($request, true)->pluck('id') : collect();
 
         return $this->success('Comments retrieved.', [
             'comments' => $comments->map(fn (AdminComment $comment) => $this->present($comment, $names)),
-            'mentionable' => $this->mentionable($request)->map(fn (User $user) => ['id' => $user->id, 'name' => $user->name, 'cs' => $csIds->contains($user->id)])->values(),
+            'mentionable' => $this->mentionable($request)->map(fn (User $user) => ['id' => $user->public_id, 'name' => $user->name, 'cs' => $csIds->contains($user->id)])->values(),
             'can_cs' => $this->canWriteCs($request),
             'meta' => ['current_page' => $page->currentPage(), 'last_page' => $page->lastPage(), 'total' => $page->total()],
         ]);
@@ -58,7 +58,7 @@ class CommentController extends Controller
             'body' => ['required', 'string', 'max:2000'],
             'visibility' => ['sometimes', Rule::in([AdminComment::STAFF, AdminComment::CS])],
             'mentions' => ['sometimes', 'array', 'max:10'],
-            'mentions.*' => ['integer', Rule::in($this->mentionable($request, $csOnly)->pluck('id'))],
+            'mentions.*' => ['string', Rule::in($this->mentionable($request, $csOnly)->pluck('public_id'))],
         ], [
             'body.required' => 'Komentar tidak boleh kosong.',
             'body.max' => 'Komentar maksimal 2000 karakter.',
@@ -66,7 +66,8 @@ class CommentController extends Controller
             'mentions.*.in' => 'Orang yang ditandai tidak valid.',
         ]);
 
-        $mentions = collect($validated['mentions'] ?? [])->unique()->values();
+        // ID publik dari klien dipetakan ke ID angka; kolom `mentions` dan notifikasi tetap memakai ID internal.
+        $mentions = User::whereIn('public_id', collect($validated['mentions'] ?? [])->unique()->values())->pluck('id')->values();
         $comment = $this->target($request)->comments()->create([
             'user_id' => $request->user()->id,
             'body' => $validated['body'],
@@ -85,7 +86,7 @@ class CommentController extends Controller
             Notification::sendNow(User::whereIn('id', $mentions)->get(), new MentionedInComment($request->user()->name, $kind, $label, $validated['body']));
         }
 
-        return $this->success('Comment added.', $this->present($comment->load('user:id,name'), User::whereIn('id', $mentions)->pluck('name', 'id')), 201);
+        return $this->success('Comment added.', $this->present($comment->load('user:id,name'), $this->people($mentions)), 201);
     }
 
     private function target(Request $request): Voucher|PromoContent|Order|Refund|OrderCancellationRequest
@@ -135,22 +136,31 @@ class CommentController extends Controller
             $query->permission(AdminComment::CS_PERMISSION);
         }
 
-        return $query->get(['id', 'name']);
+        return $query->get(['id', 'public_id', 'name']);
     }
 
     /**
-     * @param  Collection<int|string, string>  $names  id staf => nama
+     * @param  Collection<int|string, User>  $names  id staf => akun (nama dan ID publik)
      * @return array<string, mixed>
      */
     private function present(AdminComment $comment, Collection $names): array
     {
         return [
-            'id' => $comment->id,
+            'id' => $comment->public_id,
             'author' => $comment->user->name,
             'body' => $comment->body,
             'visibility' => $comment->visibility,
-            'mentions' => collect($comment->mentions ?? [])->filter(fn ($id) => $names->has($id))->map(fn ($id) => ['id' => $id, 'name' => $names[$id]])->values(),
+            'mentions' => collect($comment->mentions ?? [])->filter(fn ($id) => $names->has($id))->map(fn ($id) => ['id' => $names[$id]->public_id, 'name' => $names[$id]->name])->values(),
             'created_at' => $comment->created_at,
         ];
+    }
+
+    /**
+     * @param  Collection<int, mixed>  $ids
+     * @return Collection<int|string, User>
+     */
+    private function people(Collection $ids): Collection
+    {
+        return User::whereIn('id', $ids)->get(['id', 'public_id', 'name'])->keyBy('id');
     }
 }

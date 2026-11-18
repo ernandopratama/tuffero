@@ -90,6 +90,7 @@ class OrderStatusService
                     'courier_code' => $locked->shipping_courier,
                     'service_code' => $locked->shipping_service,
                     'waybill_id' => $created['waybill_id'],
+                    'routing_code' => $created['routing_code'],
                     'status' => $created['status'],
                     'shipping_fee' => $locked->shipping_fee,
                 ]);
@@ -215,6 +216,7 @@ class OrderStatusService
                 'courier_code' => $locked->shipping_courier,
                 'service_code' => $locked->shipping_service,
                 'waybill_id' => $created['waybill_id'],
+                'routing_code' => $created['routing_code'],
                 'status' => $created['status'],
                 'shipping_fee' => $locked->shipping_fee,
                 'shipped_at' => now(),

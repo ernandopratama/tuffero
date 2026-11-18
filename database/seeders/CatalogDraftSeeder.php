@@ -6,6 +6,7 @@ use App\Models\InventoryStock;
 use App\Models\ProductVariant;
 use App\Models\User;
 use App\Models\Warehouse;
+use App\Services\ImageService;
 use App\Services\InventoryService;
 use App\Services\ProductService;
 use Illuminate\Database\Seeder;
@@ -48,7 +49,8 @@ class CatalogDraftSeeder extends Seeder
                 ], null);
 
                 foreach ($row['photos'] as $order => $photo) {
-                    $path = "products/{$product->id}/".basename($photo);
+                    // Path acak tanpa ID dan nama asli (D-142); foto sumber di public/ selalu .webp atau .jpg.
+                    $path = ImageService::randomPath('products', strtolower(pathinfo($photo, PATHINFO_EXTENSION)));
                     Storage::disk('public')->put($path, File::get(public_path($photo)));
                     $product->images()->create(['path' => $path, 'alt' => $row['name'], 'sort_order' => $order]);
                 }

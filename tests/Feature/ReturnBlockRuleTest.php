@@ -58,7 +58,7 @@ class ReturnBlockRuleTest extends TestCase
         $this->assertSame(1, $owner->notifications()->count());
         $this->assertDatabaseHas('audit_logs', ['action' => 'customer_block_rule.requested', 'actor_user_id' => $storeAdmin->id]);
 
-        $this->actingAs($owner)->postJson("/api/v1/admin/customer-blocks/rule/requests/{$ruleRequest->id}/decide", ['decision' => 'approve', 'note' => 'Setuju'])
+        $this->actingAs($owner)->postJson("/api/v1/admin/customer-blocks/rule/requests/{$ruleRequest->public_id}/decide", ['decision' => 'approve', 'note' => 'Setuju'])
             ->assertOk()->assertJsonPath('data.enabled', true)->assertJsonPath('data.pending', null)->assertJsonPath('data.last_decision.status', 'approved');
 
         $this->assertTrue($this->enabled());
@@ -72,7 +72,7 @@ class ReturnBlockRuleTest extends TestCase
         $ruleRequest = $this->request($superAdmin);
 
         // Super Admin memegang semua izin, tetapi hanya peran Pemilik yang memutuskan.
-        $this->actingAs($superAdmin)->postJson("/api/v1/admin/customer-blocks/rule/requests/{$ruleRequest->id}/decide", ['decision' => 'approve'])->assertForbidden();
+        $this->actingAs($superAdmin)->postJson("/api/v1/admin/customer-blocks/rule/requests/{$ruleRequest->public_id}/decide", ['decision' => 'approve'])->assertForbidden();
         $this->assertFalse($this->enabled());
         $this->assertSame('pending', $ruleRequest->fresh()->status);
     }
@@ -83,7 +83,7 @@ class ReturnBlockRuleTest extends TestCase
         $owner = $this->staff('owner');
         $ruleRequest = $this->request($storeAdmin);
 
-        $this->actingAs($storeAdmin)->postJson("/api/v1/admin/customer-blocks/rule/requests/{$ruleRequest->id}/decide", ['decision' => 'approve'])->assertForbidden();
+        $this->actingAs($storeAdmin)->postJson("/api/v1/admin/customer-blocks/rule/requests/{$ruleRequest->public_id}/decide", ['decision' => 'approve'])->assertForbidden();
         $this->actingAs($owner)->postJson('/api/v1/admin/customer-blocks/rule/request', ['note' => 'Pemilik mengajukan sendiri'])->assertForbidden();
         $this->actingAs($this->staff('customer-service'))->postJson('/api/v1/admin/customer-blocks/rule/request', ['note' => 'CS mengajukan'])->assertForbidden();
         $this->assertFalse($this->enabled());
@@ -94,7 +94,7 @@ class ReturnBlockRuleTest extends TestCase
         $both = $this->staff('store-admin', 'owner');
         $ruleRequest = $this->request($both);
 
-        $this->actingAs($both)->postJson("/api/v1/admin/customer-blocks/rule/requests/{$ruleRequest->id}/decide", ['decision' => 'approve'])->assertJsonValidationErrors('rule');
+        $this->actingAs($both)->postJson("/api/v1/admin/customer-blocks/rule/requests/{$ruleRequest->public_id}/decide", ['decision' => 'approve'])->assertJsonValidationErrors('rule');
         $this->assertFalse($this->enabled());
     }
 
@@ -115,13 +115,13 @@ class ReturnBlockRuleTest extends TestCase
         $owner = $this->staff('owner');
         $ruleRequest = $this->request($storeAdmin);
 
-        $this->actingAs($owner)->postJson("/api/v1/admin/customer-blocks/rule/requests/{$ruleRequest->id}/decide", ['decision' => 'reject'])->assertJsonValidationErrors('note');
-        $this->actingAs($owner)->postJson("/api/v1/admin/customer-blocks/rule/requests/{$ruleRequest->id}/decide", ['decision' => 'reject', 'note' => 'Tunggu S&K final'])
+        $this->actingAs($owner)->postJson("/api/v1/admin/customer-blocks/rule/requests/{$ruleRequest->public_id}/decide", ['decision' => 'reject'])->assertJsonValidationErrors('note');
+        $this->actingAs($owner)->postJson("/api/v1/admin/customer-blocks/rule/requests/{$ruleRequest->public_id}/decide", ['decision' => 'reject', 'note' => 'Tunggu S&K final'])
             ->assertOk()->assertJsonPath('data.last_decision.status', 'rejected');
 
         $this->assertFalse($this->enabled());
         // Sudah diputuskan: tidak bisa diputuskan dua kali, dan pengajuan baru boleh dibuat.
-        $this->actingAs($owner)->postJson("/api/v1/admin/customer-blocks/rule/requests/{$ruleRequest->id}/decide", ['decision' => 'approve'])->assertJsonValidationErrors('rule');
+        $this->actingAs($owner)->postJson("/api/v1/admin/customer-blocks/rule/requests/{$ruleRequest->public_id}/decide", ['decision' => 'approve'])->assertJsonValidationErrors('rule');
         $this->actingAs($storeAdmin)->postJson('/api/v1/admin/customer-blocks/rule/request', ['note' => 'Pengajuan kedua setelah S&K'])->assertCreated();
     }
 
@@ -142,7 +142,7 @@ class ReturnBlockRuleTest extends TestCase
         $storeAdmin = $this->staff('store-admin');
         $owner = $this->staff('owner');
         $ruleRequest = $this->request($storeAdmin);
-        $this->actingAs($owner)->postJson("/api/v1/admin/customer-blocks/rule/requests/{$ruleRequest->id}/decide", ['decision' => 'approve'])->assertOk();
+        $this->actingAs($owner)->postJson("/api/v1/admin/customer-blocks/rule/requests/{$ruleRequest->public_id}/decide", ['decision' => 'approve'])->assertOk();
 
         $this->actingAs($storeAdmin)->postJson('/api/v1/admin/customer-blocks/rule/disable', [])->assertJsonValidationErrors('note');
         $this->actingAs($storeAdmin)->postJson('/api/v1/admin/customer-blocks/rule/disable', ['note' => 'Terlalu banyak salah blokir'])->assertOk()->assertJsonPath('data.enabled', false);

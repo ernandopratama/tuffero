@@ -56,7 +56,8 @@ class CategoryController extends Controller
     private function present(ProductCategory $category): array
     {
         return [
-            ...$category->only(['id', 'slug', 'name_id', 'name_en', 'sort_order', 'is_active', 'color']),
+            'id' => $category->public_id,
+            ...$category->only(['slug', 'name_id', 'name_en', 'sort_order', 'is_active', 'color']),
             'products_count' => $category->products_count,
             'types' => $category->relationLoaded('types') ? $category->types->map(fn (ProductType $type) => $this->presentType($type))->values() : [],
         ];
@@ -65,6 +66,6 @@ class CategoryController extends Controller
     /** @return array<string, mixed> */
     private function presentType(ProductType $type): array
     {
-        return [...$type->only(['id', 'product_category_id', 'slug', 'name_id', 'name_en', 'sort_order', 'is_active']), 'products_count' => $type->products_count];
+        return ['id' => $type->public_id, 'product_category_id' => $type->category?->public_id, ...$type->only(['slug', 'name_id', 'name_en', 'sort_order', 'is_active']), 'products_count' => $type->products_count];
     }
 }

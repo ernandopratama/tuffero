@@ -34,7 +34,7 @@ class NewProductDraftSeederTest extends TestCase
         $admin->assignRole('store-admin');
         $product = Product::where('name', 'Bola Susu')->firstOrFail();
 
-        $this->actingAs($admin)->patchJson("/api/v1/admin/products/{$product->id}", ['is_published' => true])->assertJsonValidationErrors('is_published');
+        $this->actingAs($admin)->patchJson("/api/v1/admin/products/{$product->public_id}", ['is_published' => true])->assertJsonValidationErrors('is_published');
         $this->assertFalse($product->fresh()->is_published);
     }
 }

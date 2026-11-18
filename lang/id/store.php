@@ -572,6 +572,7 @@ Anda coba*',
             'legal' => [
                 'eyebrow' => 'Ketentuan Layanan',
                 'version' => 'Versi {version}, diperbarui {date}',
+                'count' => '{n} butir',
                 'docs' => [[
                     'id' => 'syarat',
                     'title' => 'Syarat & Ketentuan',

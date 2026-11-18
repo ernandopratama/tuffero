@@ -61,7 +61,7 @@ class ProductTranslationTest extends TestCase
         $id = $this->actingAs($this->staff())->postJson('/api/v1/admin/products', ['name' => 'Nastar Baru', 'description' => 'Enak sekali.'])
             ->assertCreated()->json('data.id');
 
-        $product = Product::findOrFail($id);
+        $product = Product::where('public_id', $id)->firstOrFail();
         $this->assertSame('EN name', $product->name_en);
         $this->assertSame('EN description', $product->description_en);
         $this->assertSame('ai', $product->translation_mode);
@@ -80,10 +80,10 @@ class ProductTranslationTest extends TestCase
         $service->apply($product->refresh());
         Http::assertSentCount(1);
 
-        $this->actingAs($admin)->patchJson("/api/v1/admin/products/{$product->id}", ['badges' => ['Baru']])->assertOk();
+        $this->actingAs($admin)->patchJson("/api/v1/admin/products/{$product->public_id}", ['badges' => ['Baru']])->assertOk();
         Http::assertSentCount(1);
 
-        $this->patchJson("/api/v1/admin/products/{$product->id}", ['description' => 'Deskripsi baru.'])->assertOk();
+        $this->patchJson("/api/v1/admin/products/{$product->public_id}", ['description' => 'Deskripsi baru.'])->assertOk();
         Http::assertSentCount(2);
         $this->assertFalse($service->isOutdated($product->refresh()));
     }
@@ -102,7 +102,7 @@ class ProductTranslationTest extends TestCase
         Http::fake(['api.anthropic.com/*' => Http::response(['error' => ['message' => 'overloaded']], 529)]);
         $product = $this->product();
 
-        $this->actingAs($this->staff())->patchJson("/api/v1/admin/products/{$product->id}", ['name' => 'Nastar Uji 2'])->assertOk();
+        $this->actingAs($this->staff())->patchJson("/api/v1/admin/products/{$product->public_id}", ['name' => 'Nastar Uji 2'])->assertOk();
 
         $this->assertNull($product->fresh()->name_en);
         $this->get('/produk/nas-uji-01?lang=en')->assertOk()->assertSee('Nastar Uji 2');
@@ -124,10 +124,10 @@ class ProductTranslationTest extends TestCase
         $admin = $this->staff();
         $product = $this->product();
 
-        $this->actingAs($admin)->patchJson("/api/v1/admin/products/{$product->id}", ['name_en' => 'Test Nastar', 'description_en' => 'Crisp and melting.'])
+        $this->actingAs($admin)->patchJson("/api/v1/admin/products/{$product->public_id}", ['name_en' => 'Test Nastar', 'description_en' => 'Crisp and melting.'])
             ->assertOk()->assertJsonPath('data.translation_mode', 'manual')->assertJsonPath('data.translation_outdated', false);
 
-        $this->patchJson("/api/v1/admin/products/{$product->id}", ['name' => 'Nastar Uji Baru'])
+        $this->patchJson("/api/v1/admin/products/{$product->public_id}", ['name' => 'Nastar Uji Baru'])
             ->assertOk()->assertJsonPath('data.name_en', 'Test Nastar')->assertJsonPath('data.translation_outdated', true);
         Http::assertNothingSent();
     }
@@ -138,7 +138,7 @@ class ProductTranslationTest extends TestCase
         $admin = $this->staff();
         $product = $this->product(['name_en' => 'Tulisan tangan', 'translation_mode' => 'manual']);
 
-        $this->actingAs($admin)->patchJson("/api/v1/admin/products/{$product->id}", ['translation_mode' => 'ai'])
+        $this->actingAs($admin)->patchJson("/api/v1/admin/products/{$product->public_id}", ['translation_mode' => 'ai'])
             ->assertOk()->assertJsonPath('data.translation_mode', 'ai');
 
         // Antrean memakai driver sync di tes; di produksi terjemahan masuk beberapa detik setelah respons.
@@ -151,7 +151,7 @@ class ProductTranslationTest extends TestCase
         $product = $this->product();
         $variant = $product->variants->first();
 
-        $this->actingAs($this->staff())->patchJson("/api/v1/admin/products/{$product->id}", ['variant_names_en' => [$variant->id => '500 g pack', 99999 => 'bukan milik produk ini']])
+        $this->actingAs($this->staff())->patchJson("/api/v1/admin/products/{$product->public_id}", ['variant_names_en' => [$variant->id => '500 g pack', 99999 => 'bukan milik produk ini']])
             ->assertOk()->assertJsonPath('data.translation_mode', 'manual')->assertJsonPath('data.variants.0.name_en', '500 g pack');
 
         Http::assertNothingSent();
@@ -164,7 +164,7 @@ class ProductTranslationTest extends TestCase
         $product = $this->product(['translation_mode' => 'manual']);
         $variantId = $product->variants->first()->id;
 
-        $this->actingAs($this->staff())->postJson("/api/v1/admin/products/{$product->id}/translate")
+        $this->actingAs($this->staff())->postJson("/api/v1/admin/products/{$product->public_id}/translate")
             ->assertOk()
             ->assertJsonPath('data.name_en', 'EN name')
             ->assertJsonPath('data.description_en', 'EN description')
@@ -178,7 +178,7 @@ class ProductTranslationTest extends TestCase
         Http::fake(['api.anthropic.com/*' => Http::response('garbage', 500)]);
         $product = $this->product();
 
-        $response = $this->actingAs($this->staff())->postJson("/api/v1/admin/products/{$product->id}/translate")->assertStatus(503);
+        $response = $this->actingAs($this->staff())->postJson("/api/v1/admin/products/{$product->public_id}/translate")->assertStatus(503);
 
         $this->assertStringNotContainsString('sk-test-rahasia', $response->getContent());
     }
@@ -188,7 +188,7 @@ class ProductTranslationTest extends TestCase
         $this->fakeClaude(['name' => 'hanya satu kunci']);
         $product = $this->product();
 
-        $this->actingAs($this->staff())->postJson("/api/v1/admin/products/{$product->id}/translate")->assertStatus(503);
+        $this->actingAs($this->staff())->postJson("/api/v1/admin/products/{$product->public_id}/translate")->assertStatus(503);
     }
 
     /** @return array<string, array{string, int}> */
@@ -207,7 +207,7 @@ class ProductTranslationTest extends TestCase
         $this->fakeClaude();
         $product = $this->product();
 
-        $this->actingAs($this->staff($role))->postJson("/api/v1/admin/products/{$product->id}/translate")->assertStatus($status);
+        $this->actingAs($this->staff($role))->postJson("/api/v1/admin/products/{$product->public_id}/translate")->assertStatus($status);
     }
 
     public function test_english_storefront_uses_the_saved_english_texts_and_indonesian_keeps_its_own(): void

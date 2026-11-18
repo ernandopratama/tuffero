@@ -15,7 +15,7 @@ class ReviewController extends Controller
 {
     use ApiResponse;
 
-    private const FIELDS = ['id', 'author_name', 'rating', 'body', 'source', 'reviewed_on', 'is_published'];
+    private const FIELDS = ['author_name', 'rating', 'body', 'source', 'reviewed_on', 'is_published'];
 
     public function index(Request $request): JsonResponse
     {
@@ -31,7 +31,7 @@ class ReviewController extends Controller
             ->paginate($this->perPage($request));
 
         return $this->success('Reviews retrieved.', [
-            'items' => $page->getCollection()->map(fn (StoreReview $review) => $review->only(self::FIELDS))->values(),
+            'items' => $page->getCollection()->map(fn (StoreReview $review) => ['id' => $review->public_id] + $review->only(self::FIELDS))->values(),
             'meta' => ['current_page' => $page->currentPage(), 'last_page' => $page->lastPage(), 'total' => $page->total()],
         ]);
     }
@@ -45,14 +45,14 @@ class ReviewController extends Controller
             return $review;
         });
 
-        return $this->success('Review created.', $review->only(self::FIELDS), 201);
+        return $this->success('Review created.', ['id' => $review->public_id] + $review->only(self::FIELDS), 201);
     }
 
     public function update(ReviewRequest $request, StoreReview $review): JsonResponse
     {
         DB::transaction(fn () => AuditLog::saveWithAudit($review, $request->validated(), 'review.updated', $request->user()));
 
-        return $this->success('Review updated.', $review->refresh()->only(self::FIELDS));
+        return $this->success('Review updated.', ['id' => $review->public_id] + $review->refresh()->only(self::FIELDS));
     }
 
     public function destroy(Request $request, StoreReview $review): JsonResponse

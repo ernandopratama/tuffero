@@ -2,11 +2,15 @@
 
 namespace App\Models;
 
+use Carbon\CarbonInterface;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 
-#[Fillable(['provider', 'provider_order_id', 'tracking_id', 'courier_code', 'service_code', 'waybill_id', 'note', 'status', 'shipping_fee', 'shipped_at', 'delivered_at'])]
+/**
+ * @property CarbonInterface|null $shipped_at
+ */
+#[Fillable(['provider', 'provider_order_id', 'tracking_id', 'courier_code', 'service_code', 'waybill_id', 'routing_code', 'note', 'status', 'shipping_fee', 'shipped_at', 'delivered_at'])]
 class Shipment extends Model
 {
     /**

@@ -123,7 +123,7 @@ class PromoService
     public function setContentImage(PromoContent $content, UploadedFile $file, User $actor): PromoContent
     {
         $old = $content->image_path;
-        $path = $this->images->storeWebp($file, "promo/{$content->id}", 1920);
+        $path = $this->images->storeWebp($file, 'promo', 1920);
 
         DB::transaction(function () use ($content, $path, $actor) {
             $content->forceFill(['image_path' => $path])->save();

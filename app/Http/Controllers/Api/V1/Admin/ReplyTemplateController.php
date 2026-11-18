@@ -60,6 +60,6 @@ class ReplyTemplateController extends Controller
     /** @return array<string, mixed> */
     private function present(ReplyTemplate $template): array
     {
-        return $template->only(['id', 'title', 'body', 'scope', 'sort_order', 'is_active']);
+        return ['id' => $template->public_id] + $template->only(['title', 'body', 'scope', 'sort_order', 'is_active']);
     }
 }

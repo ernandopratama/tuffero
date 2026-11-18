@@ -4,6 +4,7 @@ namespace Tests\Feature;
 
 use App\Models\AuditLog;
 use App\Models\Product;
+use App\Models\ProductImage;
 use App\Models\User;
 use Database\Seeders\DatabaseSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -36,7 +37,7 @@ class ProductImageOrderTest extends TestCase
         $product = Product::create(['name' => 'Nastar', 'slug' => $slug]);
         $ids = [];
         foreach (range(1, $count) as $n) {
-            $ids[] = $product->images()->create(['path' => "products/{$product->id}/{$n}.webp", 'alt' => "Foto {$n}", 'sort_order' => $n])->id;
+            $ids[] = $product->images()->create(['path' => "products/{$product->id}/{$n}.webp", 'alt' => "Foto {$n}", 'sort_order' => $n])->public_id;
         }
 
         return [$product, $ids];
@@ -44,7 +45,7 @@ class ProductImageOrderTest extends TestCase
 
     private function order(Product $product, array $ids)
     {
-        return $this->putJson("/api/v1/admin/products/{$product->id}/images/order", ['ids' => $ids]);
+        return $this->putJson("/api/v1/admin/products/{$product->public_id}/images/order", ['ids' => $ids]);
     }
 
     public function test_reordering_changes_the_main_photo_and_is_audited(): void
@@ -55,9 +56,10 @@ class ProductImageOrderTest extends TestCase
         $response = $this->order($product, [$ids[2], $ids[0], $ids[1]])->assertOk();
 
         $this->assertSame([$ids[2], $ids[0], $ids[1]], array_column($response->json('data.images'), 'id'));
-        $this->assertSame($ids[2], $product->fresh()->images()->first()->id, 'foto pertama menjadi foto utama');
+        $this->assertSame($ids[2], $product->fresh()->images()->first()->public_id, 'foto pertama menjadi foto utama');
         $log = AuditLog::where('action', 'product.images_reordered')->firstOrFail();
-        $this->assertSame($ids[2], $log->changes['main_image_id']);
+        // Audit log tetap menyimpan ID internal.
+        $this->assertSame(ProductImage::where('public_id', $ids[2])->value('id'), $log->changes['main_image_id']);
     }
 
     public function test_the_storefront_catalog_follows_the_new_order(): void
@@ -68,7 +70,7 @@ class ProductImageOrderTest extends TestCase
 
         $this->order($product, [$ids[1], $ids[0]])->assertOk();
 
-        $this->assertSame($ids[1], $product->fresh()->images->first()->id);
+        $this->assertSame($ids[1], $product->fresh()->images->first()->public_id);
     }
 
     /** @return array<string, array{callable}> */
@@ -76,9 +78,10 @@ class ProductImageOrderTest extends TestCase
     {
         return [
             'kurang satu' => [fn (array $ids) => [$ids[0], $ids[1]]],
-            'lebih satu (foto produk lain)' => [fn (array $ids) => [...$ids, 999999]],
+            'lebih satu (foto produk lain)' => [fn (array $ids) => [...$ids, '01jaaaaaaaaaaaaaaaaaaaaaaa']],
+            'ID angka lama ditolak' => [fn (array $ids) => [1, 2, 3]],
             'ganda' => [fn (array $ids) => [$ids[0], $ids[0], $ids[1]]],
-            'foto tidak dikenal' => [fn (array $ids) => [$ids[0], $ids[1], 999999]],
+            'foto tidak dikenal' => [fn (array $ids) => [$ids[0], $ids[1], '01jaaaaaaaaaaaaaaaaaaaaaaa']],
             'kosong' => [fn () => []],
         ];
     }
@@ -90,7 +93,7 @@ class ProductImageOrderTest extends TestCase
         $this->actingAs($this->staff());
 
         $this->order($product, $make($ids))->assertUnprocessable();
-        $this->assertSame($ids, $product->images()->pluck('id')->all(), 'urutan tidak berubah');
+        $this->assertSame($ids, $product->images()->pluck('public_id')->all(), 'urutan tidak berubah');
     }
 
     public function test_photos_of_another_product_cannot_be_reordered_through_this_one(): void
@@ -117,6 +120,6 @@ class ProductImageOrderTest extends TestCase
         $this->actingAs($this->staff('store-admin', ['mfa_totp_confirmed_at' => null]));
         $this->order($product, $reversed)->assertForbidden();
 
-        $this->assertSame($ids, $product->images()->pluck('id')->all());
+        $this->assertSame($ids, $product->images()->pluck('public_id')->all());
     }
 }

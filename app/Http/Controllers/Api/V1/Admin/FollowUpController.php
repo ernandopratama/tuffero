@@ -70,7 +70,7 @@ class FollowUpController extends Controller
     private function present(FollowUp $followUp): array
     {
         return [
-            'id' => $followUp->id,
+            'id' => $followUp->public_id,
             'note' => $followUp->note,
             'due_on' => $followUp->due_on->toDateString(),
             'done_at' => $followUp->done_at,

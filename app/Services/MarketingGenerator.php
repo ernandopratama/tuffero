@@ -16,7 +16,8 @@ use Illuminate\Support\Facades\Cache;
  */
 class MarketingGenerator
 {
-    private const SYSTEM = <<<'TXT'
+    /** Aturan brand bersama; dipakai juga oleh StoryboardGenerator. */
+    public const SYSTEM = <<<'TXT'
 Kamu penulis konten marketing untuk Tuffero Bakery, toko kue kering dan pastry premium dari Malang (Nastar, Macaron, Pia, Cookies, Brownies, Hampers). Tulis dalam bahasa Indonesia santai-sopan, hangat, tidak lebay.
 
 Aturan wajib:
@@ -64,11 +65,7 @@ TXT;
             throw new MarketingModelException('Pembuat draf AI belum aktif. Hubungi Super Admin.');
         }
 
-        $day = 'marketing-ai:'.now()->toDateString();
-        Cache::add($day, 0, now()->endOfDay());
-        if (Cache::increment($day) > self::DAILY_LIMIT) {
-            throw new MarketingModelException('Batas pembuatan draf AI hari ini sudah tercapai. Coba lagi besok.');
-        }
+        self::consumeDailyQuota();
 
         $trend = $input['type'] === 'trend_report';
         $period = $trend ? now()->subDays(7)->format('j M Y').' sampai '.now()->format('j M Y') : null;
@@ -96,10 +93,26 @@ TXT;
         return $draft;
     }
 
+    /** Satu kuota harian untuk semua panggilan AI Marketing (draf dan storyboard). */
+    public static function consumeDailyQuota(): void
+    {
+        $day = 'marketing-ai:'.now()->toDateString();
+        Cache::add($day, 0, now()->endOfDay());
+        if (Cache::increment($day) > self::DAILY_LIMIT) {
+            throw new MarketingModelException('Batas pembuatan draf AI hari ini sudah tercapai. Coba lagi besok.');
+        }
+    }
+
+    /** Hanya nama produk tayang; tidak ada harga, stok, atau data pesanan yang dikirim ke model. */
+    public static function productNames(): string
+    {
+        return Product::where('is_published', true)->orderBy('name')->limit(60)->pluck('name')->implode(', ');
+    }
+
     /** @param array{type: string, platform?: string|null, brief: string} $input */
     private function prompt(array $input, ?string $period): string
     {
-        $products = Product::where('is_published', true)->orderBy('name')->limit(60)->pluck('name')->implode(', ');
+        $products = self::productNames();
 
         return implode("\n", array_filter([
             'Jenis: '.MarketingDraft::TYPES[$input['type']],

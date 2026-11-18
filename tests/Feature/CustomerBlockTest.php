@@ -249,14 +249,14 @@ class CustomerBlockTest extends TestCase
         $block = CustomerBlock::firstOrFail();
         $admin = $this->staff('store-admin');
 
-        $this->actingAs($admin)->postJson("/api/v1/admin/customer-blocks/{$block->id}/release", [])->assertJsonValidationErrors('note');
-        $this->actingAs($admin)->postJson("/api/v1/admin/customer-blocks/{$block->id}/release", ['note' => 'Salah paham, sudah dihubungi'])->assertOk();
+        $this->actingAs($admin)->postJson("/api/v1/admin/customer-blocks/{$block->public_id}/release", [])->assertJsonValidationErrors('note');
+        $this->actingAs($admin)->postJson("/api/v1/admin/customer-blocks/{$block->public_id}/release", ['note' => 'Salah paham, sudah dihubungi'])->assertOk();
 
         $block->refresh();
         $this->assertNotNull($block->released_at);
         $this->assertSame($admin->id, $block->released_by_user_id);
         $this->assertTrue(AuditLog::where('action', 'customer.block_released')->exists());
-        $this->actingAs($admin)->postJson("/api/v1/admin/customer-blocks/{$block->id}/release", ['note' => 'Sekali lagi'])->assertJsonValidationErrors('block');
+        $this->actingAs($admin)->postJson("/api/v1/admin/customer-blocks/{$block->public_id}/release", ['note' => 'Sekali lagi'])->assertJsonValidationErrors('block');
 
         $this->app['auth']->forgetGuards();
         $this->checkout()->assertCreated();
@@ -286,7 +286,7 @@ class CustomerBlockTest extends TestCase
         }
         foreach (['owner', 'customer-service', 'warehouse', 'marketing'] as $role) {
             $user = $this->staff($role);
-            $this->actingAs($user)->postJson("/api/v1/admin/customer-blocks/{$block->id}/release", ['note' => 'Coba cabut'])->assertForbidden();
+            $this->actingAs($user)->postJson("/api/v1/admin/customer-blocks/{$block->public_id}/release", ['note' => 'Coba cabut'])->assertForbidden();
             $this->actingAs($user)->postJson('/api/v1/admin/customer-blocks', ['phone' => '081200001111', 'note' => 'Coba tambah'])->assertForbidden();
         }
         $this->assertTrue($block->refresh()->isActive());

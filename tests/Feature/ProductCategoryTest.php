@@ -133,7 +133,7 @@ class ProductCategoryTest extends TestCase
 
         // Nama jenis boleh sama di kategori lain, tetapi tidak di kategori yang sama.
         $this->postJson("/api/v1/admin/categories/{$id}/types", ['name_id' => 'Teh', 'name_en' => 'Tea'])->assertUnprocessable()->assertJsonValidationErrors('name_id');
-        $this->postJson('/api/v1/admin/categories/'.$this->category('nastar')->id.'/types', ['name_id' => 'Teh', 'name_en' => 'Tea'])->assertCreated()->assertJsonPath('data.slug', 'teh-2');
+        $this->postJson('/api/v1/admin/categories/'.$this->category('nastar')->public_id.'/types', ['name_id' => 'Teh', 'name_en' => 'Tea'])->assertCreated()->assertJsonPath('data.slug', 'teh-2');
 
         $this->patchJson("/api/v1/admin/category-types/{$typeId}", ['name_id' => 'Teh Manis'])->assertOk()->assertJsonPath('data.name_id', 'Teh Manis');
 
@@ -151,9 +151,9 @@ class ProductCategoryTest extends TestCase
         $this->product(['is_published' => true, 'product_category_id' => $nastar->id, 'product_type_id' => $sultan->id]);
         $this->actingAs($this->staff('super-admin'));
 
-        $this->patchJson("/api/v1/admin/categories/{$nastar->id}", ['is_active' => false])->assertUnprocessable()->assertJsonValidationErrors('is_active');
-        $this->patchJson("/api/v1/admin/category-types/{$sultan->id}", ['is_active' => false])->assertUnprocessable()->assertJsonValidationErrors('is_active');
-        $this->patchJson('/api/v1/admin/categories/'.$this->category('hampers')->id, ['is_active' => false])->assertOk()->assertJsonPath('data.is_active', false);
+        $this->patchJson("/api/v1/admin/categories/{$nastar->public_id}", ['is_active' => false])->assertUnprocessable()->assertJsonValidationErrors('is_active');
+        $this->patchJson("/api/v1/admin/category-types/{$sultan->public_id}", ['is_active' => false])->assertUnprocessable()->assertJsonValidationErrors('is_active');
+        $this->patchJson('/api/v1/admin/categories/'.$this->category('hampers')->public_id, ['is_active' => false])->assertOk()->assertJsonPath('data.is_active', false);
     }
 
     public function test_product_category_and_type_rules(): void
@@ -165,27 +165,27 @@ class ProductCategoryTest extends TestCase
         $this->actingAs($this->staff('store-admin'));
 
         // Tayang butuh kategori.
-        $this->patchJson("/api/v1/admin/products/{$product->id}", ['is_published' => true])->assertUnprocessable()->assertJsonValidationErrors('product_category_id');
+        $this->patchJson("/api/v1/admin/products/{$product->public_id}", ['is_published' => true])->assertUnprocessable()->assertJsonValidationErrors('product_category_id');
 
         // Jenis harus milik kategorinya.
-        $this->patchJson("/api/v1/admin/products/{$product->id}", ['product_category_id' => $macaron->id, 'product_type_id' => $sultan->id])
+        $this->patchJson("/api/v1/admin/products/{$product->public_id}", ['product_category_id' => $macaron->public_id, 'product_type_id' => $sultan->public_id])
             ->assertUnprocessable()->assertJsonValidationErrors('product_type_id');
 
-        $this->patchJson("/api/v1/admin/products/{$product->id}", ['product_category_id' => $nastar->id, 'product_type_id' => $sultan->id, 'is_published' => true])
+        $this->patchJson("/api/v1/admin/products/{$product->public_id}", ['product_category_id' => $nastar->public_id, 'product_type_id' => $sultan->public_id, 'is_published' => true])
             ->assertOk()
-            ->assertJsonPath('data.product_category_id', $nastar->id)
-            ->assertJsonPath('data.product_type_id', $sultan->id);
+            ->assertJsonPath('data.product_category_id', $nastar->public_id)
+            ->assertJsonPath('data.product_type_id', $sultan->public_id);
 
         // Ganti kategori tanpa menyebut jenis melepas jenis lama.
-        $this->patchJson("/api/v1/admin/products/{$product->id}", ['product_category_id' => $macaron->id])
+        $this->patchJson("/api/v1/admin/products/{$product->public_id}", ['product_category_id' => $macaron->public_id])
             ->assertOk()->assertJsonPath('data.product_type_id', null);
 
         // Produk tayang tidak boleh dikosongkan kategorinya.
-        $this->patchJson("/api/v1/admin/products/{$product->id}", ['product_category_id' => null])->assertUnprocessable()->assertJsonValidationErrors('product_category_id');
+        $this->patchJson("/api/v1/admin/products/{$product->public_id}", ['product_category_id' => null])->assertUnprocessable()->assertJsonValidationErrors('product_category_id');
 
         // Kategori nonaktif tidak bisa dipilih.
         $this->category('hampers')->update(['is_active' => false]);
-        $this->patchJson("/api/v1/admin/products/{$product->id}", ['product_category_id' => $this->category('hampers')->id])->assertUnprocessable()->assertJsonValidationErrors('product_category_id');
+        $this->patchJson("/api/v1/admin/products/{$product->public_id}", ['product_category_id' => $this->category('hampers')->id])->assertUnprocessable()->assertJsonValidationErrors('product_category_id');
     }
 
     public function test_store_reads_categories_and_types_from_the_database(): void

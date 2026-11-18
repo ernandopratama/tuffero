@@ -146,7 +146,7 @@ class HermesDraftTest extends TestCase
         $marketing->assignRole('marketing');
 
         $this->actingAs($marketing)->getJson('/api/v1/admin/marketing-drafts')->assertOk()->assertJsonPath('data.items.0.origin', 'hermes');
-        $this->actingAs($marketing)->postJson("/api/v1/admin/marketing-drafts/{$draft->id}/move", ['action' => 'submit'])->assertOk()->assertJsonPath('data.status', 'in_review');
+        $this->actingAs($marketing)->postJson("/api/v1/admin/marketing-drafts/{$draft->public_id}/move", ['action' => 'submit'])->assertOk()->assertJsonPath('data.status', 'in_review');
     }
 
     public function test_rate_limit_applies(): void

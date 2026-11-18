@@ -1,7 +1,8 @@
 <script setup>
-import { computed, onMounted, reactive, ref } from 'vue';
+import { computed, onBeforeUnmount, onMounted, reactive, ref } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import AdminIcon from '../../components/AdminIcon.vue';
+import StoryboardPanel from '../../components/marketing/StoryboardPanel.vue';
 import AddButton from '../../components/ui/AddButton.vue';
 import AppModal from '../../components/ui/AppModal.vue';
 import IconAction from '../../components/ui/IconAction.vue';
@@ -91,7 +92,16 @@ const saving = ref(false);
 const busy = ref(false);
 const formError = ref('');
 const fieldErrors = ref({});
-const blank = { type: 'caption', platform: '', title: '', body: '', sources: '', source_period: '', scheduled_on: '' };
+const blank = { type: 'caption', platform: '', title: '', body: '', sources: '', source_period: '', scheduled_on: '', duration_seconds: '', music_note: '', visual_mode: 'team' };
+const VISUAL_MODES = { team: 'Foto/rekaman tim', ai: 'Dibuat AI sepenuhnya' };
+const DURATIONS = [15, 30, 60];
+// Lencana storyboard di kartu draf video.
+const STORYBOARD = {
+    pending: { label: 'Menyusun storyboard', cls: 'bg-accent-tint-12 text-primary' },
+    ready: { label: 'Storyboard siap', cls: 'bg-success-surface text-success' },
+    failed: { label: 'Storyboard gagal', cls: 'bg-error-surface text-on-error-surface' },
+    waiting: { label: 'Menunggu 2 foto acuan', cls: 'bg-warning-surface text-warning' },
+};
 const form = reactive({ ...blank });
 
 const visible = computed(() => (filter.value ? items.value.filter((row) => row.status === filter.value) : items.value));
@@ -102,11 +112,17 @@ const readOnly = computed(() => !canManage.value || (editing.value && !editable(
 const isTrend = computed(() => form.type === 'trend_report');
 // Mode lihat: draf ditampilkan sebagai bacaan, bukan formulir terkunci.
 const viewing = computed(() => Boolean(editing.value) && readOnly.value);
+// Nomor draf = id database: tetap, unik, dan dipakai untuk menyebut draf di grup atau rapat. Draf yang dihapus meninggalkan celah nomor.
+const draftLabel = (row) => (row ? `Draf #${row.id} · ${row.title}` : '');
 const dayLabel = (value) => day.format(new Date(`${value}T00:00:00`));
 const sourceLinksList = computed(() => sourceLinks(form.sources));
 
-async function load() {
-    loading.value = true;
+// Storyboard disusun di antrean: selama ada yang menunggu, daftar dimuat ulang diam-diam tiap 10 detik.
+let poll = null;
+
+async function load(quiet = false) {
+    clearTimeout(poll);
+    if (!quiet) loading.value = true;
     loadError.value = '';
     try {
         const { data } = await api.get('/admin/marketing-drafts');
@@ -114,6 +130,9 @@ async function load() {
         frequency.value = data.data.frequency;
         aiEnabled.value = data.data.ai_enabled;
         week.value = data.data.week;
+        // Draf yang sedang dibuka ikut diperbarui (storyboard, foto, catatan); isi formulir tidak ditimpa.
+        if (editing.value) editing.value = items.value.find((row) => row.id === editing.value.id) ?? editing.value;
+        if (items.value.some((row) => row.storyboard_status === 'pending')) poll = setTimeout(() => load(true), 10000);
         // Tautan "Buka" dari kalender Ringkasan: ?draf=ID membuka draf itu sekali, lalu parameternya dibuang.
         const target = items.value.find((row) => String(row.id) === String(route.query.draf));
         if (target) {
@@ -139,6 +158,9 @@ function open(row = null) {
         sources: row.sources ?? '',
         source_period: row.source_period ?? '',
         scheduled_on: row.scheduled_on ?? '',
+        duration_seconds: row.duration_seconds ?? '',
+        music_note: row.music_note ?? '',
+        visual_mode: row.visual_mode ?? 'team',
     } : {});
     dialog.value.showModal();
 }
@@ -147,12 +169,12 @@ async function save() {
     saving.value = true;
     formError.value = '';
     fieldErrors.value = {};
-    const body = { ...form, platform: form.platform || null, sources: form.sources || null, source_period: form.source_period || null, scheduled_on: form.scheduled_on || null };
+    const body = { ...form, platform: form.platform || null, sources: form.sources || null, source_period: form.source_period || null, scheduled_on: form.scheduled_on || null, duration_seconds: form.duration_seconds || null, music_note: form.music_note || null };
     try {
         if (editing.value) await api.patch(`/admin/marketing-drafts/${editing.value.id}`, body);
         else await api.post('/admin/marketing-drafts', body);
         dialog.value.close();
-        await load();
+        await load(true);
     } catch (e) {
         const { message, fields } = apiError(e);
         formError.value = message;
@@ -166,7 +188,7 @@ async function move(row, action) {
     busy.value = true;
     try {
         await api.post(`/admin/marketing-drafts/${row.id}/move`, { action });
-        await load();
+        await load(true);
     } catch (e) {
         loadError.value = apiError(e).message;
     } finally {
@@ -188,7 +210,7 @@ async function confirmDecide() {
     try {
         await api.post(`/admin/marketing-drafts/${toDecide.value.id}/decide`, { decision: decision.value, note: note.value || null });
         decideDialog.value.close();
-        await load();
+        await load(true);
     } catch (e) {
         formError.value = apiError(e).message;
     } finally {
@@ -206,7 +228,7 @@ async function confirmDelete() {
     try {
         await api.delete(`/admin/marketing-drafts/${toDelete.value.id}`, { toast: 'Draf dihapus.' });
         deleteDialog.value.close();
-        await load();
+        await load(true);
     } catch (e) {
         loadError.value = apiError(e).message;
         deleteDialog.value.close();
@@ -216,6 +238,7 @@ async function confirmDelete() {
 }
 
 onMounted(load);
+onBeforeUnmount(() => clearTimeout(poll));
 </script>
 
 <template>
@@ -269,15 +292,17 @@ onMounted(load);
     </div>
 
     <ul v-else class="mt-space-lg grid gap-space-md sm:grid-cols-2 xl:grid-cols-3">
-      <li v-for="row in visible" :key="row.id" class="flex flex-col gap-2 rounded-3xl border border-border bg-surface p-space-md shadow-card">
+      <li v-for="row in visible" :key="row.id" class="flex min-w-0 flex-col gap-2 rounded-3xl border border-border bg-surface p-space-md shadow-card">
+        <p class="text-body-lg font-semibold tabular-nums text-primary">Draf #{{ row.id }}</p>
         <div class="flex flex-wrap items-center gap-2">
           <span class="rounded-full px-2.5 py-1 text-label-sm" :class="STATUS[row.status].cls">{{ STATUS[row.status].label }}</span>
           <span class="rounded-full bg-secondary-tint-12 px-2.5 py-1 text-label-sm">{{ TYPES[row.type] }}</span>
           <span v-if="row.platform" class="rounded-full bg-secondary-tint-12 px-2.5 py-1 text-label-sm">{{ PLATFORMS[row.platform] }}</span>
           <span v-if="ORIGINS[row.origin]" class="inline-flex items-center gap-1 rounded-full bg-accent-tint-15 px-2.5 py-1 text-label-sm text-primary"><AdminIcon name="sparkles" :size="12" />{{ ORIGINS[row.origin] }}</span>
+          <span v-if="STORYBOARD[row.storyboard_status]" class="rounded-full px-2.5 py-1 text-label-sm" :class="STORYBOARD[row.storyboard_status].cls">{{ STORYBOARD[row.storyboard_status].label }}</span>
         </div>
-        <h2 class="font-heading text-headline-sm">{{ row.title }}</h2>
-        <p class="line-clamp-3 whitespace-pre-line text-body-sm text-secondary">{{ row.body }}</p>
+        <h2 class="font-heading text-headline-sm break-words">{{ row.title }}</h2>
+        <p class="line-clamp-3 whitespace-pre-line break-words text-body-sm text-secondary">{{ row.body }}</p>
         <p v-if="row.scheduled_on" class="flex items-center gap-1.5 text-body-sm"><AdminIcon name="clock" :size="16" class="shrink-0 text-secondary" />Jadwal {{ day.format(new Date(`${row.scheduled_on}T00:00:00`)) }}</p>
         <p v-if="row.review_note" class="rounded-2xl bg-secondary-tint-12 px-3 py-2 text-body-sm">Catatan {{ row.reviewer || 'peninjau' }}: {{ row.review_note }}</p>
         <p class="text-body-sm text-secondary">{{ row.origin === 'hermes' ? 'Dikirim Hermes (riset terjadwal)' : `Disusun ${row.creator || 'akun yang sudah dihapus'}` }}</p>
@@ -299,7 +324,7 @@ onMounted(load);
     </ul>
   </template>
 
-  <AppModal ref="dialog" :variant="editing ? (readOnly ? 'read' : 'update') : 'create'" size="2xl" :title="editing ? (readOnly ? 'Lihat draf' : 'Ubah draf') : 'Tambah draf'" :subtitle="editing?.title">
+  <AppModal ref="dialog" :variant="editing ? (readOnly ? 'read' : 'update') : 'create'" size="2xl" :title="editing ? `${readOnly ? 'Lihat' : 'Ubah'} Draf #${editing.id}` : 'Tambah draf'" :subtitle="editing?.title">
     <article v-if="viewing" class="space-y-space-md" aria-label="Isi draf">
       <div class="flex flex-wrap items-center gap-2">
         <span class="rounded-full px-2.5 py-1 text-label-sm" :class="STATUS[editing.status].cls">{{ STATUS[editing.status].label }}</span>
@@ -352,6 +377,23 @@ onMounted(load);
             <input v-model="form.scheduled_on" type="date" :class="field">
           </label>
         </div>
+        <label v-if="form.type === 'video_script'" class="block text-label-md">
+          Sumber visual
+          <select v-model="form.visual_mode" :class="field"><option v-for="(label, key) in VISUAL_MODES" :key="key" :value="key">{{ label }}</option></select>
+          <span class="mt-1 block text-body-sm font-normal text-secondary">{{ form.visual_mode === 'ai' ? 'Seluruh video akan dibuat AI dari foto produk asli. Wajib minimal 2 foto acuan; storyboard baru disusun setelah foto kedua diunggah.' : 'Adegan produk memakai foto acuan atau rekaman tim; AI hanya untuk adegan suasana.' }}</span>
+        </label>
+        <div v-if="form.type === 'video_script'" class="grid gap-space-md sm:grid-cols-3">
+          <label class="block text-label-md">
+            Durasi video
+            <select v-model="form.duration_seconds" :class="field"><option value="">30 detik (bawaan)</option><option v-for="seconds in DURATIONS" :key="seconds" :value="seconds">{{ seconds }} detik</option></select>
+          </label>
+          <label class="block text-label-md sm:col-span-2">
+            Musik <span class="font-normal text-secondary">(opsional)</span>
+            <input v-model="form.music_note" maxlength="300" placeholder="Contoh: akustik hangat, atau kosongkan agar AI menyarankan" :class="field">
+            <span v-if="fieldErrors.music_note" class="mt-1 block text-body-sm font-normal text-error">{{ fieldErrors.music_note[0] }}</span>
+          </label>
+        </div>
+        <p v-if="form.type === 'video_script'" class="text-body-sm text-secondary">Naskah dan storyboard dibuat otomatis oleh AI setelah draf disimpan, dan disusun ulang bila durasi atau musik diubah.</p>
         <label class="block text-label-md">
           Judul
           <input v-model="form.title" required maxlength="150" :class="field">
@@ -379,6 +421,7 @@ onMounted(load);
         <p class="text-body-sm text-secondary">Jangan menulis klaim kesehatan, alergen, atau halal tanpa data resmi (OQ-20).</p>
       </fieldset>
     </form>
+    <StoryboardPanel v-if="editing && editing.type === 'video_script'" :draft="editing" :can-edit="canManage && editable(editing)" class="mt-space-md" @changed="load(true)" />
     <template #footer>
       <button type="button" :class="btn" @click="dialog.close()">Tutup</button>
       <button v-if="!readOnly" form="draft-form" :disabled="saving" :class="btnPrimary"><AdminIcon name="check" :size="16" />{{ saving ? 'Menyimpan...' : (editing ? 'Simpan' : 'Buat draf') }}</button>
@@ -419,7 +462,7 @@ onMounted(load);
     </template>
   </AppModal>
 
-  <AppModal ref="decideDialog" variant="update" size="md" :title="decision === 'approve' ? 'Setujui draf?' : 'Tolak draf?'" :subtitle="toDecide?.title">
+  <AppModal ref="decideDialog" variant="update" size="md" :title="decision === 'approve' ? 'Setujui draf?' : 'Tolak draf?'" :subtitle="draftLabel(toDecide)">
     <p v-if="formError" role="alert" class="mb-3 rounded-2xl bg-error-surface px-4 py-3 text-body-sm text-on-error-surface">{{ formError }}</p>
     <p class="text-body-sm">{{ decision === 'approve' ? 'Setelah disetujui, tim marketing boleh memposting secara manual. Sistem tidak memposting otomatis.' : 'Draf kembali ke Marketing untuk diperbaiki. Tulis alasannya.' }}</p>
     <label class="mt-3 block text-label-md">
@@ -432,7 +475,7 @@ onMounted(load);
     </template>
   </AppModal>
 
-  <AppModal ref="deleteDialog" variant="delete" size="md" title="Hapus draf?" :subtitle="toDelete?.title">
+  <AppModal ref="deleteDialog" variant="delete" size="md" title="Hapus draf?" :subtitle="draftLabel(toDelete)">
     <p class="text-body-sm">Draf ini hilang dari daftar dan tidak bisa dikembalikan dari dashboard. Penghapusan tercatat di Audit Log.</p>
     <template #footer>
       <button type="button" :disabled="busy" :class="btn" @click="deleteDialog.close()">Batal</button>

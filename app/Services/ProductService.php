@@ -155,7 +155,7 @@ class ProductService
 
     public function addImage(Product $product, UploadedFile $file, string $alt, User $actor): ProductImage
     {
-        $path = $this->images->storeWebp($file, "products/{$product->id}", 1600);
+        $path = $this->images->storeWebp($file, 'products', 1600);
 
         return DB::transaction(function () use ($product, $path, $alt, $actor) {
             $image = $product->images()->create([

@@ -60,7 +60,8 @@ const { rows, meta, page, perPage, search, filter, loading, error, load } = useD
 // Tanpa pilihan, server memakai gudang aktif pertama; daftar gudang diambil sekali untuk pilihan filter.
 const warehouses = ref([]);
 const warehouseOptions = computed(() => warehouses.value.map((w) => ({ value: w.id, label: w.name })));
-const warehouseId = computed(() => Number(filter.warehouse_id) || warehouses.value[0]?.id || null);
+// ID gudang adalah ID publik (string ULID, D-143), bukan angka.
+const warehouseId = computed(() => filter.warehouse_id || warehouses.value[0]?.id || null);
 
 const adjustDialog = ref(null);
 const selected = ref(null);

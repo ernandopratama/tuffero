@@ -8,6 +8,7 @@ use App\Notifications\StaffEvent;
 use App\Support\PermissionCatalog;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
 use Spatie\Permission\Models\Permission;
 use Spatie\Permission\Models\Role;
@@ -25,15 +26,35 @@ class RoleService
 {
     public function __construct(private StaffNotifier $notifier) {}
 
+    /**
+     * Isi ID publik role dan izin yang masih kosong (D-143). Role dan izin dibuat lewat model Spatie, kadang dengan event
+     * dibisukan (seeder), jadi pengisian lewat event `creating` tidak selalu jalan. Hanya baris kosong yang disentuh.
+     */
+    public static function fillPublicIds(): void
+    {
+        $filled = 0;
+        foreach ([Role::class, Permission::class] as $model) {
+            foreach ($model::whereNull('public_id')->orderBy('id')->pluck('id') as $id) {
+                $filled += $model::whereKey($id)->whereNull('public_id')->update(['public_id' => strtolower((string) Str::ulid())]);
+            }
+        }
+
+        // Cache izin Spatie menyimpan atribut role dan izin; dikosongkan supaya ID yang baru diisi ikut terbaca.
+        if ($filled > 0) {
+            app(PermissionRegistrar::class)->forgetCachedPermissions();
+        }
+    }
+
     /** @return array{roles: list<array<string, mixed>>, permissions: list<array<string, mixed>>, super_admin_only: list<string>} */
     public function overview(): array
     {
+        self::fillPublicIds();
         $counts = DB::table(config('permission.table_names.model_has_roles'))
             ->where('model_type', (new User)->getMorphClass())
             ->selectRaw('role_id, count(*) as total')->groupBy('role_id')->pluck('total', 'role_id');
 
         $roles = Role::with('permissions:id,name')->orderBy('id')->get()->map(fn (Role $role) => [
-            'id' => $role->id,
+            'id' => $role->getAttribute('public_id'),
             'name' => $role->name,
             'label' => self::roleLabel($role),
             'system' => PermissionCatalog::isSystemRole($role->name),
@@ -43,7 +64,7 @@ class RoleService
         ])->values()->all();
 
         $permissions = Permission::orderBy('name')->get()->map(fn (Permission $permission) => [
-            'id' => $permission->id,
+            'id' => $permission->getAttribute('public_id'),
             'name' => $permission->name,
             'group' => PermissionCatalog::PERMISSIONS[$permission->name][0] ?? PermissionCatalog::CUSTOM_GROUP,
             'label' => PermissionCatalog::PERMISSIONS[$permission->name][1] ?? (data_get($permission, 'label') ?: $permission->name),

@@ -101,7 +101,17 @@ class RefundTest extends TestCase
 
     private function act(User $user, Refund $refund, string $action, array $body = [])
     {
-        return $this->actingAs($user)->postJson("/api/v1/admin/refunds/{$refund->id}/{$action}", $body);
+        return $this->actingAs($user)->postJson("/api/v1/admin/refunds/{$refund->public_ref}/{$action}", $body);
+    }
+
+    public function test_admin_refund_routes_use_public_ref_not_numeric_id(): void
+    {
+        $refund = $this->filed($this->received());
+        $cs = $this->staff('customer-service');
+
+        $this->actingAs($cs)->getJson("/api/v1/admin/refunds/{$refund->public_ref}")->assertOk()->assertJsonPath('data.id', $refund->public_ref);
+        $this->getJson("/api/v1/admin/refunds/{$refund->id}")->assertNotFound();
+        $this->actingAs($this->staff('marketing'))->getJson("/api/v1/admin/refunds/{$refund->public_ref}")->assertForbidden();
     }
 
     // ---------- pelanggan ----------
@@ -182,7 +192,7 @@ class RefundTest extends TestCase
         $store = $this->staff('store-admin');
         $owner = $this->staff('owner');
 
-        foreach (["/api/v1/admin/orders/{$order->id}/comments", "/api/v1/admin/refunds/{$refund->id}/comments"] as $url) {
+        foreach (["/api/v1/admin/orders/{$order->public_ref}/comments", "/api/v1/admin/refunds/{$refund->public_ref}/comments"] as $url) {
             $this->actingAs($cs)->postJson($url, ['body' => 'Pelanggan sensitif, hubungi lewat WA', 'visibility' => 'cs'])->assertCreated()->assertJsonPath('data.visibility', 'cs');
             $this->actingAs($owner)->postJson($url, ['body' => 'Catatan staf biasa'])->assertCreated()->assertJsonPath('data.visibility', 'staff');
 
@@ -194,13 +204,13 @@ class RefundTest extends TestCase
 
             $this->actingAs($owner)->postJson($url, ['body' => 'Coba tulis catatan CS', 'visibility' => 'cs'])->assertForbidden();
             $this->actingAs($cs)->postJson($url, ['body' => 'x', 'visibility' => 'rahasia'])->assertUnprocessable();
-            $this->actingAs($cs)->postJson($url, ['body' => 'Tag bukan CS', 'visibility' => 'cs', 'mentions' => [$store->id]])->assertUnprocessable();
-            $this->actingAs($cs)->postJson($url, ['body' => 'Tag rekan CS', 'visibility' => 'cs', 'mentions' => [$secondCs->id]])->assertCreated();
+            $this->actingAs($cs)->postJson($url, ['body' => 'Tag bukan CS', 'visibility' => 'cs', 'mentions' => [$store->public_id]])->assertUnprocessable();
+            $this->actingAs($cs)->postJson($url, ['body' => 'Tag rekan CS', 'visibility' => 'cs', 'mentions' => [$secondCs->public_id]])->assertCreated();
         }
 
         $this->assertSame(4, AuditLog::where('action', 'comment.cs_created')->count());
         $this->assertStringNotContainsString('sensitif', AuditLog::where('action', 'comment.cs_created')->get()->toJson());
-        $this->actingAs($this->staff('marketing'))->getJson("/api/v1/admin/refunds/{$refund->id}/comments")->assertForbidden();
+        $this->actingAs($this->staff('marketing'))->getJson("/api/v1/admin/refunds/{$refund->public_ref}/comments")->assertForbidden();
     }
 
     public function test_reply_templates_are_managed_only_by_customer_service_and_super_admin(): void
@@ -226,7 +236,7 @@ class RefundTest extends TestCase
 
         $this->assertSame(1, AuditLog::where('action', 'reply_template.created')->count());
         $this->assertSame(1, AuditLog::where('action', 'reply_template.updated')->count());
-        $this->assertFalse(ReplyTemplate::findOrFail($id)->is_active);
+        $this->assertFalse(ReplyTemplate::where('public_id', $id)->firstOrFail()->is_active);
     }
 
     public function test_reply_templates_fill_variables_from_server_data_and_match_the_context(): void
@@ -237,12 +247,12 @@ class RefundTest extends TestCase
         ReplyTemplate::create(['title' => 'Salah ketik', 'body' => 'Halo {nama} {tidak_dikenal}', 'scope' => 'order', 'sort_order' => 99]);
         ReplyTemplate::where('title', 'Info status dan resi')->update(['is_active' => false]);
 
-        $forOrder = collect($this->actingAs($cs)->getJson("/api/v1/admin/orders/{$order->id}/reply-templates")->assertOk()->json('data.items'));
+        $forOrder = collect($this->actingAs($cs)->getJson("/api/v1/admin/orders/{$order->public_ref}/reply-templates")->assertOk()->json('data.items'));
         $this->assertSame('Halo Budi Uji {tidak_dikenal}', $forOrder->firstWhere('title', 'Salah ketik')['text'], 'variabel tak dikenal tidak diganti');
         $this->assertNull($forOrder->firstWhere('title', 'Info status dan resi'), 'template nonaktif tidak muncul');
         $this->assertNull($forOrder->firstWhere('title', 'Minta video unboxing'), 'template refund tidak muncul di pesanan');
 
-        $forRefund = collect($this->actingAs($cs)->getJson("/api/v1/admin/refunds/{$refund->id}/reply-templates")->assertOk()->json('data.items'));
+        $forRefund = collect($this->actingAs($cs)->getJson("/api/v1/admin/refunds/{$refund->public_ref}/reply-templates")->assertOk()->json('data.items'));
         $video = $forRefund->firstWhere('title', 'Minta video unboxing')['text'];
         $this->assertStringContainsString('Budi Uji', $video);
         $this->assertStringContainsString($refund->refund_number, $video);
@@ -254,8 +264,8 @@ class RefundTest extends TestCase
         $this->assertStringNotContainsString(self::EMAIL, $forRefund->toJson());
         $this->assertStringNotContainsString('081234567890', $forRefund->toJson());
 
-        $this->actingAs($this->staff('store-admin'))->getJson("/api/v1/admin/orders/{$order->id}/reply-templates")->assertForbidden();
-        $this->actingAs($this->staff('owner'))->getJson("/api/v1/admin/refunds/{$refund->id}/reply-templates")->assertForbidden();
+        $this->actingAs($this->staff('store-admin'))->getJson("/api/v1/admin/orders/{$order->public_ref}/reply-templates")->assertForbidden();
+        $this->actingAs($this->staff('owner'))->getJson("/api/v1/admin/refunds/{$refund->public_ref}/reply-templates")->assertForbidden();
     }
 
     public function test_quick_search_finds_records_for_cs_without_leaking_contact_data(): void
@@ -291,18 +301,18 @@ class RefundTest extends TestCase
         $owner = $this->staff('owner');
         $tomorrow = now()->addDay()->toDateString();
 
-        $this->actingAs($cs)->postJson("/api/v1/admin/orders/{$order->id}/follow-ups", ['note' => 'Hubungi lagi soal paket', 'due_on' => $tomorrow])->assertCreated()->assertJsonPath('data.created_by', $cs->name);
-        $this->actingAs($cs)->postJson("/api/v1/admin/refunds/{$refund->id}/follow-ups", ['note' => 'Tunggu video', 'due_on' => now()->toDateString()])->assertCreated();
+        $this->actingAs($cs)->postJson("/api/v1/admin/orders/{$order->public_ref}/follow-ups", ['note' => 'Hubungi lagi soal paket', 'due_on' => $tomorrow])->assertCreated()->assertJsonPath('data.created_by', $cs->name);
+        $this->actingAs($cs)->postJson("/api/v1/admin/refunds/{$refund->public_ref}/follow-ups", ['note' => 'Tunggu video', 'due_on' => now()->toDateString()])->assertCreated();
 
-        $this->actingAs($cs)->postJson("/api/v1/admin/orders/{$order->id}/follow-ups", ['note' => 'x', 'due_on' => now()->subDay()->toDateString()])->assertUnprocessable();
-        $this->actingAs($cs)->postJson("/api/v1/admin/orders/{$order->id}/follow-ups", ['note' => 'x', 'due_on' => now()->addDays(120)->toDateString()])->assertUnprocessable();
-        $this->actingAs($cs)->postJson("/api/v1/admin/orders/{$order->id}/follow-ups", ['note' => str_repeat('a', 201), 'due_on' => $tomorrow])->assertUnprocessable();
+        $this->actingAs($cs)->postJson("/api/v1/admin/orders/{$order->public_ref}/follow-ups", ['note' => 'x', 'due_on' => now()->subDay()->toDateString()])->assertUnprocessable();
+        $this->actingAs($cs)->postJson("/api/v1/admin/orders/{$order->public_ref}/follow-ups", ['note' => 'x', 'due_on' => now()->addDays(120)->toDateString()])->assertUnprocessable();
+        $this->actingAs($cs)->postJson("/api/v1/admin/orders/{$order->public_ref}/follow-ups", ['note' => str_repeat('a', 201), 'due_on' => $tomorrow])->assertUnprocessable();
 
-        $this->actingAs($owner)->getJson("/api/v1/admin/orders/{$order->id}/follow-ups")->assertForbidden();
-        $this->actingAs($owner)->postJson("/api/v1/admin/orders/{$order->id}/follow-ups", ['note' => 'x', 'due_on' => $tomorrow])->assertForbidden();
-        $this->actingAs($this->staff('customer-service', ['mfa_totp_confirmed_at' => null]))->postJson("/api/v1/admin/orders/{$order->id}/follow-ups", ['note' => 'x', 'due_on' => $tomorrow])->assertForbidden();
+        $this->actingAs($owner)->getJson("/api/v1/admin/orders/{$order->public_ref}/follow-ups")->assertForbidden();
+        $this->actingAs($owner)->postJson("/api/v1/admin/orders/{$order->public_ref}/follow-ups", ['note' => 'x', 'due_on' => $tomorrow])->assertForbidden();
+        $this->actingAs($this->staff('customer-service', ['mfa_totp_confirmed_at' => null]))->postJson("/api/v1/admin/orders/{$order->public_ref}/follow-ups", ['note' => 'x', 'due_on' => $tomorrow])->assertForbidden();
 
-        $this->actingAs($cs)->getJson("/api/v1/admin/orders/{$order->id}/follow-ups")->assertOk()->assertJsonCount(1, 'data.items');
+        $this->actingAs($cs)->getJson("/api/v1/admin/orders/{$order->public_ref}/follow-ups")->assertOk()->assertJsonCount(1, 'data.items');
 
         $list = fn () => collect($this->actingAs($cs)->getJson('/api/v1/admin/dashboard')->assertOk()->json('data.lists'))->firstWhere('key', 'followup_due');
         $this->assertCount(2, $list()['rows']);
@@ -311,9 +321,9 @@ class RefundTest extends TestCase
         $this->assertNull(collect($this->actingAs($owner)->getJson('/api/v1/admin/dashboard')->json('data.lists'))->firstWhere('key', 'followup_due'));
 
         $first = FollowUp::where('note', 'Tunggu video')->firstOrFail();
-        $this->actingAs($cs)->postJson("/api/v1/admin/follow-ups/{$first->id}/done")->assertOk();
-        $this->actingAs($cs)->postJson("/api/v1/admin/follow-ups/{$first->id}/done")->assertOk();
-        $this->actingAs($owner)->postJson("/api/v1/admin/follow-ups/{$first->id}/done")->assertForbidden();
+        $this->actingAs($cs)->postJson("/api/v1/admin/follow-ups/{$first->public_id}/done")->assertOk();
+        $this->actingAs($cs)->postJson("/api/v1/admin/follow-ups/{$first->public_id}/done")->assertOk();
+        $this->actingAs($owner)->postJson("/api/v1/admin/follow-ups/{$first->public_id}/done")->assertForbidden();
 
         $this->assertCount(1, $list()['rows']);
         $this->assertSame(1, AuditLog::where('action', 'follow_up.done')->count(), 'selesai dua kali tetap satu catatan audit');
@@ -374,7 +384,7 @@ class RefundTest extends TestCase
         $order = $this->received(2);
         $refund = $this->filed($order);
         $cs = $this->staff('customer-service');
-        $url = "/api/v1/admin/orders/{$order->id}/customer-emails";
+        $url = "/api/v1/admin/orders/{$order->public_ref}/customer-emails";
 
         // Membuka riwayat tidak mengirim apa pun; alamat disamarkan.
         $this->actingAs($cs)->getJson($url)->assertOk()->assertJsonPath('data.to', 'b***@example.com');
@@ -404,7 +414,7 @@ class RefundTest extends TestCase
         Mail::assertSentCount(1);
 
         // Refund memakai email pengaju; peran lain, tanpa MFA, atau tanpa izin lihat datanya ditolak.
-        $this->actingAs($cs)->postJson("/api/v1/admin/refunds/{$refund->id}/customer-emails", ['subject' => 'Refund', 'text' => 'x'])->assertCreated();
+        $this->actingAs($cs)->postJson("/api/v1/admin/refunds/{$refund->public_ref}/customer-emails", ['subject' => 'Refund', 'text' => 'x'])->assertCreated();
         Mail::assertSentCount(2);
         foreach (['owner', 'store-admin', 'warehouse', 'marketing'] as $role) {
             $this->actingAs($this->staff($role))->postJson($url, ['subject' => 'x', 'text' => 'y'])->assertForbidden();
@@ -419,7 +429,7 @@ class RefundTest extends TestCase
         $order = $this->received(2);
         config(['mail.default' => 'smtp', 'mail.mailers.smtp.host' => '127.0.0.1', 'mail.mailers.smtp.port' => 1, 'mail.mailers.smtp.timeout' => 2]);
 
-        $response = $this->actingAs($this->staff('customer-service'))->postJson("/api/v1/admin/orders/{$order->id}/customer-emails", ['subject' => 'Info', 'text' => 'Halo'])->assertStatus(502);
+        $response = $this->actingAs($this->staff('customer-service'))->postJson("/api/v1/admin/orders/{$order->public_ref}/customer-emails", ['subject' => 'Info', 'text' => 'Halo'])->assertStatus(502);
 
         $this->assertStringNotContainsString(self::EMAIL, $response->getContent());
         $this->assertSame(['failed'], CustomerEmail::pluck('status')->all());
@@ -433,25 +443,25 @@ class RefundTest extends TestCase
         $refund = $this->filed($first);
         $cs = $this->staff('customer-service');
 
-        $groups = collect($this->actingAs($cs)->getJson("/api/v1/admin/orders/{$second->id}/customer-history")->assertOk()->json('data.groups'))->keyBy('key');
+        $groups = collect($this->actingAs($cs)->getJson("/api/v1/admin/orders/{$second->public_ref}/customer-history")->assertOk()->json('data.groups'))->keyBy('key');
         $this->assertSame([$first->order_number], array_column($groups['orders']['rows'], 'title'), 'pesanan lain dengan kontak sama, bukan pesanan ini');
         $this->assertSame([$refund->refund_number], array_column($groups['refunds']['rows'], 'title'));
 
-        $fromRefund = collect($this->actingAs($cs)->getJson("/api/v1/admin/refunds/{$refund->id}/customer-history")->assertOk()->json('data.groups'))->keyBy('key');
+        $fromRefund = collect($this->actingAs($cs)->getJson("/api/v1/admin/refunds/{$refund->public_ref}/customer-history")->assertOk()->json('data.groups'))->keyBy('key');
         $this->assertCount(1, $fromRefund['orders']['rows'], 'pesanan kedua muncul dari sisi refund');
         $this->assertSame([], $fromRefund['refunds']['rows'], 'refund ini sendiri tidak ikut');
 
-        $json = $this->actingAs($cs)->getJson("/api/v1/admin/orders/{$second->id}/customer-history")->getContent();
+        $json = $this->actingAs($cs)->getJson("/api/v1/admin/orders/{$second->public_ref}/customer-history")->getContent();
         $this->assertStringNotContainsString(self::EMAIL, $json);
         $this->assertStringNotContainsString('081234567890', $json);
 
         // Kontak lain tidak ikut.
         Order::where('id', $second->id)->update(['customer_email' => 'lain@example.com', 'customer_phone' => '089900000000']);
-        $alone = collect($this->actingAs($cs)->getJson("/api/v1/admin/orders/{$second->id}/customer-history")->json('data.groups'))->keyBy('key');
+        $alone = collect($this->actingAs($cs)->getJson("/api/v1/admin/orders/{$second->public_ref}/customer-history")->json('data.groups'))->keyBy('key');
         $this->assertSame([], $alone['orders']['rows']);
 
         foreach (['owner', 'store-admin', 'warehouse', 'marketing'] as $role) {
-            $this->actingAs($this->staff($role))->getJson("/api/v1/admin/orders/{$second->id}/customer-history")->assertForbidden();
+            $this->actingAs($this->staff($role))->getJson("/api/v1/admin/orders/{$second->public_ref}/customer-history")->assertForbidden();
         }
     }
 
@@ -655,7 +665,7 @@ class RefundTest extends TestCase
 
             return $refund;
         };
-        $detail = fn (Refund $refund) => $this->actingAs($owner)->getJson("/api/v1/admin/refunds/{$refund->id}")->assertOk()->json('data');
+        $detail = fn (Refund $refund) => $this->actingAs($owner)->getJson("/api/v1/admin/refunds/{$refund->public_ref}")->assertOk()->json('data');
 
         // Barang rusak bukan kesalahan Tuffero: ongkir tidak bisa ikut, dan tidak ditawarkan.
         $damaged = $review($this->filed($order, ['reason_type' => 'damaged']));
@@ -703,7 +713,7 @@ class RefundTest extends TestCase
         $free->forceFill(['shipping_fee' => 0])->save();
         $refund = $this->filed($free, ['reason_type' => 'wrong_item']);
         $this->act($cs, $refund, 'evidence', ['result' => 'received', 'channel' => 'email', 'note' => 'Lengkap'])->assertOk();
-        $this->assertFalse($this->actingAs($owner)->getJson("/api/v1/admin/refunds/{$refund->id}")->json('data.shipping_eligible'));
+        $this->assertFalse($this->actingAs($owner)->getJson("/api/v1/admin/refunds/{$refund->public_ref}")->json('data.shipping_eligible'));
         $this->act($owner, $refund, 'approve', ['approved_amount' => 50000, 'include_shipping' => true])->assertUnprocessable();
     }
 
@@ -742,7 +752,7 @@ class RefundTest extends TestCase
         $this->act($cs, $refund, 'choice', ['choice' => 'tunai'])->assertUnprocessable()->assertJsonValidationErrors('choice');
         $this->act($cs, $refund, 'choice', ['choice' => 'voucher', 'note' => 'Pelanggan pilih voucher'])->assertOk();
 
-        $detail = fn () => $this->actingAs($owner)->getJson("/api/v1/admin/refunds/{$refund->id}")->json('data');
+        $detail = fn () => $this->actingAs($owner)->getJson("/api/v1/admin/refunds/{$refund->public_ref}")->json('data');
         $this->assertSame(['voucher', false], [$detail()['customer_choice'], $detail()['shipping_eligible']], 'ongkir hanya untuk pengembalian dana');
         $this->assertStringContainsString('Pilihan pelanggan: voucher', $refund->histories()->latest('id')->value('reason'));
 
@@ -752,7 +762,7 @@ class RefundTest extends TestCase
 
         $refund->refresh();
         $this->assertSame([Refund::REFUNDED, 'voucher', 'VCR-ABC'], [$refund->status, $refund->refund_method, $refund->refund_reference]);
-        $this->assertSame('voucher', collect($this->actingAs($cs)->getJson('/api/v1/admin/refunds')->json('data.items'))->firstWhere('id', $refund->id)['refund_method']);
+        $this->assertSame('voucher', collect($this->actingAs($cs)->getJson('/api/v1/admin/refunds')->json('data.items'))->firstWhere('id', $refund->public_ref)['refund_method']);
 
         // Kirim ulang memakai jalur yang sama; pengembalian dana tetap bawaan.
         $resend = $this->filed($order, ['reason_type' => 'damaged']);
@@ -883,7 +893,7 @@ class RefundTest extends TestCase
         $refund = $this->filed($this->received(2), ['contact_preference' => 'email']);
         $this->act($cs, $refund, 'contacted', ['note' => 'Sudah dihubungi'])->assertOk();
 
-        $data = $this->actingAs($cs)->getJson("/api/v1/admin/refunds/{$refund->id}")->assertOk()->json('data');
+        $data = $this->actingAs($cs)->getJson("/api/v1/admin/refunds/{$refund->public_ref}")->assertOk()->json('data');
 
         $this->assertSame(self::EMAIL, $data['requester_email']);
         $this->assertSame('email', $data['contact_preference']);

@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Models\Concerns\HasPublicId;
 use Carbon\CarbonInterface;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Builder;
@@ -19,6 +20,8 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 #[Fillable(['phone_hash', 'address_hash', 'phone_masked', 'customer_name', 'address_summary', 'ip_address', 'source', 'note', 'order_ids', 'refund_ids', 'active_flag', 'released_at', 'released_by_user_id', 'release_note'])]
 class CustomerBlock extends Model
 {
+    use HasPublicId;
+
     /** @return array<string, string> */
     protected function casts(): array
     {

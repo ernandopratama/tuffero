@@ -16,7 +16,7 @@ class ProductReviewRequest extends FormRequest
     {
         return [
             // Produk hanya ditentukan saat membuat; ulasan yang sudah ada tidak berpindah produk.
-            'product_id' => [$this->isMethod('POST') ? 'required' : 'prohibited', 'integer', 'exists:products,id'],
+            'product_id' => [$this->isMethod('POST') ? 'required' : 'prohibited', 'string', 'ulid', 'exists:products,public_id'],
             'author_name' => ['required', 'string', 'max:100'],
             'rating' => ['required', 'integer', 'between:1,5'],
             'body' => ['nullable', 'string', 'max:1000'],

@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Models\Concerns\HasPublicId;
 use Carbon\CarbonInterface;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Model;
@@ -15,6 +16,8 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 #[Fillable(['requested_by_user_id', 'note', 'status', 'pending_flag', 'decided_by_user_id', 'decision_note', 'decided_at'])]
 class ReturnBlockRuleRequest extends Model
 {
+    use HasPublicId;
+
     public const PENDING = 'pending';
 
     public const APPROVED = 'approved';

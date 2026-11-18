@@ -7,6 +7,9 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasOne;
 
+/**
+ * @property-read ProductVariant|null $variant
+ */
 #[Fillable(['product_variant_id', 'sku_snapshot', 'product_name_snapshot', 'variant_name_snapshot', 'unit_price', 'quantity', 'weight_gram_snapshot', 'line_total'])]
 class OrderItem extends Model
 {

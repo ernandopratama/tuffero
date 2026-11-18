@@ -28,6 +28,9 @@ class MarketingDraftRequest extends FormRequest
             'sources' => [Rule::requiredIf($trend), 'nullable', 'string', 'max:1000'],
             'source_period' => [Rule::requiredIf($trend), 'nullable', 'string', 'max:100'],
             'scheduled_on' => ['nullable', 'date'],
+            'duration_seconds' => ['nullable', 'integer', Rule::in(MarketingDraft::DURATIONS)],
+            'music_note' => ['nullable', 'string', 'max:300'],
+            'visual_mode' => ['sometimes', Rule::in(array_keys(MarketingDraft::VISUAL_MODES))],
         ];
     }
 
@@ -42,6 +45,8 @@ class MarketingDraftRequest extends FormRequest
             'body.max' => 'Isi maksimal 5000 karakter.',
             'sources.required' => 'Riset tren wajib menyebut sumber.',
             'source_period.required' => 'Riset tren wajib menyebut periode.',
+            'duration_seconds.in' => 'Durasi hanya 15, 30, atau 60 detik.',
+            'music_note.max' => 'Catatan musik maksimal 300 karakter.',
         ];
     }
 }

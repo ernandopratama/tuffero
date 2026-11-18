@@ -122,7 +122,7 @@ class ReturnBlockRuleService
     private function present(ReturnBlockRuleRequest $request): array
     {
         return [
-            'id' => $request->id,
+            'id' => $request->public_id,
             'status' => $request->status,
             'note' => $request->note,
             'requested_by' => $request->requester?->name,

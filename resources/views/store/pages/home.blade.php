@@ -28,7 +28,8 @@
 		<section class="tf-hero tf-wrap">
 			<div class="tf-hero-box">
 				<img class="tf-hero-photo" src="/images/Tuffero Bakery Treats Showcase.webp" {{ $site->imageSize('/images/Tuffero Bakery Treats Showcase.webp') }} alt="" fetchpriority="high">
-				<div class="tf-hero-video" aria-hidden="true"><video class="is-on" src="/videos/HeroVideo%20(1).mp4" muted playsinline tabindex="-1" preload="auto"></video><video src="/videos/HeroVideo%20(2).mp4" muted playsinline tabindex="-1" preload="metadata"></video></div>
+				{{-- Latar hero: dua video YouTube (ID tetap, bukan input pengguna) dimuat lewat home.js. --}}
+				<div class="tf-hero-video" aria-hidden="true" inert><div class="tf-hero-yt is-on" data-id="bRz85j6GlN0"><div></div></div><div class="tf-hero-yt" data-id="sECIX0-I0Ao"><div></div></div></div>
 				<div class="tf-hero-shade"></div>
 				@php($w = $t['hero']['welcome'])
 				<div @class(['tf-hero-content', 'is-welcome' => $welcome])>
@@ -80,7 +81,7 @@
 				<article class="tf-card-video image-anime wow fadeInUp">
 					<img src="{{ $thumb('Nastar Classic') }}" {{ $site->imageSize($thumb('Nastar Classic')) }} alt="{{ $t['hero']['videoAlt'] }}">
 					<div class="tf-card-video-shade"></div>
-					<a href="/videos/HeroVideo%20(2).mp4" class="tf-pill popup-video" data-cursor-text="Play">{{ $t['hero']['videoLink'] }} {{ $site->icon('north_east', 12) }}</a>
+					<a href="https://www.youtube.com/watch?v=sECIX0-I0Ao" class="tf-pill popup-video" data-cursor-text="Play">{{ $t['hero']['videoLink'] }} {{ $site->icon('north_east', 12) }}</a>
 					<div class="tf-card-video-text">
 						<p>{{ $t['hero']['videoTag'] }}</p>
 						<h2>{{ $t['hero']['videoTitle'] }}</h2>

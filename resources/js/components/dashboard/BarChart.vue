@@ -1,5 +1,5 @@
 <script setup>
-import { computed, ref } from 'vue';
+import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue';
 import { rupiahCompact } from '../../utils/orderLabels';
 import { BAR } from './tones';
 
@@ -9,6 +9,15 @@ const props = defineProps({
 
 const last = computed(() => props.chart.labels.length - 1);
 const active = ref(props.chart.labels.length - 1);
+// Tooltip hanya tampil saat kolom disorot (mouse), diketuk (sentuh), atau difokus keyboard; bulan terakhir tetap ditebalkan tanpa tooltip.
+const showTip = ref(false);
+const point = (i) => { active.value = i; showTip.value = true; };
+const reset = () => { active.value = last.value; showTip.value = false; };
+// Sentuhan memicu pointerleave tepat setelah jari diangkat; tooltip sentuh ditutup lewat focusout saat mengetuk di luar grafik.
+const onLeave = (e) => { if (e.pointerType !== 'touch') reset(); };
+const onFocusOut = (e) => { if (!e.currentTarget.contains(e.relatedTarget)) reset(); };
+// Periode berganti (mis. 18 hari menjadi 11 bulan): kolom aktif lama bisa di luar jangkauan, jadi kembali ke kolom terakhir sebelum digambar.
+watch(() => props.chart.labels.length, reset);
 
 // Sumbu tanpa awalan Rp supaya muat satu baris: 500 rb, 1,5 jt.
 const axis = (v) => {
@@ -62,6 +71,23 @@ const tipStyle = computed(() => {
     return { ...style, left: `${((active.value + 0.5) / n) * 100}%`, transform: 'translateX(-50%)' };
 });
 
+// Banyak kolom (mis. 92 hari): batang menyempit mengikuti lebar kolom, dan label sumbu hanya tiap beberapa kolom supaya tidak
+// bertumpuk. `axis_labels` (opsional) = label pendek sumbu; label lengkap tetap di tooltip dan tabel pembaca layar.
+const dense = computed(() => props.chart.labels.length > 16);
+// Jumlah label sumbu mengikuti lebar area batang (kira-kira 64 px per label), supaya tidak bertumpuk di layar HP.
+const plot = ref(null);
+const plotWidth = ref(0);
+let observer;
+onMounted(() => {
+    observer = new ResizeObserver(([entry]) => { plotWidth.value = entry.contentRect.width - 56; }); // tanpa kolom sumbu pl-14
+    if (!plot.value) return;
+    plotWidth.value = plot.value.clientWidth - 56; // ukuran awal tanpa menunggu callback pertama
+    observer.observe(plot.value);
+});
+onBeforeUnmount(() => observer?.disconnect());
+const every = computed(() => Math.ceil(props.chart.labels.length / Math.max(2, Math.min(12, Math.floor(plotWidth.value / 64) || 12))));
+const axisLabel = (g) => props.chart.axis_labels?.[g.i] ?? g.label;
+
 const describe = (g) => `${g.label}: ${props.chart.series.map((s, k) => `${s.name} ${fmt(g.values[k])}`).join(', ')}`;
 </script>
 
@@ -73,7 +99,7 @@ const describe = (g) => `${g.label}: ${props.chart.series.map((s, k) => `${s.nam
       </li>
     </ul>
 
-    <div class="relative mt-4 h-60" @pointerleave="active = last">
+    <div ref="plot" class="relative mt-4 h-60" @pointerleave="onLeave" @focusout="onFocusOut">
       <!-- garis bantu dan sumbu: 5 selang di area setinggi 80%, sisanya untuk label periode -->
       <div v-for="(t, i) in ticks" :key="t" class="absolute inset-x-0 flex -translate-y-1/2 items-center" :style="{ top: `${i * 16}%` }" aria-hidden="true">
         <span class="w-14 shrink-0 whitespace-nowrap pr-2 text-right text-body-sm text-secondary">{{ axis(t) }}</span>
@@ -87,15 +113,16 @@ const describe = (g) => `${g.label}: ${props.chart.series.map((s, k) => `${s.nam
           <div
             v-for="g in groups"
             :key="g.i"
-            class="absolute inset-y-0 flex justify-center gap-1 rounded-lg outline-none focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
+            class="absolute inset-y-0 flex justify-center rounded-lg outline-none focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
+            :class="dense ? 'gap-px px-px' : 'gap-1'"
             :style="{ left: `${(g.i / chart.labels.length) * 100}%`, width: `${100 / chart.labels.length}%` }"
             tabindex="0"
             role="group"
             :aria-label="describe(g)"
-            @pointerenter="active = g.i"
-            @focus="active = g.i"
+            @pointerenter="point(g.i)"
+            @focus="point(g.i)"
           >
-            <span v-for="(s, k) in chart.series" :key="s.key" class="relative h-full w-2.5 sm:w-3">
+            <span v-for="(s, k) in chart.series" :key="s.key" class="relative h-full" :class="dense ? 'max-w-3 min-w-px flex-1' : 'w-2.5 sm:w-3'">
               <span
                 class="absolute inset-x-0 animate-grow transition-opacity duration-150 ease-out"
                 :class="[BAR[s.tone], active === g.i ? 'opacity-100' : 'opacity-35', g.values[k] < 0 ? 'origin-top rounded-b-[4px]' : 'origin-bottom rounded-t-[4px]']"
@@ -104,11 +131,16 @@ const describe = (g) => `${g.label}: ${props.chart.series.map((s, k) => `${s.nam
             </span>
           </div>
 
-          <div class="pointer-events-none absolute z-10 w-52 rounded-2xl border border-border bg-surface p-3 shadow-pop transition-[left,right,bottom] duration-200 ease-out-strong" :style="tipStyle" aria-hidden="true">
+          <div
+            class="pointer-events-none absolute z-10 w-max min-w-52 origin-bottom rounded-2xl border border-border bg-surface p-3 shadow-pop transition-[left,right,bottom,opacity,scale] duration-200 ease-out-strong motion-reduce:transition-opacity"
+            :class="showTip ? 'scale-100 opacity-100' : 'scale-[0.97] opacity-0'"
+            :style="tipStyle"
+            aria-hidden="true"
+          >
             <p class="text-label-md">{{ groups[active].label }}</p>
             <p v-for="(s, k) in chart.series" :key="s.key" class="mt-1 flex items-center justify-between gap-3 text-body-sm">
-              <span class="flex items-center gap-1.5 text-secondary"><span class="size-2 rounded-full" :class="BAR[s.tone]"></span>{{ s.name }}</span>
-              <span class="font-semibold">{{ fmt(groups[active].values[k]) }}</span>
+              <span class="flex items-center gap-1.5 whitespace-nowrap text-secondary"><span class="size-2 shrink-0 rounded-full" :class="BAR[s.tone]"></span>{{ s.name }}</span>
+              <span class="whitespace-nowrap font-semibold">{{ fmt(groups[active].values[k]) }}</span>
             </p>
           </div>
         </div>
@@ -117,21 +149,25 @@ const describe = (g) => `${g.label}: ${props.chart.series.map((s, k) => `${s.nam
           <span
             v-for="g in groups"
             :key="g.i"
-            class="absolute text-center text-body-sm"
+            v-show="g.i % every === 0"
+            class="absolute flex justify-center whitespace-nowrap text-body-sm"
             :class="active === g.i ? 'font-semibold text-primary' : 'text-secondary'"
             :style="{ left: `${(g.i / chart.labels.length) * 100}%`, width: `${100 / chart.labels.length}%` }"
-          >{{ g.label }}</span>
+          >{{ axisLabel(g) }}</span>
         </div>
       </div>
     </div>
 
-    <table class="sr-only">
-      <caption>{{ chart.title }}</caption>
-      <thead><tr><th scope="col">Periode</th><th v-for="s in chart.series" :key="s.key" scope="col">{{ s.name }}</th></tr></thead>
-      <tbody>
-        <tr v-for="g in groups" :key="g.i"><th scope="row">{{ g.label }}</th><td v-for="(s, k) in chart.series" :key="s.key">{{ fmt(g.values[k]) }}</td></tr>
-      </tbody>
-      <tfoot><tr><th scope="row">Total</th><td v-for="(s, k) in chart.series" :key="s.key">{{ fmt(total[k]) }}</td></tr></tfoot>
-    </table>
+    <!-- sr-only di pembungkus div: tabel mengabaikan width 1px dan melebar ke isi, sehingga halaman HP bisa tergeser ke samping. -->
+    <div class="sr-only">
+      <table>
+        <caption>{{ chart.title }}</caption>
+        <thead><tr><th scope="col">Periode</th><th v-for="s in chart.series" :key="s.key" scope="col">{{ s.name }}</th></tr></thead>
+        <tbody>
+          <tr v-for="g in groups" :key="g.i"><th scope="row">{{ g.label }}</th><td v-for="(s, k) in chart.series" :key="s.key">{{ fmt(g.values[k]) }}</td></tr>
+        </tbody>
+        <tfoot><tr><th scope="row">Total</th><td v-for="(s, k) in chart.series" :key="s.key">{{ fmt(total[k]) }}</td></tr></tfoot>
+      </table>
+    </div>
   </div>
 </template>

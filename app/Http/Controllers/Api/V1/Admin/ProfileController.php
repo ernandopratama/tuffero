@@ -195,7 +195,7 @@ class ProfileController extends Controller
 
         return $this->success('Activity retrieved.', [
             'items' => $page->getCollection()->map(fn (AuditLog $log) => [
-                'id' => $log->id,
+                'id' => $log->public_id,
                 'action' => $log->action,
                 'target' => $log->auditable_type ? class_basename($log->auditable_type) : null,
                 'ip' => $log->ip_address,

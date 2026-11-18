@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+    Tes konkurensi stok pada MySQL 8.4 / MariaDB 10.6 (bukan SQLite). Terpisah dari phpunit.xml supaya `php artisan test`
+    tetap cepat dan tidak butuh database server. Jalankan: vendor/bin/phpunit -c phpunit.concurrency.xml
+    Konfigurasi koneksi lewat CONCURRENCY_DB_* (lihat docs/TESTING_CONCURRENCY.md); tanpa itu semua tes dilewati.
+    Sengaja TIDAK mengatur DB_*: koneksi diatur oleh Tests\Concurrency\Boot yang menolak database selain tuffero_concurrency_test.
+-->
+<phpunit xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:noNamespaceSchemaLocation="vendor/phpunit/phpunit/phpunit.xsd"
+         bootstrap="vendor/autoload.php"
+         colors="true"
+>
+    <testsuites>
+        <testsuite name="Concurrency">
+            <directory suffix="Test.php">tests/Concurrency</directory>
+        </testsuite>
+    </testsuites>
+</phpunit>

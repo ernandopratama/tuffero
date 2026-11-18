@@ -126,7 +126,7 @@ class AdminManagementTest extends TestCase
         $admin = $this->staff('super-admin');
         $target = $this->staff('marketing');
 
-        $this->actingAs($admin)->patchJson("/api/v1/admin/users/{$target->id}", ['role' => 'owner', 'mfa_required' => false])
+        $this->actingAs($admin)->patchJson("/api/v1/admin/users/{$target->public_id}", ['role' => 'owner', 'mfa_required' => false])
             ->assertOk()
             ->assertJsonPath('data.role', 'owner')
             ->assertJsonPath('data.mfa_required', false);
@@ -153,7 +153,7 @@ class AdminManagementTest extends TestCase
     {
         $admin = $this->staff('super-admin');
 
-        $this->actingAs($admin)->patchJson("/api/v1/admin/users/{$admin->id}", $body)
+        $this->actingAs($admin)->patchJson("/api/v1/admin/users/{$admin->public_id}", $body)
             ->assertUnprocessable()
             ->assertJsonValidationErrors([$field]);
 
@@ -165,7 +165,7 @@ class AdminManagementTest extends TestCase
     {
         $admin = $this->staff('super-admin');
 
-        $this->actingAs($admin)->postJson("/api/v1/admin/users/{$admin->id}/reset-mfa")->assertUnprocessable();
+        $this->actingAs($admin)->postJson("/api/v1/admin/users/{$admin->public_id}/reset-mfa")->assertUnprocessable();
         $this->assertNotNull($admin->fresh()->mfa_totp_confirmed_at);
     }
 
@@ -174,7 +174,7 @@ class AdminManagementTest extends TestCase
         $admin = $this->staff('super-admin');
         $target = $this->staff('warehouse', ['mfa_totp_secret' => 'GEZDGNBVGY3TQOJQ']);
 
-        $this->actingAs($admin)->postJson("/api/v1/admin/users/{$target->id}/reset-mfa")->assertOk()->assertJsonPath('data.mfa_enrolled', false);
+        $this->actingAs($admin)->postJson("/api/v1/admin/users/{$target->public_id}/reset-mfa")->assertOk()->assertJsonPath('data.mfa_enrolled', false);
 
         $this->assertNull($target->fresh()->mfa_totp_secret);
         $this->assertSame($admin->id, AuditLog::where('action', 'mfa.reset')->value('actor_user_id'));
@@ -190,7 +190,7 @@ class AdminManagementTest extends TestCase
         $this->actingAs($admin)->postJson('/api/v1/admin/users', [...$body, 'email' => 'b3@example.com', 'username' => 'a@b'])->assertUnprocessable()->assertJsonValidationErrors('username');
         $this->actingAs($admin)->postJson('/api/v1/admin/users', [...$body, 'email' => 'b4@example.com', 'username' => 'ab'])->assertUnprocessable()->assertJsonValidationErrors('username');
 
-        $id = User::where('email', 'budi@example.com')->value('id');
+        $id = User::where('email', 'budi@example.com')->value('public_id');
         $this->actingAs($admin)->patchJson("/api/v1/admin/users/{$id}", ['username' => null])->assertOk()->assertJsonPath('data.username', null);
     }
 
@@ -200,7 +200,7 @@ class AdminManagementTest extends TestCase
         $target = $this->staff('warehouse');
         $target->createToken('t');
 
-        $this->actingAs($admin)->deleteJson("/api/v1/admin/users/{$target->id}")->assertOk();
+        $this->actingAs($admin)->deleteJson("/api/v1/admin/users/{$target->public_id}")->assertOk();
 
         $this->assertDatabaseMissing('users', ['id' => $target->id]);
         $this->assertDatabaseMissing('personal_access_tokens', ['tokenable_id' => $target->id]);
@@ -215,11 +215,11 @@ class AdminManagementTest extends TestCase
         $admin = $this->staff('super-admin');
         $customer = User::factory()->create();
         $writer = $this->staff('marketing');
-        DB::table('admin_comments')->insert(['user_id' => $writer->id, 'commentable_type' => 'x', 'commentable_id' => 1, 'body' => 'catatan', 'created_at' => now()]);
+        DB::table('admin_comments')->insert(['public_id' => strtolower((string) str()->ulid()), 'user_id' => $writer->id, 'commentable_type' => 'x', 'commentable_id' => 1, 'body' => 'catatan', 'created_at' => now()]);
 
-        $this->actingAs($admin)->deleteJson("/api/v1/admin/users/{$admin->id}")->assertUnprocessable();
-        $this->actingAs($admin)->deleteJson("/api/v1/admin/users/{$customer->id}")->assertUnprocessable();
-        $this->actingAs($admin)->deleteJson("/api/v1/admin/users/{$writer->id}")->assertUnprocessable();
+        $this->actingAs($admin)->deleteJson("/api/v1/admin/users/{$admin->public_id}")->assertUnprocessable();
+        $this->actingAs($admin)->deleteJson("/api/v1/admin/users/{$customer->public_id}")->assertUnprocessable();
+        $this->actingAs($admin)->deleteJson("/api/v1/admin/users/{$writer->public_id}")->assertUnprocessable();
 
         foreach ([$admin, $customer, $writer] as $user) {
             $this->assertDatabaseHas('users', ['id' => $user->id]);
@@ -231,7 +231,7 @@ class AdminManagementTest extends TestCase
     {
         $target = $this->staff('warehouse');
 
-        $this->actingAs($this->staff('owner'))->deleteJson("/api/v1/admin/users/{$target->id}")->assertForbidden();
+        $this->actingAs($this->staff('owner'))->deleteJson("/api/v1/admin/users/{$target->public_id}")->assertForbidden();
         $this->assertDatabaseHas('users', ['id' => $target->id]);
     }
 
@@ -257,7 +257,7 @@ class AdminManagementTest extends TestCase
         $this->actingAs($admin);
         config(['session.driver' => 'database']);
 
-        $this->patchJson("/api/v1/admin/users/{$target->id}", ['password' => self::STRONG_PASSWORD])->assertOk();
+        $this->patchJson("/api/v1/admin/users/{$target->public_id}", ['password' => self::STRONG_PASSWORD])->assertOk();
 
         $this->assertDatabaseMissing('sessions', ['id' => 'sesi-uji']);
         $this->assertTrue(AuditLog::where('action', 'user.updated')->firstOrFail()->changes['password_changed']);

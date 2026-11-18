@@ -11,14 +11,20 @@ use Anthropic\Core\Exceptions\APIException;
  */
 class ClaudeMarketingModel implements MarketingModel
 {
-    /** Termasuk token berpikir model dan hasil pencarian yang dirangkum. */
-    private const MAX_TOKENS = 4096;
+    /** Termasuk token berpikir model dan hasil pencarian yang dirangkum. Storyboard (JSON per adegan) butuh lebih dari 4096. */
+    private const MAX_TOKENS = 16000;
 
     /** Batas pencarian web per permintaan, supaya biaya riset tren terkendali. */
     private const MAX_SEARCHES = 5;
 
-    public function generate(string $system, string $prompt, bool $search): array
+    public function generate(string $system, string $prompt, bool $search, array $images = []): array
     {
+        // Gambar lebih dulu, lalu teks: Claude membaca foto acuan sebagai konteks untuk instruksi sesudahnya.
+        $content = $images === [] ? $prompt : [
+            ...array_map(fn (array $image) => ['type' => 'image', 'source' => ['type' => 'base64', 'mediaType' => $image['media_type'], 'data' => $image['data']]], $images),
+            ['type' => 'text', 'text' => $prompt],
+        ];
+
         $key = config('services.anthropic.key');
         if (! is_string($key) || $key === '') {
             throw new MarketingModelException('ANTHROPIC_API_KEY belum diisi.');
@@ -35,7 +41,7 @@ class ClaudeMarketingModel implements MarketingModel
         try {
             $message = $client->messages->create(
                 maxTokens: self::MAX_TOKENS,
-                messages: [['role' => 'user', 'content' => $prompt]],
+                messages: [['role' => 'user', 'content' => $content]],
                 model: (string) config('services.anthropic.models.marketing'),
                 system: [['type' => 'text', 'text' => $system, 'cacheControl' => ['type' => 'ephemeral']]],
                 tools: $search ? [['name' => 'web_search', 'type' => 'web_search_20250305', 'maxUses' => self::MAX_SEARCHES]] : null,

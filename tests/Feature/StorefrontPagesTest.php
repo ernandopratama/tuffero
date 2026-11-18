@@ -73,6 +73,16 @@ class StorefrontPagesTest extends TestCase
         $this->get($path)->assertOk()->assertSee('content="noindex, nofollow"', false)->assertDontSee('property="og:title"', false);
     }
 
+    public function test_footer_track_link_opens_the_order_lookup_page(): void
+    {
+        // Dulu `href="#"`; tautan Lacak Pesanan di footer harus ke /cek-pesanan seperti di header dan navigasi bawah.
+        $html = $this->get('/tentang-kami')->assertOk()->getContent();
+        $footer = substr($html, (int) strpos($html, '<footer id="contact"'));
+
+        $this->assertStringContainsString('href="/cek-pesanan">'.trans('store.landing.top.track', [], 'id').'</a>', $footer);
+        $this->assertStringNotContainsString('href="#"', $footer);
+    }
+
     public function test_product_page_is_server_rendered_with_price_from_database_and_json_ld(): void
     {
         $this->product(['description' => 'Deskripsi uji', 'badges' => ['Terlaris']], ['max_order_quantity' => 12]);

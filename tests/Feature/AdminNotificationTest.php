@@ -34,7 +34,7 @@ class AdminNotificationTest extends TestCase
     {
         $voucher = Voucher::create(['code' => 'UJI'.random_int(100, 999), 'type' => 'fixed', 'value' => 10000, 'is_active' => true]);
         $this->actingAs($author)
-            ->postJson("/api/v1/admin/vouchers/{$voucher->id}/comments", ['body' => "@{$target->name} {$body}", 'mentions' => [$target->id]])
+            ->postJson("/api/v1/admin/vouchers/{$voucher->public_id}/comments", ['body' => "@{$target->name} {$body}", 'mentions' => [$target->public_id]])
             ->assertCreated();
 
         return $voucher->code;
@@ -95,7 +95,7 @@ class AdminNotificationTest extends TestCase
         $owner = $this->staff('owner');
         $voucher = Voucher::create(['code' => 'SEPI1', 'type' => 'fixed', 'value' => 10000, 'is_active' => true]);
 
-        $this->actingAs($owner)->postJson("/api/v1/admin/vouchers/{$voucher->id}/comments", ['body' => 'tanpa tag'])->assertCreated();
+        $this->actingAs($owner)->postJson("/api/v1/admin/vouchers/{$voucher->public_id}/comments", ['body' => 'tanpa tag'])->assertCreated();
 
         $this->assertSame(0, DatabaseNotification::count());
     }

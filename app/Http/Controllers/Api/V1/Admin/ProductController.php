@@ -6,7 +6,9 @@ use App\Http\Controllers\Controller;
 use App\Http\Requests\Admin\ProductRequest;
 use App\Http\Requests\Admin\VariantRequest;
 use App\Models\Product;
+use App\Models\ProductCategory;
 use App\Models\ProductImage;
+use App\Models\ProductType;
 use App\Models\ProductVariant;
 use App\Services\DiscountService;
 use App\Services\ImageService;
@@ -32,7 +34,7 @@ class ProductController extends Controller
                 ->where('name', 'like', "%{$search}%")
                 ->orWhereHas('variants', fn ($variant) => $variant->where('sku', 'like', "%{$search}%"))))
             ->when(in_array($request->query('status'), ['published', 'draft'], true), fn ($query) => $query->where('is_published', $request->query('status') === 'published'))
-            ->when($request->integer('category_id'), fn ($query, $id) => $query->where('product_category_id', $id))
+            ->when($request->query('category_id'), fn ($query, $id) => $query->whereHas('category', fn ($c) => $c->where('public_id', $id)))
             ->orderBy('name')
             ->paginate($this->perPage($request));
 
@@ -49,12 +51,12 @@ class ProductController extends Controller
 
     public function store(ProductRequest $request): JsonResponse
     {
-        return $this->success('Product created.', $this->present($this->products->createProduct($request->validated(), $request->user())), 201);
+        return $this->success('Product created.', $this->present($this->products->createProduct($this->productData($request), $request->user())), 201);
     }
 
     public function update(ProductRequest $request, Product $product): JsonResponse
     {
-        return $this->success('Product updated.', $this->present($this->products->updateProduct($product, $request->validated(), $request->user())));
+        return $this->success('Product updated.', $this->present($this->products->updateProduct($product, $this->productData($request), $request->user())));
     }
 
     /** Usulan terjemahan Inggris dari AI. Tidak menyimpan apa pun: admin memeriksa lalu menyimpan sendiri. */
@@ -104,9 +106,12 @@ class ProductController extends Controller
 
     public function reorderImages(Request $request, Product $product): JsonResponse
     {
-        $validated = $request->validate(['ids' => ['required', 'array', 'min:1', 'max:50'], 'ids.*' => ['integer', 'distinct']]);
+        $validated = $request->validate(['ids' => ['required', 'array', 'min:1', 'max:50'], 'ids.*' => ['string', 'ulid', 'distinct']]);
 
-        $this->products->reorderImages($product, array_map('intval', $validated['ids']), $request->user());
+        // ID publik foto dipetakan ke ID internal produk ini; foto produk lain tidak ikut, sehingga daftar tidak cocok (422).
+        $map = $product->images()->whereIn('public_id', $validated['ids'])->pluck('id', 'public_id');
+        $ids = array_map(fn (string $publicId) => (int) ($map[$publicId] ?? 0), $validated['ids']);
+        $this->products->reorderImages($product, $ids, $request->user());
 
         return $this->success('Images reordered.', $this->present($product));
     }
@@ -126,11 +131,11 @@ class ProductController extends Controller
         $product->load(['variants.discounts', 'images']);
 
         return [
-            'id' => $product->id,
+            'id' => $product->public_id,
             'name' => $product->name,
             'slug' => $product->slug,
-            'product_category_id' => $product->product_category_id,
-            'product_type_id' => $product->product_type_id,
+            'product_category_id' => $product->category?->public_id,
+            'product_type_id' => $product->type?->public_id,
             'description' => $product->description,
             'name_en' => $product->name_en,
             'description_en' => $product->description_en,
@@ -139,17 +144,35 @@ class ProductController extends Controller
             'badges' => $product->badges ?? [],
             'is_published' => $product->is_published,
             'max_discount_percent' => $this->discounts->maxPercent(),
-            'variants' => $product->variants->sortBy('id')->values()->map(fn (ProductVariant $variant) => $variant->only([
-                'id', 'sku', 'name', 'name_en', 'price', 'compare_at_price', 'weight_gram', 'net_weight_gram',
+            'variants' => $product->variants->sortBy('id')->values()->map(fn (ProductVariant $variant) => ['id' => $variant->public_id] + $variant->only([
+                'sku', 'name', 'name_en', 'price', 'compare_at_price', 'weight_gram', 'net_weight_gram',
                 'length_cm', 'width_cm', 'height_cm', 'shelf_life_days', 'max_order_quantity', 'low_stock_threshold', 'is_active',
-            ]) + ['discounts' => $variant->discounts->whereNull('campaign_id')->sortByDesc('id')->values()->map(fn ($discount) => $discount->only([
-                'id', 'audience', 'type', 'value', 'starts_at', 'ends_at', 'is_active',
+            ]) + ['discounts' => $variant->discounts->whereNull('campaign_id')->sortByDesc('id')->values()->map(fn ($discount) => ['id' => $discount->public_id] + $discount->only([
+                'audience', 'type', 'value', 'starts_at', 'ends_at', 'is_active',
             ]))]),
             'images' => $product->images->map(fn (ProductImage $image) => [
-                'id' => $image->id,
+                'id' => $image->public_id,
                 'url' => '/storage/'.$image->path,
                 'alt' => $image->alt,
             ]),
         ];
+    }
+
+    /**
+     * Kategori dan jenis dikirim sebagai ID publik; layanan menyimpan foreign key angka (D-143).
+     *
+     * @return array<string, mixed>
+     */
+    private function productData(ProductRequest $request): array
+    {
+        $data = $request->validated();
+        if (array_key_exists('product_category_id', $data)) {
+            $data['product_category_id'] = $data['product_category_id'] === null ? null : ProductCategory::where('public_id', $data['product_category_id'])->value('id');
+        }
+        if (array_key_exists('product_type_id', $data)) {
+            $data['product_type_id'] = $data['product_type_id'] === null ? null : ProductType::where('public_id', $data['product_type_id'])->value('id');
+        }
+
+        return $data;
     }
 }

@@ -10,7 +10,6 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Storage;
-use Illuminate\Support\Str;
 use RuntimeException;
 
 /**
@@ -54,7 +53,7 @@ class VideoThumbnailService
         }
 
         $old = $content->image_path;
-        $path = "promo/{$content->id}/auto-".Str::random(10).'.jpg';
+        $path = ImageService::randomPath('promo', 'jpg', 'auto-');
         Storage::disk('public')->put($path, $jpeg);
 
         DB::transaction(function () use ($content, $path, $jpeg, $actor) {
