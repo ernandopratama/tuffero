@@ -237,7 +237,9 @@ abstract class ConcurrencyTestCase extends TestCase
         $count = count($this->workers);
         $this->assertLessThanOrEqual($count, count($actions));
 
-        file_put_contents("{$this->dir}/plan_{$round}", json_encode($actions, JSON_THROW_ON_ERROR));
+        // Tulis lalu rename: worker mengecek keberadaan berkas, jadi berkas setengah jadi akan terbaca sebagai JSON rusak.
+        file_put_contents("{$this->dir}/plan_{$round}.tmp", json_encode($actions, JSON_THROW_ON_ERROR));
+        rename("{$this->dir}/plan_{$round}.tmp", "{$this->dir}/plan_{$round}");
         $this->waitFor(fn () => $this->allExist('armed', $round, $count), "worker siap (putaran {$round})");
 
         // Penghalang: semua worker sudah menyiapkan aksi dan menunggu berkas ini.
