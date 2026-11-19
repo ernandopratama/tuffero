@@ -391,6 +391,26 @@ class ProductStockAdminTest extends TestCase
         $this->assertSame(100000, $sultan->fresh()->price);
     }
 
+    public function test_catalog_seeder_assigns_category_and_type_and_backfills_old_uncategorized_products(): void
+    {
+        Storage::fake('public');
+        $this->seed(CatalogDraftSeeder::class);
+
+        $sultan = ProductVariant::where('sku', 'NAS-TOP-01')->firstOrFail()->product;
+        $this->assertSame(['nastar', 'sultan'], [$sultan->category->slug, $sultan->type->slug]);
+        $this->assertSame(0, Product::whereNull('product_category_id')->count());
+
+        // Seeder versi lama membuat produk tanpa kategori; dijalankan ulang hanya mengisi yang kosong.
+        $sultan->forceFill(['product_category_id' => null, 'product_type_id' => null])->save();
+        $other = ProductVariant::where('sku', 'MAC-REG-06')->firstOrFail()->product;
+        $other->forceFill(['product_category_id' => ProductCategory::where('slug', 'cookies')->value('id'), 'product_type_id' => null])->save();
+
+        $this->seed(CatalogDraftSeeder::class);
+
+        $this->assertSame('nastar', $sultan->fresh()->category->slug);
+        $this->assertSame('cookies', $other->fresh()->category->slug, 'Pilihan admin tidak ditimpa');
+    }
+
     public function test_service_rejects_change_directly_too(): void
     {
         $this->expectException(ValidationException::class);

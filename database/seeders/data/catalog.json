@@ -2,6 +2,8 @@
     {
         "sku": "NAS-TOP-01",
         "name": "Nastar Sultan Nanas Premium",
+        "category": "nastar",
+        "type": "sultan",
         "price": 144000,
         "compare_at_price": 150000,
         "weight_gram": 500,
@@ -20,6 +22,8 @@
     {
         "sku": "NAS-CLAS-01",
         "name": "Nastar Classic Nanas Homemade",
+        "category": "nastar",
+        "type": "classic",
         "price": 144000,
         "compare_at_price": 150000,
         "weight_gram": 550,
@@ -36,6 +40,8 @@
     {
         "sku": "NAS-APEL-01",
         "name": "Nastar Apel Premium",
+        "category": "nastar",
+        "type": "apel",
         "price": 85000,
         "compare_at_price": 100000,
         "weight_gram": 500,
@@ -51,6 +57,8 @@
     {
         "sku": "NAS-COO-01",
         "name": "Nastar Cookies (Tanpa Telur)",
+        "category": "nastar",
+        "type": "nastar-cookies",
         "price": 90250,
         "compare_at_price": 95000,
         "weight_gram": 500,
@@ -67,6 +75,8 @@
     {
         "sku": "MAC-MIN-31",
         "name": "Macaron Mini Isi 30 (6 Rasa)",
+        "category": "macaron",
+        "type": "mini",
         "price": 68850,
         "compare_at_price": 85000,
         "weight_gram": 250,
@@ -81,6 +91,8 @@
     {
         "sku": "MAC-MIN-30",
         "name": "Macaron Mini Isi 30 Almond",
+        "category": "macaron",
+        "type": "mini",
         "price": 63180,
         "compare_at_price": 78000,
         "weight_gram": 300,
@@ -95,6 +107,8 @@
     {
         "sku": "MAC-MIN-50",
         "name": "Macaron Mini Isi 50 Premium",
+        "category": "macaron",
+        "type": "mini",
         "price": 109250,
         "compare_at_price": 115000,
         "weight_gram": 500,
@@ -110,6 +124,8 @@
     {
         "sku": "MAC-REG-06",
         "name": "Macaron Besar Regular Isi 6",
+        "category": "macaron",
+        "type": "regular",
         "price": 53350,
         "compare_at_price": 55000,
         "weight_gram": 200,
@@ -123,6 +139,8 @@
     {
         "sku": "PIA-OLH-02",
         "name": "Pia Cokelat Premium",
+        "category": "pia",
+        "type": null,
         "price": 57200,
         "compare_at_price": 65000,
         "weight_gram": 400,
@@ -137,6 +155,8 @@
     {
         "sku": "CHO-DUB-01",
         "name": "Cokelat Dubai Kunafa Pistachio Brownies",
+        "category": "brownies-cake",
+        "type": "dubai",
         "price": 50250,
         "compare_at_price": 75000,
         "weight_gram": 250,
@@ -152,6 +172,8 @@
     {
         "sku": "BRW-BOX-03",
         "name": "Brownies Marble Box",
+        "category": "brownies-cake",
+        "type": "brownies",
         "price": 40500,
         "compare_at_price": 50000,
         "weight_gram": 500,
@@ -167,6 +189,8 @@
     {
         "sku": "MER-TOP-01",
         "name": "Meringue Cookies",
+        "category": "cookies",
+        "type": null,
         "price": 19750,
         "compare_at_price": 25000,
         "weight_gram": 200,
@@ -182,6 +206,8 @@
     {
         "sku": "BUNDLING-NAS-02",
         "name": "Paket Nastar Wisman + Classic",
+        "category": "nastar",
+        "type": "nastar-paket",
         "price": 270000,
         "compare_at_price": 300000,
         "weight_gram": 700,
@@ -198,6 +224,8 @@
     {
         "sku": "SELAI-NANAS-01",
         "name": "Selai Nanas Nastar Sultan",
+        "category": "lainnya",
+        "type": "selai",
         "price": 45100,
         "compare_at_price": 55000,
         "weight_gram": 600,
@@ -214,6 +242,8 @@
     {
         "sku": "MAC-PAK-01",
         "name": "Paket 2 Box Mini + 1 Box Regular",
+        "category": "macaron",
+        "type": "macaron-paket",
         "price": 70400,
         "compare_at_price": 80000,
         "weight_gram": 300,
@@ -227,6 +257,8 @@
     {
         "sku": "MAC-REM-01",
         "name": "Macaron Crumbs Remahan",
+        "category": "macaron",
+        "type": "crumbs",
         "price": 19710,
         "compare_at_price": 27000,
         "weight_gram": 100,
@@ -241,6 +273,8 @@
     {
         "sku": "MAC-RICE-01",
         "name": "Macaron Rice Crispy Cokelat",
+        "category": "macaron",
+        "type": "rice",
         "price": 18860,
         "compare_at_price": 23000,
         "weight_gram": 100,
@@ -255,6 +289,8 @@
     {
         "sku": "MAC-RICE-02",
         "name": "Macaron Rice Crispy Strawberry",
+        "category": "macaron",
+        "type": "rice",
         "price": 18860,
         "compare_at_price": 25000,
         "weight_gram": 100,
@@ -270,6 +306,8 @@
     {
         "sku": "CHO-DUB-02",
         "name": "Paket 2 Cokelat Dubai",
+        "category": "brownies-cake",
+        "type": "dubai",
         "price": 99000,
         "compare_at_price": 150000,
         "weight_gram": 500,
@@ -285,6 +323,8 @@
     {
         "sku": "COO-BIT-02",
         "name": "Choco Chips Cookies",
+        "category": "cookies",
+        "type": null,
         "price": 8500,
         "compare_at_price": null,
         "weight_gram": 50,
@@ -299,6 +339,8 @@
     {
         "sku": "COO-LUM-01",
         "name": "Chocopia Lumer",
+        "category": "cookies",
+        "type": null,
         "price": 8550,
         "compare_at_price": 9000,
         "weight_gram": 50,
@@ -313,6 +355,8 @@
     {
         "sku": "TERASI-KING-01",
         "name": "Terasi Oven King 1 Toples",
+        "category": "lainnya",
+        "type": "terasi",
         "price": 28000,
         "compare_at_price": null,
         "weight_gram": 100,
@@ -325,6 +369,8 @@
     {
         "sku": "TERASI-KING-02",
         "name": "Terasi Oven King 2 Toples",
+        "category": "lainnya",
+        "type": "terasi",
         "price": 66000,
         "compare_at_price": 70000,
         "weight_gram": 250,
@@ -337,6 +383,8 @@
     {
         "sku": "TERASI-KING-03",
         "name": "Terasi Oven King 3 Toples",
+        "category": "lainnya",
+        "type": "terasi",
         "price": 95000,
         "compare_at_price": 105000,
         "weight_gram": 350,
@@ -349,6 +397,8 @@
     {
         "sku": "TERASI-SACHET-12",
         "name": "Terasi Oven King 12 Sachet",
+        "category": "lainnya",
+        "type": "terasi",
         "price": 26000,
         "compare_at_price": null,
         "weight_gram": 100,
@@ -361,6 +411,8 @@
     {
         "sku": "BUMBU-HTM-01",
         "name": "Sambal Bebek Bumbu Hitam 1 Pouch",
+        "category": "lainnya",
+        "type": "sambal",
         "price": 19500,
         "compare_at_price": 25000,
         "weight_gram": 200,
@@ -373,6 +425,8 @@
     {
         "sku": "BUMBU-HTM-03",
         "name": "Sambal Bebek Bumbu Hitam 3 Pouch",
+        "category": "lainnya",
+        "type": "sambal",
         "price": 45000,
         "compare_at_price": 75000,
         "weight_gram": 450,
@@ -385,6 +439,8 @@
     {
         "sku": "BUMBU-HTM-05",
         "name": "Sambal Bebek Bumbu Hitam 5 Pouch",
+        "category": "lainnya",
+        "type": "sambal",
         "price": 72500,
         "compare_at_price": 125000,
         "weight_gram": 750,
@@ -397,6 +453,8 @@
     {
         "sku": "BUMBU-HTM-02",
         "name": "Bundling 2 Sambal + 1 Terasi",
+        "category": "lainnya",
+        "type": "lainnya-paket",
         "price": 63000,
         "compare_at_price": null,
         "weight_gram": 500,

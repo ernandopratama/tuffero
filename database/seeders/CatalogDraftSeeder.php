@@ -3,6 +3,9 @@
 namespace Database\Seeders;
 
 use App\Models\InventoryStock;
+use App\Models\Product;
+use App\Models\ProductCategory;
+use App\Models\ProductType;
 use App\Models\ProductVariant;
 use App\Models\User;
 use App\Models\Warehouse;
@@ -28,14 +31,26 @@ class CatalogDraftSeeder extends Seeder
     {
         $rows = json_decode(File::get(database_path('seeders/data/catalog.json')), true, flags: JSON_THROW_ON_ERROR);
         $imported = 0;
+        $backfilled = 0;
+        // Kategori dan jenis berasal dari migrasi product_categories (slug di catalog.json); slug tak dikenal berarti tanpa kategori.
+        $categories = ProductCategory::pluck('id', 'slug');
+        $types = ProductType::pluck('id', 'slug');
 
         foreach ($rows as $row) {
-            if (ProductVariant::withTrashed()->where('sku', $row['sku'])->exists()) {
+            $classification = ['product_category_id' => $categories[$row['category']] ?? null, 'product_type_id' => $types[$row['type'] ?? ''] ?? null];
+
+            $existing = ProductVariant::withTrashed()->where('sku', $row['sku'])->first();
+            if ($existing) {
+                // Produk hasil seeder lama dibuat tanpa kategori. Hanya yang masih kosong diisi; pilihan admin tidak ditimpa.
+                if ($classification['product_category_id']) {
+                    $backfilled += Product::whereKey($existing->product_id)->whereNull('product_category_id')->update($classification);
+                }
+
                 continue;
             }
 
-            DB::transaction(function () use ($products, $row) {
-                $product = $products->createProduct(['name' => $row['name']], null);
+            DB::transaction(function () use ($products, $row, $classification) {
+                $product = $products->createProduct(['name' => $row['name'], ...$classification], null);
 
                 // shortcut: satu SKU menjadi satu produk dengan varian "Standar"; digabung per keluarga setelah OQ-23 diputuskan.
                 $products->createVariant($product, [
@@ -59,7 +74,7 @@ class CatalogDraftSeeder extends Seeder
             $imported++;
         }
 
-        $this->command?->info("{$imported} SKU diimpor sebagai draf, ".(count($rows) - $imported).' dilewati.');
+        $this->command?->info("{$imported} SKU diimpor sebagai draf, ".(count($rows) - $imported)." dilewati, kategori dilengkapi pada {$backfilled} produk lama.");
         $this->seedStock($inventory, array_column($rows, 'sku'));
     }
 

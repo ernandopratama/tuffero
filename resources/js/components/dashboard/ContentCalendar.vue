@@ -81,7 +81,10 @@ const cells = computed(() => {
 });
 
 const inMonth = computed(() => cells.value.filter((cell) => !cell.outside).reduce((sum, cell) => sum + cell.items.length, 0));
-const unscheduled = computed(() => items.value.filter((row) => !row.scheduled_on && row.type !== 'trend_report' && row.status !== 'posted').length);
+// Draf tanpa tanggal (misalnya kiriman Hermes) tidak punya kotak di kalender, jadi dicantumkan di bawahnya.
+const unscheduledRows = computed(() => items.value.filter((row) => !row.scheduled_on && row.type !== 'trend_report' && row.status !== 'posted'));
+const unscheduled = computed(() => unscheduledRows.value.length);
+const UNSCHEDULED_SHOWN = 5;
 const agenda = computed(() => byDay.value[selected.value] ?? []);
 
 function shift(step) {
@@ -118,7 +121,7 @@ onMounted(load);
     <header class="mb-4 flex flex-wrap items-center justify-between gap-3">
       <div>
         <h2 id="calendar-title" class="font-heading text-headline-sm">Kalender konten</h2>
-        <p class="text-body-sm text-background/70">Draf muncul di tanggal jadwal posting.</p>
+        <p class="text-body-sm text-background/70">Draf muncul di tanggal jadwal posting. Yang belum punya tanggal dicantumkan di bawah kalender.</p>
       </div>
       <div class="flex items-center gap-2">
         <button type="button" :class="iconBtn" aria-label="Bulan sebelumnya" @click="shift(-1)">
@@ -184,6 +187,17 @@ onMounted(load);
         {{ inMonth }} draf bulan ini<template v-if="unscheduled">
           · <router-link :to="{ name: 'AdminMarketingDrafts' }" class="underline underline-offset-2 hover:text-accent">{{ unscheduled }} draf belum dijadwalkan</router-link></template>
       </p>
+
+      <ul v-if="unscheduled" class="mt-2 space-y-1.5" aria-label="Draf belum dijadwalkan">
+        <li v-for="row in unscheduledRows.slice(0, UNSCHEDULED_SHOWN)" :key="row.id">
+          <router-link :to="{ name: 'AdminMarketingDrafts', query: { draf: row.id } }" :class="`flex min-w-0 items-center gap-2 rounded-xl border border-background/20 bg-background/10 px-3 py-2 text-body-sm hover:bg-background/20 ${press}`">
+            <span :class="['size-2 shrink-0 rounded-full', STATUS[row.status].cellDot]" aria-hidden="true"></span>
+            <span class="min-w-0 flex-1 truncate">{{ row.title }}</span>
+            <span class="shrink-0 text-label-sm text-background/70">{{ STATUS[row.status].label }}</span>
+          </router-link>
+        </li>
+        <li v-if="unscheduled > UNSCHEDULED_SHOWN" class="px-1 text-label-sm text-background/70">+{{ unscheduled - UNSCHEDULED_SHOWN }} draf lainnya di Draf Konten</li>
+      </ul>
     </template>
 
     <AppModal ref="dialog" variant="read" size="xl" :title="longDay.format(parse(selected))" :subtitle="agenda.length ? `${agenda.length} draf` : 'Tidak ada draf'">
@@ -199,7 +213,7 @@ onMounted(load);
                   <span v-if="row.platform" class="rounded-full bg-secondary-tint-12 px-2 py-0.5 text-label-sm">{{ PLATFORMS[row.platform] }}</span>
                   <span v-if="ORIGINS[row.origin]" class="inline-flex items-center gap-1 rounded-full bg-accent-tint-15 px-2 py-0.5 text-label-sm text-primary"><AdminIcon name="sparkles" :size="12" />{{ ORIGINS[row.origin] }}</span>
                 </div>
-                <p class="mt-1.5 break-words font-heading text-body-md"><span class="font-sans text-label-sm tabular-nums text-secondary">Draf #{{ row.id }}</span> {{ row.title }}</p>
+                <p class="mt-1.5 break-words font-heading text-body-md">{{ row.title }}</p>
               </div>
               <svg class="mt-1 size-5 shrink-0 text-secondary transition-transform duration-[160ms] ease-out-strong group-open:rotate-90" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 6l6 6-6 6" /></svg>
             </summary>

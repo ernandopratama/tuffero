@@ -113,7 +113,7 @@ const isTrend = computed(() => form.type === 'trend_report');
 // Mode lihat: draf ditampilkan sebagai bacaan, bukan formulir terkunci.
 const viewing = computed(() => Boolean(editing.value) && readOnly.value);
 // Nomor draf = id database: tetap, unik, dan dipakai untuk menyebut draf di grup atau rapat. Draf yang dihapus meninggalkan celah nomor.
-const draftLabel = (row) => (row ? `Draf #${row.id} · ${row.title}` : '');
+const draftLabel = (row) => row?.title ?? '';
 const dayLabel = (value) => day.format(new Date(`${value}T00:00:00`));
 const sourceLinksList = computed(() => sourceLinks(form.sources));
 
@@ -293,7 +293,6 @@ onBeforeUnmount(() => clearTimeout(poll));
 
     <ul v-else class="mt-space-lg grid gap-space-md sm:grid-cols-2 xl:grid-cols-3">
       <li v-for="row in visible" :key="row.id" class="flex min-w-0 flex-col gap-2 rounded-3xl border border-border bg-surface p-space-md shadow-card">
-        <p class="text-body-lg font-semibold tabular-nums text-primary">Draf #{{ row.id }}</p>
         <div class="flex flex-wrap items-center gap-2">
           <span class="rounded-full px-2.5 py-1 text-label-sm" :class="STATUS[row.status].cls">{{ STATUS[row.status].label }}</span>
           <span class="rounded-full bg-secondary-tint-12 px-2.5 py-1 text-label-sm">{{ TYPES[row.type] }}</span>
@@ -324,7 +323,7 @@ onBeforeUnmount(() => clearTimeout(poll));
     </ul>
   </template>
 
-  <AppModal ref="dialog" :variant="editing ? (readOnly ? 'read' : 'update') : 'create'" size="2xl" :title="editing ? `${readOnly ? 'Lihat' : 'Ubah'} Draf #${editing.id}` : 'Tambah draf'" :subtitle="editing?.title">
+  <AppModal ref="dialog" :variant="editing ? (readOnly ? 'read' : 'update') : 'create'" size="2xl" :title="editing ? `${readOnly ? 'Lihat' : 'Ubah'} draf` : 'Tambah draf'" :subtitle="editing?.title">
     <article v-if="viewing" class="space-y-space-md" aria-label="Isi draf">
       <div class="flex flex-wrap items-center gap-2">
         <span class="rounded-full px-2.5 py-1 text-label-sm" :class="STATUS[editing.status].cls">{{ STATUS[editing.status].label }}</span>
