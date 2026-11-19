@@ -18,6 +18,8 @@ use App\Services\Translation\TranslationException;
 use App\Traits\ApiResponse;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Validation\Rule;
+use Illuminate\Validation\ValidationException;
 
 class ProductController extends Controller
 {
@@ -57,6 +59,42 @@ class ProductController extends Controller
     public function update(ProductRequest $request, Product $product): JsonResponse
     {
         return $this->success('Product updated.', $this->present($this->products->updateProduct($product, $this->productData($request), $request->user())));
+    }
+
+    /**
+     * Aksi massal dari daftar produk: publikasikan, jadikan draf, atau hapus. Tiap produk diproses sendiri dengan aturan yang
+     * sama seperti aksi satuan; yang gagal dilaporkan dan tidak menggagalkan yang lain.
+     */
+    public function bulk(Request $request): JsonResponse
+    {
+        $data = $request->validate([
+            'action' => ['required', Rule::in(['publish', 'draft', 'delete'])],
+            'ids' => ['required', 'array', 'min:1', 'max:100'],
+            'ids.*' => ['required', 'string', 'distinct'],
+        ]);
+
+        $done = 0;
+        $failed = [];
+
+        foreach (Product::whereIn('public_id', $data['ids'])->orderBy('name')->get() as $product) {
+            // Sudah berstatus tujuan: dilewati, bukan gagal dan bukan dihitung selesai.
+            if ($data['action'] === 'publish' && $product->is_published || $data['action'] === 'draft' && ! $product->is_published) {
+                continue;
+            }
+
+            try {
+                match ($data['action']) {
+                    'publish' => $this->products->updateProduct($product, ['is_published' => true], $request->user()),
+                    'draft' => $this->products->updateProduct($product, ['is_published' => false], $request->user()),
+                    default => $this->products->deleteProduct($product, $request->user()),
+                };
+                $done++;
+            } catch (ValidationException $e) {
+                $failed[] = ['id' => $product->public_id, 'name' => $product->name, 'message' => collect($e->errors())->flatten()->first()];
+            }
+        }
+
+        return $this->success('Bulk action finished.', ['done' => $done, 'failed' => $failed]);
     }
 
     /** Usulan terjemahan Inggris dari AI. Tidak menyimpan apa pun: admin memeriksa lalu menyimpan sendiri. */

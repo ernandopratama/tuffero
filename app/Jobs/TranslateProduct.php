@@ -32,7 +32,11 @@ class TranslateProduct implements ShouldQueue
         } catch (TranslationException $e) {
             // Toko jatuh kembali ke bahasa Indonesia; log tanpa data pelanggan.
             Log::warning('Terjemahan produk gagal', ['product_id' => $product->id, 'reason' => $e->getMessage()]);
-            $this->release($this->backoff[$this->attempts() - 1] ?? 300);
+            // Percobaan terakhir selesai tanpa dilepas lagi: dilepas sekali lagi hanya membuat job masuk failed_jobs sebagai
+            // MaxAttemptsExceeded. Terjemahan tetap usang dan admin bisa memicunya ulang.
+            if ($this->attempts() < $this->tries) {
+                $this->release($this->backoff[$this->attempts() - 1] ?? 300);
+            }
         }
     }
 }

@@ -3,6 +3,8 @@
 namespace App\Services;
 
 use App\Models\AuditLog;
+use App\Models\InventoryStock;
+use App\Models\Order;
 use App\Models\Product;
 use App\Models\ProductImage;
 use App\Models\ProductType;
@@ -95,6 +97,29 @@ class ProductService
             $this->syncTranslation($locked, $edited, $backToAi);
 
             return $locked;
+        });
+    }
+
+    /**
+     * Menghapus produk (soft delete, data dan riwayat pesanan tetap). Ditolak selama masih ada pesanan yang berjalan
+     * (belum dibayar sampai dikirim) atau stok yang sedang ditahan untuk varian produk ini.
+     */
+    public function deleteProduct(Product $product, User $actor): void
+    {
+        DB::transaction(function () use ($product, $actor) {
+            $locked = Product::whereKey($product->id)->lockForUpdate()->firstOrFail();
+            $variantIds = $locked->variants()->pluck('id');
+
+            $open = Order::whereIn('status', [Order::AWAITING_APPROVAL, Order::PENDING_PAYMENT, Order::PAID, Order::PROCESSING, Order::SHIPPED])
+                ->whereHas('items', fn ($query) => $query->whereIn('product_variant_id', $variantIds))
+                ->exists();
+
+            if ($open || InventoryStock::whereIn('product_variant_id', $variantIds)->where('reserved', '>', 0)->exists()) {
+                throw ValidationException::withMessages(['product' => 'Masih ada pesanan berjalan untuk produk ini. Selesaikan atau batalkan dulu.']);
+            }
+
+            AuditLog::record('product.deleted', $locked, ['name' => $locked->name], $actor->id);
+            $locked->delete();
         });
     }
 

@@ -1,5 +1,5 @@
 <script setup>
-import { computed, onMounted, reactive, ref } from 'vue';
+import { computed, onMounted, reactive, ref, watch } from 'vue';
 import { useRoute } from 'vue-router';
 import AdminIcon from '../../components/AdminIcon.vue';
 import AppModal from '../../components/ui/AppModal.vue';
@@ -9,6 +9,7 @@ import FilterSelect from '../../components/ui/FilterSelect.vue';
 import TableToolbar from '../../components/ui/TableToolbar.vue';
 import { useDataTable } from '../../composables/useDataTable';
 import api from '../../utils/api';
+import { toast } from '../../composables/useToast';
 import { apiError } from '../../utils/apiError';
 import { TONE_CLASS } from '../../utils/orderLabels';
 import { useAuthStore } from '../../stores/auth';
@@ -36,7 +37,7 @@ const level = (row) => {
     return { label: 'Aman', tone: 'ok' };
 };
 
-const COLUMNS = [
+const BASE_COLUMNS = [
     { key: 'product', label: 'Produk' },
     { key: 'sku', label: 'SKU' },
     { key: 'quantity', label: 'Stok' },
@@ -44,6 +45,10 @@ const COLUMNS = [
     { key: 'available', label: 'Tersedia' },
     { key: 'actions', label: 'Aksi' },
 ];
+const canAdjust = computed(() => auth.can('stock.adjust'));
+const COLUMNS = computed(() => (canAdjust.value ? [{ key: 'select', label: 'Pilih', srOnly: true, class: 'w-10' }, ...BASE_COLUMNS] : BASE_COLUMNS));
+// Sama dengan batas StockController::bulkSet.
+const BULK_LIMIT = 100;
 
 const press = 'transition-[transform,background-color] duration-[160ms] ease-out-strong focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary active:scale-[0.97] disabled:opacity-60 disabled:active:scale-100';
 const field = 'mt-1 block w-full rounded-2xl border border-secondary bg-surface px-3 py-2 text-body-md font-normal focus:outline-2 focus:outline-primary';
@@ -74,6 +79,90 @@ const fieldErrors = ref({});
 const change = computed(() => (form.quantity_change === '' ? null : Number(form.quantity_change)));
 const stockAfter = computed(() => (selected.value && change.value !== null && Number.isFinite(change.value) ? selected.value.quantity + change.value : null));
 
+// Set stok massal. Pilihan: id varian -> cuplikan baris. Bertahan saat pindah halaman atau mengganti filter, tetapi dikosongkan
+// saat gudang diganti karena jumlah di gudang lain berbeda.
+const picked = ref({});
+const pickedItems = computed(() => Object.values(picked.value));
+const overLimit = computed(() => pickedItems.value.length > BULK_LIMIT);
+const allOnPage = computed(() => rows.value.length > 0 && rows.value.every((row) => row.variant_id in picked.value));
+const someOnPage = computed(() => rows.value.some((row) => row.variant_id in picked.value));
+const snapshot = (row) => ({ id: row.variant_id, sku: row.sku, product: row.product, variant: row.variant, quantity: row.quantity, reserved: row.reserved });
+function togglePick(row) {
+    const next = { ...picked.value };
+    if (row.variant_id in next) delete next[row.variant_id];
+    else next[row.variant_id] = snapshot(row);
+    picked.value = next;
+}
+function togglePickAll() {
+    const next = { ...picked.value };
+    for (const row of rows.value) {
+        if (allOnPage.value) delete next[row.variant_id];
+        else next[row.variant_id] = snapshot(row);
+    }
+    picked.value = next;
+}
+const clearPicked = () => { picked.value = {}; };
+watch(warehouseId, (now, before) => { if (before) clearPicked(); });
+
+const bulkDialog = ref(null);
+const confirmDialog = ref(null);
+const bulkForm = reactive({ quantity: '', note: '' });
+const bulkSaving = ref(false);
+const bulkError = ref('');
+const bulkFields = ref({});
+const target = computed(() => (bulkForm.quantity === '' ? null : Number(bulkForm.quantity)));
+// Varian yang jumlah barunya di bawah stok yang sedang dipesan akan ditolak server; ditandai sejak di konfirmasi.
+const blocked = computed(() => pickedItems.value.filter((item) => target.value !== null && target.value < item.reserved));
+
+function openBulk() {
+    Object.assign(bulkForm, { quantity: '', note: '' });
+    bulkError.value = '';
+    bulkFields.value = {};
+    bulkDialog.value.showModal();
+}
+// Langkah 1 selesai: jangan simpan dulu, minta konfirmasi dengan rincian sebelum dan sesudah.
+function askConfirm() {
+    if (!Number.isInteger(target.value) || target.value < 0) {
+        bulkFields.value = { quantity: ['Jumlah harus angka bulat 0 atau lebih.'] };
+        return;
+    }
+    bulkFields.value = {};
+    bulkError.value = '';
+    bulkDialog.value.close();
+    confirmDialog.value.showModal();
+}
+function backToForm() {
+    confirmDialog.value.close();
+    bulkDialog.value.showModal();
+}
+async function submitBulk() {
+    bulkSaving.value = true;
+    bulkError.value = '';
+    try {
+        const { data } = await api.post('/admin/stock/bulk-set', {
+            warehouse_id: warehouseId.value,
+            variant_ids: pickedItems.value.map((item) => item.id),
+            quantity: target.value,
+            note: bulkForm.note,
+        }, { toast: false });
+        const { done, unchanged, failed } = data.data;
+        confirmDialog.value.close();
+        // Yang berhasil dan yang sudah sama keluar dari pilihan; yang gagal tetap terpilih untuk dicoba lagi.
+        const failedIds = new Set(failed.map((item) => item.id));
+        picked.value = Object.fromEntries(Object.entries(picked.value).filter(([id]) => failedIds.has(id)));
+        if (done || unchanged) toast.success(`Stok ${done} varian diatur ke ${target.value}${unchanged ? `, ${unchanged} sudah sama` : ''}.`);
+        if (failed.length) bulkError.value = failed.map((item) => `${item.sku}: ${item.message}`).join(' ');
+        await load();
+    } catch (e) {
+        const { message, fields } = apiError(e);
+        bulkError.value = message;
+        bulkFields.value = fields;
+        confirmDialog.value.close();
+        bulkDialog.value.showModal();
+    } finally {
+        bulkSaving.value = false;
+    }
+}
 const historyDialog = ref(null);
 const history = ref([]);
 const historyLoading = ref(false);
@@ -146,6 +235,19 @@ onMounted(async () => {
     </TableToolbar>
   </div>
 
+  <p v-if="bulkError" role="alert" class="mt-space-md rounded-2xl bg-error-surface px-4 py-3 text-body-sm text-on-error-surface">{{ bulkError }}</p>
+
+  <div v-if="pickedItems.length" role="region" aria-label="Pilihan massal" class="sticky top-24 z-10 mt-space-md flex flex-wrap items-center gap-x-4 gap-y-2 rounded-2xl border border-primary bg-surface px-4 py-3 shadow-card">
+    <p class="text-label-md" role="status">{{ pickedItems.length }} varian dipilih</p>
+    <p v-if="overLimit" class="text-body-sm text-error">Maksimal {{ BULK_LIMIT }} varian sekali proses. Kurangi pilihan Anda.</p>
+    <div class="ml-auto flex flex-wrap items-center gap-2">
+      <button type="button" :disabled="overLimit" :class="`inline-flex min-h-10 items-center gap-2 rounded-full bg-accent px-4 text-label-md hover:bg-accent-hover ${press}`" @click="openBulk">
+        <AdminIcon name="sliders" :size="16" />Atur jumlah stok
+      </button>
+      <button type="button" class="inline-flex min-h-10 items-center rounded-full px-3 text-label-md text-secondary underline hover:text-primary focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary" @click="clearPicked">Hapus pilihan</button>
+    </div>
+  </div>
+
   <DataTable
     v-model:page="page"
     v-model:per-page="perPage"
@@ -162,6 +264,12 @@ onMounted(async () => {
     :error="error"
     @retry="load"
   >
+    <template #head-select>
+      <input type="checkbox" class="size-5 cursor-pointer accent-primary" :checked="allOnPage" :indeterminate.prop="someOnPage && !allOnPage" aria-label="Pilih semua varian di halaman ini" @change="togglePickAll">
+    </template>
+    <template #cell-select="{ row }">
+      <input type="checkbox" class="size-5 cursor-pointer accent-primary" :checked="row.variant_id in picked" :aria-label="`Pilih ${row.sku}`" @change="togglePick(row)">
+    </template>
     <template #cell-product="{ row }">
       <span class="block text-label-md" :class="row.is_active ? '' : 'text-secondary'">{{ row.product }}</span>
       <span class="text-body-sm text-secondary">{{ row.variant }}</span>
@@ -223,6 +331,44 @@ onMounted(async () => {
     <template #footer>
       <button type="button" :class="`inline-flex min-h-10 items-center rounded-full border border-secondary px-4 text-label-md hover:bg-accent-tint-15 ${press}`" @click="adjustDialog.close()">Batal</button>
       <button form="adjust-form" :disabled="saving" :class="`inline-flex min-h-10 items-center gap-1.5 rounded-full bg-accent px-4 text-label-md hover:bg-accent-hover ${press}`"><AdminIcon name="check" :size="16" />{{ saving ? 'Menyimpan...' : 'Simpan' }}</button>
+    </template>
+  </AppModal>
+
+  <AppModal ref="bulkDialog" variant="update" size="lg" title="Atur jumlah stok" :subtitle="`${pickedItems.length} varian dipilih`">
+    <form id="bulk-form" class="space-y-space-md" @submit.prevent="askConfirm">
+      <p v-if="bulkError" role="alert" class="rounded-2xl bg-error-surface px-4 py-3 text-body-sm text-on-error-surface">{{ bulkError }}</p>
+      <p class="flex items-start gap-2 rounded-2xl bg-background/70 p-3 text-body-sm text-secondary">
+        <AdminIcon name="info" :size="16" class="mt-0.5 shrink-0" />Stok fisik semua varian terpilih diganti menjadi satu jumlah yang sama (bukan ditambah). Tiap perubahan tercatat sebagai penyesuaian.
+      </p>
+      <label class="block text-label-md">
+        Jumlah stok baru
+        <input v-model.number="bulkForm.quantity" type="number" required min="0" max="1000000" step="1" inputmode="numeric" :class="field">
+        <span v-if="bulkFields.quantity" class="mt-1 block text-body-sm font-normal text-error">{{ bulkFields.quantity[0] }}</span>
+      </label>
+      <label class="block text-label-md">
+        Alasan
+        <input v-model="bulkForm.note" required maxlength="255" placeholder="Contoh: Hitung ulang gudang" :class="field">
+        <span v-if="bulkFields.note" class="mt-1 block text-body-sm font-normal text-error">{{ bulkFields.note[0] }}</span>
+      </label>
+    </form>
+    <template #footer>
+      <button type="button" :class="`inline-flex min-h-10 items-center rounded-full border border-secondary px-4 text-label-md hover:bg-accent-tint-15 ${press}`" @click="bulkDialog.close()">Batal</button>
+      <button form="bulk-form" :class="`inline-flex min-h-10 items-center gap-1.5 rounded-full bg-accent px-4 text-label-md hover:bg-accent-hover ${press}`">Lanjut</button>
+    </template>
+  </AppModal>
+
+  <AppModal ref="confirmDialog" variant="delete" size="lg" title="Yakin atur jumlah stok?" :subtitle="`${pickedItems.length} varian menjadi ${target}`">
+    <p class="text-body-sm">Stok fisik <strong>{{ pickedItems.length }} varian</strong> akan diganti menjadi <strong class="tabular-nums">{{ target }}</strong>. Alasan: {{ bulkForm.note }}</p>
+    <p v-if="blocked.length" role="alert" class="mt-3 rounded-2xl bg-error-surface px-4 py-3 text-body-sm text-on-error-surface">{{ blocked.length }} varian akan ditolak karena jumlah baru di bawah stok yang sedang dipesan: {{ blocked.map((item) => item.sku).join(', ') }}.</p>
+    <ul class="mt-3 max-h-56 divide-y divide-border overflow-y-auto rounded-2xl border border-border text-body-sm">
+      <li v-for="item in pickedItems" :key="item.id" class="flex items-center justify-between gap-3 px-3 py-2">
+        <span class="min-w-0"><span class="block truncate font-mono">{{ item.sku }}</span><span class="block truncate text-secondary">{{ item.product }}</span></span>
+        <span class="shrink-0 tabular-nums">{{ item.quantity }} → <strong>{{ target }}</strong></span>
+      </li>
+    </ul>
+    <template #footer>
+      <button type="button" :disabled="bulkSaving" :class="`inline-flex min-h-10 items-center rounded-full border border-secondary px-4 text-label-md hover:bg-accent-tint-15 ${press}`" @click="backToForm">Kembali</button>
+      <button type="button" :disabled="bulkSaving" :class="`inline-flex min-h-10 items-center gap-1.5 rounded-full bg-error px-4 text-label-md text-surface hover:bg-error/90 ${press}`" @click="submitBulk">{{ bulkSaving ? 'Menyimpan...' : `Ya, atur ke ${target}` }}</button>
     </template>
   </AppModal>
 

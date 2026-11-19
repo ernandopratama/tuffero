@@ -17,6 +17,7 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\Rule;
+use Illuminate\Validation\ValidationException;
 use Symfony\Component\HttpFoundation\StreamedResponse;
 
 class StockController extends Controller
@@ -217,6 +218,36 @@ class StockController extends Controller
             'reserved' => $stock->reserved,
             'available' => $stock->quantity - $stock->reserved,
         ]);
+    }
+
+    /**
+     * Menetapkan stok fisik banyak varian ke satu jumlah (hitung ulang). Tiap varian diproses sendiri; yang gagal
+     * (misalnya jumlah di bawah stok yang sedang dipesan) dilaporkan tanpa menggagalkan yang lain.
+     */
+    public function bulkSet(Request $request, InventoryService $inventory): JsonResponse
+    {
+        $data = $request->validate([
+            'warehouse_id' => ['required', 'string', 'ulid', Rule::exists('warehouses', 'public_id')->where('is_active', true)],
+            'variant_ids' => ['required', 'array', 'min:1', 'max:100'],
+            'variant_ids.*' => ['required', 'string', 'ulid', 'distinct'],
+            'quantity' => ['required', 'integer', 'min:0', 'max:1000000'],
+            'note' => ['required', 'string', 'max:255'],
+        ], ['note.required' => 'Alasan wajib diisi.', 'quantity.required' => 'Jumlah wajib diisi.', 'quantity.min' => 'Jumlah tidak boleh minus.']);
+
+        $warehouseId = (int) $this->warehouseKey($data['warehouse_id']);
+        $done = 0;
+        $unchanged = 0;
+        $failed = [];
+
+        foreach (ProductVariant::whereIn('public_id', $data['variant_ids'])->orderBy('sku')->get() as $variant) {
+            try {
+                $inventory->setQuantity($warehouseId, $variant->id, $data['quantity'], $data['note'], $request->user()) ? $done++ : $unchanged++;
+            } catch (ValidationException $e) {
+                $failed[] = ['id' => $variant->public_id, 'sku' => $variant->sku, 'message' => collect($e->errors())->flatten()->first()];
+            }
+        }
+
+        return $this->success('Stock set.', ['done' => $done, 'unchanged' => $unchanged, 'failed' => $failed]);
     }
 
     /** ID publik gudang ke ID internal; null bila kosong atau tidak dikenal (D-143). */

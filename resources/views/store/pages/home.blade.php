@@ -339,7 +339,8 @@
 				<div class="tf-slider gallery-slider gallery-items wow fadeInUp">
 					<div class="swiper">
 						<div class="swiper-wrapper">
-							@for ($n = 0; $n < 8; $n++)
+							{{-- 12 slide: loop Swiper (4 per layar di desktop) butuh lebih dari 8, kalau tidak loop mati dan konsol memberi peringatan. --}}
+							@for ($n = 0; $n < 12; $n++)
 								<div class="swiper-slide">
 									<a href="{{ $img($galleryPhotos[$n % 6]) }}" class="photo-gallery" data-cursor-text="{{ $t['gallery']['view'] }}">
 										<figure class="image-anime"><img loading="lazy" decoding="async" src="{{ $img($galleryPhotos[$n % 6]) }}" {{ $site->imageSize($img($galleryPhotos[$n % 6])) }} alt="{{ $t['gallery']['alts'][$n % 6] }}"></figure>

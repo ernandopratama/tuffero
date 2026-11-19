@@ -15,7 +15,7 @@
 	<div id="tuffero-loader" class="tuffero-loader" role="status" aria-live="polite" aria-label="Memuat website Tuffero">
 		<div class="tuffero-loader__content">
 			<div class="tuffero-logo-stage" id="tuffero-logo-stage" aria-hidden="true">
-				<img id="tuffero-logo-source" src="{{ asset('images/Logo/Tuffero Script Logo White - NoBckgrnd.webp') }}" srcset="{{ asset('images/Logo/Tuffero Script Logo White - NoBckgrnd-1086.webp') }} 1086w, {{ asset('images/Logo/Tuffero Script Logo White - NoBckgrnd.webp') }} 2172w" sizes="(max-width: 600px) 100vw, 680px" alt="" class="tuffero-logo" width="2172" height="724" fetchpriority="high" draggable="false">
+				<img id="tuffero-logo-source" src="{{ asset('images/Logo/Tuffero Script Logo White - NoBckgrnd.webp') }}" srcset="{{ str_replace(' ', '%20', asset('images/Logo/Tuffero Script Logo White - NoBckgrnd-1086.webp')) }} 1086w, {{ str_replace(' ', '%20', asset('images/Logo/Tuffero Script Logo White - NoBckgrnd.webp')) }} 2172w" sizes="(max-width: 600px) 100vw, 680px" alt="" class="tuffero-logo" width="2172" height="724" fetchpriority="high" draggable="false">
 				<span class="tuffero-pen"></span>
 				<span class="tuffero-logo-floor"></span>
 			</div>

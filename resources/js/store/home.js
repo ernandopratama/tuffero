@@ -52,10 +52,18 @@ const initHero = async () => {
     try { YT = await loadYouTube(); } catch { return; /* YouTube diblokir: foto tetap tampil */ }
 
     const make = (i) => new Promise((resolve) => {
-        players[i] = new YT.Player(slots[i].firstElementChild, {
-            host: 'https://www.youtube-nocookie.com',
-            videoId: slots[i].dataset.id,
-            playerVars: { autoplay: 0, mute: 1, controls: 0, disablekb: 1, fs: 0, iv_load_policy: 3, playsinline: 1, rel: 0 },
+        // Iframe dibuat sendiri, bukan oleh YT.Player: pustaka YouTube menambah `web-share` ke atribut allow (peringatan
+        // "Unrecognized feature" di konsol) dan memberi `origin` yang tidak cocok saat postMessage. YT.Player hanya
+        // dipasang ke iframe yang sudah ada (enablejsapi=1) untuk kontrol putar.
+        const params = new URLSearchParams({ enablejsapi: '1', origin: location.origin, autoplay: '0', mute: '1', controls: '0', disablekb: '1', fs: '0', iv_load_policy: '3', playsinline: '1', rel: '0' });
+        const frame = document.createElement('iframe');
+        frame.src = `https://www.youtube-nocookie.com/embed/${encodeURIComponent(slots[i].dataset.id)}?${params}`;
+        frame.allow = 'autoplay; encrypted-media';
+        frame.referrerPolicy = 'strict-origin-when-cross-origin';
+        frame.title = '';
+        // YT.Player baru dipasang setelah iframe selesai dimuat: sebelum itu jendelanya masih beralamat lokal dan
+        // postMessage ke youtube-nocookie.com ditolak (peringatan origin tidak cocok di konsol).
+        frame.addEventListener('load', () => { players[i] = new YT.Player(frame, {
             events: {
                 onReady: ({ target }) => { target.mute(); target.getIframe().tabIndex = -1; ready[i] = true; resolve(); },
                 onStateChange: ({ data }) => {
@@ -78,7 +86,8 @@ const initHero = async () => {
                     if (data === YT.PlayerState.ENDED && i === index) switchTo((i + 1) % slots.length);
                 },
             },
-        });
+        }); }, { once: true });
+        slots[i].firstElementChild.replaceWith(frame);
     });
     await make(0);
     players[0].playVideo();

@@ -2,10 +2,12 @@
 
 namespace Tests\Feature;
 
+use App\Jobs\TranslateProduct;
 use App\Models\Product;
 use App\Models\User;
 use App\Services\Translation\ProductTranslationService;
 use Database\Seeders\DatabaseSeeder;
+use Illuminate\Contracts\Queue\Job;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\Client\Request;
 use Illuminate\Support\Facades\Http;
@@ -52,6 +54,38 @@ class ProductTranslationTest extends TestCase
 
             return Http::response(['content' => [['type' => 'text', 'text' => json_encode($out)]]]);
         }]);
+    }
+
+    public function test_the_answer_is_read_from_the_text_block_even_when_a_thinking_block_comes_first(): void
+    {
+        Http::fake(['api.anthropic.com/*' => Http::response(['content' => [
+            ['type' => 'thinking', 'thinking' => '', 'signature' => 'abc'],
+            ['type' => 'text', 'text' => json_encode(['name' => 'EN name', 'description' => 'EN description'])],
+        ]])]);
+
+        $id = $this->actingAs($this->staff())->postJson('/api/v1/admin/products', ['name' => 'Nastar Baru', 'description' => 'Enak sekali.'])
+            ->assertCreated()->json('data.id');
+
+        $this->assertSame('EN name', Product::where('public_id', $id)->firstOrFail()->name_en);
+    }
+
+    public function test_the_last_failed_attempt_is_not_released_again_so_no_failed_job_is_left(): void
+    {
+        Http::fake(['api.anthropic.com/*' => Http::response(['error' => ['message' => 'overloaded']], 529)]);
+        $product = $this->product();
+
+        $job = new TranslateProduct($product->id);
+        $queued = \Mockery::mock(Job::class);
+        $queued->shouldReceive('attempts')->andReturn(3);
+        $queued->shouldNotReceive('release');
+        $job->setJob($queued);
+        $job->handle(app(ProductTranslationService::class));
+
+        $retry = \Mockery::mock(Job::class);
+        $retry->shouldReceive('attempts')->andReturn(1);
+        $retry->shouldReceive('release')->once()->with(30);
+        $job->setJob($retry);
+        $job->handle(app(ProductTranslationService::class));
     }
 
     public function test_creating_a_product_translates_it_automatically_with_the_configured_model(): void

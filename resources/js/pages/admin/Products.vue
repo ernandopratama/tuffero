@@ -8,6 +8,7 @@ import DataTable from '../../components/ui/DataTable.vue';
 import FilterSelect from '../../components/ui/FilterSelect.vue';
 import TableToolbar from '../../components/ui/TableToolbar.vue';
 import { useDataTable } from '../../composables/useDataTable';
+import { toast } from '../../composables/useToast';
 import api from '../../utils/api';
 import { apiError } from '../../utils/apiError';
 import { useAuthStore } from '../../stores/auth';
@@ -18,7 +19,7 @@ const auth = useAuthStore();
 const router = useRouter();
 const rupiah = new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', maximumFractionDigits: 0 });
 
-const COLUMNS = [
+const BASE_COLUMNS = [
     { key: 'name', label: 'Produk', cellClass: 'text-left' },
     { key: 'variants', label: 'Varian' },
     { key: 'price', label: 'Harga jual' },
@@ -26,6 +27,10 @@ const COLUMNS = [
     { key: 'actions', label: 'Aksi' },
 ];
 const STATUS = { published: 'Tayang', draft: 'Draf' };
+// Sama dengan batas ProductController::bulk.
+const BULK_LIMIT = 100;
+const canManage = computed(() => auth.can('products.manage'));
+const COLUMNS = computed(() => (canManage.value ? [{ key: 'select', label: 'Pilih', srOnly: true, class: 'w-10' }, ...BASE_COLUMNS] : BASE_COLUMNS));
 
 const { rows, meta, page, perPage, search, filter, loading, error, load } = useDataTable('/admin/products', { filters: { status: '', category_id: '' } });
 
@@ -45,6 +50,56 @@ async function makeDraft(product) {
         actionError.value = `${product.name}: ${apiError(e).message}`;
     } finally {
         drafting.value = null;
+    }
+}
+
+// Pilihan massal: id produk -> { name, published }. Bertahan saat pindah halaman atau mengganti filter.
+const selected = ref({});
+const selectedIds = computed(() => Object.keys(selected.value));
+// Aksi hanya berlaku bagi produk yang statusnya berbeda: yang sudah tayang tidak dipublikasikan lagi, yang sudah draf tidak didrafkan lagi.
+const idsWhere = (published) => selectedIds.value.filter((id) => selected.value[id].published === published);
+const publishIds = computed(() => idsWhere(false));
+const draftIds = computed(() => idsWhere(true));
+const overLimit = computed(() => selectedIds.value.length > BULK_LIMIT);
+const allOnPage = computed(() => rows.value.length > 0 && rows.value.every((row) => row.id in selected.value));
+const someOnPage = computed(() => rows.value.some((row) => row.id in selected.value));
+function toggle(row) {
+    const next = { ...selected.value };
+    if (row.id in next) delete next[row.id];
+    else next[row.id] = { name: row.name, published: row.is_published };
+    selected.value = next;
+}
+function toggleAll() {
+    const next = { ...selected.value };
+    for (const row of rows.value) {
+        if (allOnPage.value) delete next[row.id];
+        else next[row.id] = { name: row.name, published: row.is_published };
+    }
+    selected.value = next;
+}
+const clearSelection = () => { selected.value = {}; };
+
+const BULK_DONE = { publish: 'dipublikasikan', draft: 'dijadikan draf', delete: 'dihapus' };
+const bulking = ref(false);
+const deleteDialog = ref(null);
+async function bulk(action) {
+    const ids = { publish: publishIds.value, draft: draftIds.value, delete: selectedIds.value }[action];
+    bulking.value = true;
+    actionError.value = '';
+    try {
+        const { data } = await api.post('/admin/products/bulk', { action, ids }, { toast: false });
+        const { done, failed } = data.data;
+        if (action === 'delete') deleteDialog.value.close();
+        // Yang berhasil keluar dari pilihan; yang gagal tetap terpilih supaya bisa dicoba lagi setelah diperbaiki.
+        const failedIds = new Set(failed.map((item) => item.id));
+        selected.value = Object.fromEntries(Object.entries(selected.value).filter(([id]) => failedIds.has(id)));
+        if (done) toast.success(`${done} produk ${BULK_DONE[action]}.`);
+        if (failed.length) actionError.value = failed.map((item) => `${item.name}: ${item.message}`).join(' ');
+        await load();
+    } catch (e) {
+        actionError.value = apiError(e).message;
+    } finally {
+        bulking.value = false;
     }
 }
 
@@ -124,6 +179,23 @@ onMounted(async () => {
 
   <p v-if="actionError" role="alert" class="mt-space-md rounded-2xl bg-error-surface px-4 py-3 text-body-sm text-on-error-surface">{{ actionError }}</p>
 
+  <div v-if="selectedIds.length" role="region" aria-label="Pilihan massal" class="sticky top-24 z-10 mt-space-md flex flex-wrap items-center gap-x-4 gap-y-2 rounded-2xl border border-primary bg-surface px-4 py-3 shadow-card">
+    <p class="text-label-md" role="status">{{ selectedIds.length }} produk dipilih</p>
+    <p v-if="overLimit" class="text-body-sm text-error">Maksimal {{ BULK_LIMIT }} produk sekali proses. Kurangi pilihan Anda.</p>
+    <div class="ml-auto flex flex-wrap items-center gap-2">
+      <button type="button" :disabled="overLimit || bulking || !publishIds.length" :title="publishIds.length ? '' : 'Semua produk terpilih sudah tayang'" :class="`inline-flex min-h-10 items-center gap-2 rounded-full bg-accent px-4 text-label-md hover:bg-accent-hover ${press}`" @click="bulk('publish')">
+        <AdminIcon name="eye" :size="16" />Publikasikan ({{ publishIds.length }})
+      </button>
+      <button type="button" :disabled="overLimit || bulking || !draftIds.length" :title="draftIds.length ? '' : 'Semua produk terpilih sudah draf'" :class="`inline-flex min-h-10 items-center gap-2 rounded-full border border-secondary px-4 text-label-md hover:bg-accent-tint-15 ${press}`" @click="bulk('draft')">
+        <AdminIcon name="undo" :size="16" />Jadikan draf ({{ draftIds.length }})
+      </button>
+      <button type="button" :disabled="overLimit || bulking" :class="`inline-flex min-h-10 items-center gap-2 rounded-full border border-error px-4 text-label-md text-error hover:bg-error/10 ${press}`" @click="deleteDialog.showModal()">
+        <AdminIcon name="trash" :size="16" />Hapus
+      </button>
+      <button type="button" class="inline-flex min-h-10 items-center rounded-full px-3 text-label-md text-secondary underline hover:text-primary focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary" @click="clearSelection">Hapus pilihan</button>
+    </div>
+  </div>
+
   <DataTable
     v-model:page="page"
     v-model:per-page="perPage"
@@ -138,6 +210,12 @@ onMounted(async () => {
     :error="error"
     @retry="load"
   >
+    <template #head-select>
+      <input type="checkbox" class="size-5 cursor-pointer accent-primary" :checked="allOnPage" :indeterminate.prop="someOnPage && !allOnPage" aria-label="Pilih semua produk di halaman ini" @change="toggleAll">
+    </template>
+    <template #cell-select="{ row }">
+      <input type="checkbox" class="size-5 cursor-pointer accent-primary" :checked="row.id in selected" :aria-label="`Pilih ${row.name}`" @change="toggle(row)">
+    </template>
     <template #cell-name="{ row }">
       <div class="inline-flex max-w-sm items-center gap-3 text-left">
         <img v-if="row.images[0]" :src="row.images[0].url" :alt="row.images[0].alt || row.name" width="56" height="56" loading="lazy" class="size-14 shrink-0 rounded-2xl border border-border object-cover">
@@ -172,6 +250,15 @@ onMounted(async () => {
       </div>
     </template>
   </DataTable>
+
+  <AppModal ref="deleteDialog" variant="delete" size="md" title="Hapus produk terpilih?" :subtitle="`${selectedIds.length} produk`">
+    <p class="text-body-sm">Produk hilang dari toko dan daftar ini. Riwayat pesanan lama tetap utuh, dan penghapusan tercatat di audit log. Produk yang masih punya pesanan berjalan tidak ikut dihapus.</p>
+    <ul class="mt-3 max-h-40 list-disc overflow-y-auto pl-5 text-body-sm"><li v-for="(item, id) in selected" :key="id">{{ item.name }}</li></ul>
+    <template #footer>
+      <button type="button" :disabled="bulking" :class="`inline-flex min-h-10 items-center rounded-full border border-secondary px-4 text-label-md hover:bg-accent-tint-15 ${press}`" @click="deleteDialog.close()">Batal</button>
+      <button type="button" :disabled="bulking" :class="`inline-flex min-h-10 items-center gap-1.5 rounded-full bg-error px-4 text-label-md text-surface hover:bg-error/90 ${press}`" @click="bulk('delete')">{{ bulking ? 'Menghapus...' : 'Hapus produk' }}</button>
+    </template>
+  </AppModal>
 
   <AppModal ref="dialog" variant="create" title="Tambah produk" subtitle="Tersimpan sebagai draf, lalu lengkapi varian dan foto">
     <form id="product-form" class="space-y-space-md" @submit.prevent="create">

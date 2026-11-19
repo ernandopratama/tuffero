@@ -68,6 +68,22 @@ class InventoryService
     }
 
     /**
+     * Menetapkan stok fisik ke jumlah tertentu (hitung ulang gudang). Selisih dihitung di dalam kunci baris, jadi aman
+     * terhadap checkout bersamaan, lalu dicatat sebagai satu penyesuaian lewat adjust(). Ditolak bila jumlah baru
+     * lebih kecil dari yang sedang dipesan. Mengembalikan null bila stok sudah sama (tidak ada pergerakan).
+     */
+    public function setQuantity(int $warehouseId, int $variantId, int $target, string $note, User $actor): ?InventoryStock
+    {
+        return DB::transaction(function () use ($warehouseId, $variantId, $target, $note, $actor) {
+            InventoryStock::createOrFirst(['warehouse_id' => $warehouseId, 'product_variant_id' => $variantId]);
+
+            $stock = InventoryStock::where(['warehouse_id' => $warehouseId, 'product_variant_id' => $variantId])->lockForUpdate()->firstOrFail();
+
+            return $target === $stock->quantity ? null : $this->adjust($warehouseId, $variantId, 'adjustment', $target - $stock->quantity, $note, $actor);
+        }, 3);
+    }
+
+    /**
      * Menahan stok untuk pesanan. Dipanggil di dalam transaksi checkout; gagal bila stok habis direbut pesanan lain.
      */
     public function reserve(Order $order, int $variantId, int $quantity, CarbonInterface $expiresAt): void

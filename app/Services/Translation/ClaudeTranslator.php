@@ -47,7 +47,10 @@ TXT;
             throw new TranslationException('Claude API menolak permintaan (HTTP '.$response->status().').');
         }
 
-        return $this->parse((string) $response->json('content.0.text'), array_keys($texts));
+        // Model dengan berpikir menaruh blok `thinking` lebih dulu: teks jawaban adalah blok bertipe text pertama, bukan indeks 0.
+        $text = collect((array) $response->json('content'))->firstWhere('type', 'text')['text'] ?? '';
+
+        return $this->parse((string) $text, array_keys($texts));
     }
 
     /**

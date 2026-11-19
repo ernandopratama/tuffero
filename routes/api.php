@@ -334,6 +334,7 @@ Route::prefix('v1')->group(function () {
 
         Route::middleware(['permission:products.manage', 'mfa.enrolled'])->group(function () {
             Route::post('/products', [ProductController::class, 'store']);
+            Route::post('/products/bulk', [ProductController::class, 'bulk']);
             Route::patch('/products/{product}', [ProductController::class, 'update']);
             Route::post('/products/{product}/translate', [ProductController::class, 'translate'])->middleware('throttle:20,1');
             Route::post('/products/{product}/variants', [ProductController::class, 'storeVariant']);
@@ -353,6 +354,7 @@ Route::prefix('v1')->group(function () {
         });
 
         Route::post('/stock/adjust', [StockController::class, 'adjust'])->middleware(['permission:stock.adjust', 'mfa.enrolled']);
+        Route::post('/stock/bulk-set', [StockController::class, 'bulkSet'])->middleware(['permission:stock.adjust', 'mfa.enrolled']);
 
         Route::get('/warehouses', [WarehouseController::class, 'index'])->middleware('permission:warehouses.view');
         Route::patch('/warehouses/{warehouse}', [WarehouseController::class, 'update'])->middleware(['permission:warehouses.manage', 'mfa.enrolled']);
