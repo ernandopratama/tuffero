@@ -2,7 +2,7 @@
 	// Canonical tanpa parameter saring; versi Inggris memakai ?lang=en supaya bisa dirayapi tanpa cookie.
 	$baseUrl = url()->current();
 	$canonical = request()->query('lang') === 'en' ? $baseUrl.'?lang=en' : $baseUrl;
-	$ogImage = isset($seo['image']) ? url($seo['image']) : url('/images/Tuffero Bakery Treats Showcase.webp');
+	$ogImage = isset($seo['image']) ? url($seo['image']) : url('/images/og-default.jpg');
 @endphp
 <title>{{ $seo['title'] }}</title>
 @if (! empty($seo['description']))
