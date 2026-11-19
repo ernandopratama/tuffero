@@ -13,7 +13,7 @@ const auth = useAuthStore();
 const canManage = computed(() => auth.can('marketing_drafts.manage'));
 
 const DAYS = ['Sen', 'Sel', 'Rab', 'Kam', 'Jum', 'Sab', 'Min'];
-const TYPES = { video_script: 'Skrip video', caption: 'Caption', calendar_item: 'Kalender konten', trend_report: 'Riset tren' };
+const TYPES = { video_script: 'Rencana video', caption: 'Caption (lama)', calendar_item: 'Kalender konten (lama)', trend_report: 'Riset tren' };
 const TYPE_ICONS = { video_script: 'video', caption: 'document', calendar_item: 'clock', trend_report: 'chart' };
 const PLATFORMS = { instagram: 'Instagram', tiktok: 'TikTok' };
 const ORIGINS = { ai: 'Dibuat AI', hermes: 'Dari Hermes' };
@@ -213,7 +213,7 @@ onMounted(load);
                   <span v-if="row.platform" class="rounded-full bg-secondary-tint-12 px-2 py-0.5 text-label-sm">{{ PLATFORMS[row.platform] }}</span>
                   <span v-if="ORIGINS[row.origin]" class="inline-flex items-center gap-1 rounded-full bg-accent-tint-15 px-2 py-0.5 text-label-sm text-primary"><AdminIcon name="sparkles" :size="12" />{{ ORIGINS[row.origin] }}</span>
                 </div>
-                <p class="mt-1.5 break-words font-heading text-body-md">{{ row.title }}</p>
+                <p class="mt-1.5 break-words font-heading text-body-md"><span class="font-sans text-label-sm tabular-nums text-secondary">Draf #{{ row.number }}</span> {{ row.title }}</p>
               </div>
               <svg class="mt-1 size-5 shrink-0 text-secondary transition-transform duration-[160ms] ease-out-strong group-open:rotate-90" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 6l6 6-6 6" /></svg>
             </summary>

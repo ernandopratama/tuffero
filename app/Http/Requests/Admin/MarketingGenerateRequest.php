@@ -18,7 +18,7 @@ class MarketingGenerateRequest extends FormRequest
     public function rules(): array
     {
         return [
-            'type' => ['required', Rule::in(array_keys(MarketingDraft::TYPES))],
+            'type' => ['required', Rule::in(MarketingDraft::CREATABLE_TYPES)],
             'platform' => ['nullable', Rule::in(array_keys(MarketingDraft::PLATFORMS))],
             'brief' => ['required', 'string', 'min:10', 'max:1000'],
             'scheduled_on' => ['nullable', 'date'],

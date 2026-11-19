@@ -21,7 +21,7 @@ class MarketingDraftRequest extends FormRequest
         $trend = fn () => $this->input('type') === 'trend_report';
 
         return [
-            'type' => ['required', Rule::in(array_keys(MarketingDraft::TYPES))],
+            'type' => ['required', Rule::in(MarketingDraft::CREATABLE_TYPES)],
             'platform' => ['nullable', Rule::in(array_keys(MarketingDraft::PLATFORMS))],
             'title' => ['required', 'string', 'max:150'],
             'body' => ['required', 'string', 'max:5000'],

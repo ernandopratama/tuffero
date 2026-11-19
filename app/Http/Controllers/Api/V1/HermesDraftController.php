@@ -18,11 +18,17 @@ class HermesDraftController extends Controller
 {
     public function __invoke(Request $request, MarketingDraftService $drafts): JsonResponse
     {
+        // Caption dan kalender konten tidak lagi menjadi draf (caption dibuat tim lewat Generator Caption). Skrip Hermes lama masih
+        // mengirimnya; dijawab sukses supaya tidak dianggap galat dan dicoba ulang, tetapi tidak disimpan.
+        if (in_array($request->input('type'), ['caption', 'calendar_item'], true)) {
+            return response()->json(['success' => true, 'message' => 'Ignored.', 'data' => null]);
+        }
+
         // Pesan galat Hermes dibaca staf; tetap hanya jenis dan kolom, tanpa mengulang isi kiriman.
         $trend = fn () => $request->input('type') === 'trend_report';
         $data = $request->validate([
             'external_id' => ['required', 'string', 'max:100', 'regex:/^[A-Za-z0-9._:-]+$/'],
-            'type' => ['required', Rule::in(array_keys(MarketingDraft::TYPES))],
+            'type' => ['required', Rule::in(MarketingDraft::CREATABLE_TYPES)],
             'platform' => ['nullable', Rule::in(array_keys(MarketingDraft::PLATFORMS))],
             'title' => ['required', 'string', 'max:150'],
             'body' => ['required', 'string', 'max:5000'],

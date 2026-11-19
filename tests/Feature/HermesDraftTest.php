@@ -59,7 +59,7 @@ class HermesDraftTest extends TestCase
 
     public function test_calendar_item_keeps_its_date_and_platform_and_needs_no_sources(): void
     {
-        $item = ['external_id' => 'bed7c0ad3a34:2026-11-16_08-00-30:k1', 'type' => 'caption', 'platform' => 'instagram', 'title' => 'Hampers Natal', 'body' => 'Hook singkat', 'scheduled_on' => '2026-11-17'];
+        $item = ['external_id' => 'bed7c0ad3a34:2026-11-16_08-00-30:k1', 'type' => 'video_script', 'platform' => 'instagram', 'title' => 'Hampers Natal', 'body' => 'Hook singkat', 'scheduled_on' => '2026-11-17'];
 
         $this->send($item)->assertCreated();
 
@@ -70,6 +70,16 @@ class HermesDraftTest extends TestCase
         $this->send($item)->assertOk();
         $this->assertSame(1, MarketingDraft::count());
         $this->send([...$item, 'external_id' => 'x:2', 'scheduled_on' => '17 Nov 2026'])->assertUnprocessable()->assertJsonValidationErrors('scheduled_on');
+    }
+
+    public function test_caption_and_calendar_lines_from_an_old_hermes_script_are_ignored_not_rejected(): void
+    {
+        foreach (['caption', 'calendar_item'] as $type) {
+            $this->send(['external_id' => "bed7c0ad3a34:2026-11-16_08-00-30:{$type}", 'type' => $type, 'platform' => 'instagram', 'title' => 'Hampers', 'body' => 'Hook', 'scheduled_on' => '2026-11-17'])
+                ->assertOk()->assertJsonPath('message', 'Ignored.');
+        }
+
+        $this->assertSame(0, MarketingDraft::withTrashed()->count());
     }
 
     public function test_wrong_missing_or_short_token_is_refused(): void

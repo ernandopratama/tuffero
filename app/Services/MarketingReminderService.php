@@ -47,16 +47,16 @@ class MarketingReminderService
         return [
             ...$this->counts($now),
             'today' => $today,
-            // `id` = nomor draf yang tampil di dashboard ("Draf #12"), supaya pesan Telegram dan dashboard menyebut draf yang sama.
-            'due_items' => $this->dueQuery($now)->orderBy('scheduled_on')->limit(10)->get(['id', 'title', 'type', 'platform', 'scheduled_on'])->map(fn (MarketingDraft $d) => [
-                'id' => $d->id,
+            // `id` = `number` draf, nomor yang tampil di dashboard ("Draf #12"), supaya pesan Telegram dan dashboard menyebut draf yang sama.
+            'due_items' => $this->dueQuery($now)->orderBy('scheduled_on')->limit(10)->get(['id', 'number', 'title', 'type', 'platform', 'scheduled_on'])->map(fn (MarketingDraft $d) => [
+                'id' => $d->number ?? $d->id,
                 'title' => $d->title,
                 'type' => $d->type,
                 'platform' => $d->platform,
                 'scheduled_on' => $d->scheduled_on?->toDateString(),
                 'overdue' => $d->scheduled_on?->toDateString() < $today,
             ])->all(),
-            'review_items' => MarketingDraft::where('status', MarketingDraft::IN_REVIEW)->orderBy('submitted_at')->limit(10)->get(['id', 'title', 'type'])->map(fn (MarketingDraft $d) => ['id' => $d->id, 'title' => $d->title, 'type' => $d->type])->all(),
+            'review_items' => MarketingDraft::where('status', MarketingDraft::IN_REVIEW)->orderBy('submitted_at')->limit(10)->get(['id', 'number', 'title', 'type'])->map(fn (MarketingDraft $d) => ['id' => $d->number ?? $d->id, 'title' => $d->title, 'type' => $d->type])->all(),
         ];
     }
 

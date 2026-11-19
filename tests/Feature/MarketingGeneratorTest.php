@@ -11,6 +11,7 @@ use App\Services\MarketingGenerator;
 use Database\Seeders\DatabaseSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\Queue;
 use Tests\TestCase;
 
 /**
@@ -28,6 +29,7 @@ class MarketingGeneratorTest extends TestCase
     {
         parent::setUp();
         $this->seed(DatabaseSeeder::class);
+        Queue::fake(); // draf video mengantre storyboard; yang diuji di sini hanya pembuatan drafnya
 
         config(['services.anthropic.key' => 'test-key', 'services.anthropic.marketing_enabled' => true]);
         $this->model = new FakeMarketingModel;
@@ -48,14 +50,14 @@ class MarketingGeneratorTest extends TestCase
     /** @param array<string, mixed> $override */
     private function request(array $override = []): array
     {
-        return ['type' => 'caption', 'platform' => 'instagram', 'brief' => 'Caption Nastar untuk Natal, tema hadiah keluarga.', ...$override];
+        return ['type' => 'video_script', 'platform' => 'instagram', 'brief' => 'Video Nastar untuk Natal, tema hadiah keluarga.', ...$override];
     }
 
     public function test_generates_a_plain_draft_for_marketing(): void
     {
         $response = $this->actingAs($this->staff('marketing'))->postJson(self::URL, $this->request())->assertCreated();
 
-        $response->assertJsonPath('data.status', 'draft')->assertJsonPath('data.title', 'Judul AI')->assertJsonPath('data.type', 'caption');
+        $response->assertJsonPath('data.status', 'draft')->assertJsonPath('data.title', 'Judul AI')->assertJsonPath('data.type', 'video_script');
         $this->assertDatabaseHas('audit_logs', ['action' => 'marketing_draft.generated']);
         $this->assertCount(1, $this->model->calls);
         $this->assertFalse($this->model->calls[0]['search']);
@@ -87,7 +89,7 @@ class MarketingGeneratorTest extends TestCase
 
         $prompt = $this->model->calls[0]['prompt'];
         $this->assertStringContainsString('Nastar Uji Premium', $prompt);
-        $this->assertStringContainsString('<brief>Caption Nastar untuk Natal', $prompt);
+        $this->assertStringContainsString('<brief>Video Nastar untuk Natal', $prompt);
         $this->assertStringNotContainsString('Produk Draf Rahasia', $prompt);
         $this->assertStringNotContainsString('@', $prompt);
     }

@@ -31,7 +31,7 @@ class MarketingDraftController extends Controller
 
     public function index(): JsonResponse
     {
-        $items = MarketingDraft::with(['creator:id,name', 'reviewer:id,name', 'references', 'notes.user:id,name'])->orderByRaw('scheduled_on is null')->orderBy('scheduled_on')->orderByDesc('id')->limit(200)->get();
+        $items = MarketingDraft::with(['creator:id,name', 'reviewer:id,name', 'references', 'notes.user:id,name'])->orderByDesc('created_at')->orderByDesc('id')->limit(200)->get();
 
         // Pencapaian minggu ini terhadap target: draf yang tidak ditolak dan jadwalnya jatuh di minggu berjalan.
         $week = $items->filter(fn (MarketingDraft $d) => $d->status !== MarketingDraft::REJECTED && $d->scheduled_on && $d->scheduled_on->isCurrentWeek());
@@ -41,7 +41,6 @@ class MarketingDraftController extends Controller
             'frequency' => MarketingDraftService::frequency(),
             'ai_enabled' => MarketingGenerator::enabled(),
             'week' => [
-                'posts' => $week->whereIn('type', ['caption', 'calendar_item'])->count(),
                 'videos' => $week->where('type', 'video_script')->count(),
             ],
         ]);
@@ -153,11 +152,13 @@ class MarketingDraftController extends Controller
 
         return [
             'id' => $draft->public_id,
+            'number' => $draft->number,
             ...$draft->only(['type', 'platform', 'title', 'body', 'sources', 'source_period', 'status', 'origin', 'review_note', 'duration_seconds', 'music_note', 'visual_mode', 'storyboard', 'storyboard_status', 'storyboard_error']),
             'storyboard_at' => $draft->storyboard_at,
             'references' => $draft->references->map(fn (MarketingDraftReference $reference) => ['id' => $reference->public_id, 'url' => "/api/v1/admin/marketing-drafts/{$draft->public_id}/references/{$reference->public_id}"])->values(),
             'notes' => $draft->notes->map(fn ($note) => ['id' => $note->public_id, 'body' => $note->body, 'author' => $note->user?->name, 'created_at' => $note->created_at])->values(),
             'scheduled_on' => $draft->scheduled_on?->toDateString(),
+            'created_at' => $draft->created_at,
             'submitted_at' => $draft->submitted_at,
             'reviewed_at' => $draft->reviewed_at,
             'posted_at' => $draft->posted_at,

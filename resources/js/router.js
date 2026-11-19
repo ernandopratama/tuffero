@@ -228,6 +228,12 @@ const routes = [
                 meta: { permission: 'marketing_drafts.view' },
             },
             {
+                path: 'generator-caption',
+                name: 'AdminCaptionGenerator',
+                component: () => import('./pages/admin/CaptionGenerator.vue'),
+                meta: { permission: 'marketing_drafts.manage' },
+            },
+            {
                 path: 'laporan',
                 name: 'AdminReports',
                 component: () => import('./pages/admin/Reports.vue'),

@@ -6,6 +6,7 @@ use App\Http\Controllers\Api\V1\AccountVoucherController;
 use App\Http\Controllers\Api\V1\Admin\AuditLogController;
 use App\Http\Controllers\Api\V1\Admin\CampaignController;
 use App\Http\Controllers\Api\V1\Admin\CancellationController;
+use App\Http\Controllers\Api\V1\Admin\CaptionGeneratorController;
 use App\Http\Controllers\Api\V1\Admin\CategoryController;
 use App\Http\Controllers\Api\V1\Admin\ChatFaqController;
 use App\Http\Controllers\Api\V1\Admin\CommentController;
@@ -469,6 +470,12 @@ Route::prefix('v1')->group(function () {
             Route::patch('/marketing-drafts/{draft}', [MarketingDraftController::class, 'update'])->whereUlid('draft');
             Route::post('/marketing-drafts/{draft}/move', [MarketingDraftController::class, 'move'])->whereUlid('draft');
             Route::delete('/marketing-drafts/{draft}', [MarketingDraftController::class, 'destroy'])->whereUlid('draft');
+        });
+        // Generator Caption (tim marketing menulis isi video atau prompt, AI membalas tiga variasi caption untuk disalin).
+        Route::get('/caption-generations', [CaptionGeneratorController::class, 'index'])->middleware('permission:marketing_drafts.manage');
+        Route::middleware(['permission:marketing_drafts.manage', 'mfa.enrolled'])->group(function () {
+            Route::post('/caption-generations', [CaptionGeneratorController::class, 'store'])->middleware('throttle:marketing-ai');
+            Route::delete('/caption-generations/{generation}', [CaptionGeneratorController::class, 'destroy'])->whereUlid('generation');
         });
         Route::post('/marketing-drafts/{draft}/decide', [MarketingDraftController::class, 'decide'])->whereUlid('draft')->middleware(['permission:marketing_drafts.approve', 'mfa.enrolled']);
 

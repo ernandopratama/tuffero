@@ -22,6 +22,25 @@ import { formatDate } from '../../utils/datetime';
 import { CANCELLATION_STATUS, CARRIER_STATUS, ORDER_STATUS, ORDER_STATUS_TONE, PAYMENT_STATUS, SHIPPING_STATUS, TONE_CLASS, rupiah } from '../../utils/orderLabels';
 import PageHeader from '../../components/ui/PageHeader.vue';
 
+// Lencana status di ringkasan detail: warna penuh dan tegas (bukan pastel) supaya status terbaca sekilas.
+const SOLID_TONE = { ok: 'bg-success text-surface', info: 'bg-info text-surface', warn: 'bg-warning text-surface', bad: 'bg-error text-surface', neutral: 'bg-secondary text-surface' };
+// Satu warna per status: tidak ada dua status berbeda yang sama warnanya. Hanya kata yang sama di dua kolom (Kedaluwarsa, Dibatalkan, Menunggu) berbagi warna.
+const BADGE = 'text-surface';
+const ORDER_COLOR = {
+    awaiting_approval: 'bg-[#A16207]', rejected: 'bg-[#9D174D]', pending_payment: 'bg-[#C2410C]', paid: 'bg-[#2E6B3E]', processing: 'bg-[#1D4ED8]',
+    shipped: 'bg-[#6D28D9]', completed: 'bg-[#0F766E]', expired: 'bg-[#6D4C3D]', cancelled: 'bg-[#BA1A1A]', refunded: 'bg-[#475569]',
+};
+const PAYMENT_COLOR = { pending: 'bg-[#C2410C]', paid: 'bg-[#4D7C0F]', expired: 'bg-[#6D4C3D]', cancelled: 'bg-[#BA1A1A]', refund_pending: 'bg-[#0E7490]', refunded: 'bg-[#86198F]' };
+// Warna badge pengiriman per label (status internal dan status paket Biteship), semuanya berbeda.
+const SHIPPING_COLOR = {
+    'Belum diproses': 'bg-[#64748B]', Dikemas: 'bg-[#047857]', Dikirim: 'bg-[#5B21B6]', Diterima: 'bg-[#4D7C0F]',
+    'Menunggu kurir': 'bg-[#0369A1]', 'Kurir ditugaskan': 'bg-[#115E59]', 'Kurir menjemput': 'bg-[#1E3A8A]', 'Paket diambil': 'bg-[#4F46E5]',
+    'Dalam pengiriman': 'bg-[#2563EB]', 'Sedang diantar': 'bg-[#9333EA]', Terkirim: 'bg-[#166534]', Tertahan: 'bg-[#854D0E]',
+    'Kurir belum ditemukan': 'bg-[#C2410C]', 'Dalam pengembalian': 'bg-[#DB2777]', Dikembalikan: 'bg-[#86198F]', 'Ditolak kurir': 'bg-[#4A044E]',
+    'Dibatalkan kurir': 'bg-[#991B1B]', Dimusnahkan: 'bg-[#1F2937]',
+};
+const orderBadge = (status) => `${BADGE} ${ORDER_COLOR[status] || 'bg-secondary'}`;
+const paymentBadge = (status) => `${BADGE} ${PAYMENT_COLOR[status] || 'bg-secondary'}`;
 const HISTORY_TYPES = { order: 'Pesanan', payment: 'Pembayaran', shipping: 'Pengiriman' };
 const HISTORY_LABELS = { order: ORDER_STATUS, payment: PAYMENT_STATUS, shipping: SHIPPING_STATUS };
 
@@ -182,40 +201,49 @@ async function refresh() {
       </span>
     </template>
     <template #cell-status="{ row }">
-      <span class="inline-flex rounded-full px-2.5 py-1 text-label-sm" :class="TONE_CLASS[orderTone(row.status)]">{{ ORDER_STATUS[row.status] || row.status }}</span>
+      <span class="inline-flex rounded-full px-3 py-1 text-label-sm" :class="orderBadge(row.status)">{{ ORDER_STATUS[row.status] || row.status }}</span>
       <span v-if="carrierOf(row.carrier_status)" class="mt-1 flex items-center justify-center gap-1.5 text-label-sm text-secondary" title="Status paket dari Biteship">
         <i class="size-1.5 rounded-full" :class="DOT_CLASS[carrierOf(row.carrier_status).tone]" aria-hidden="true"></i>{{ carrierOf(row.carrier_status).label }}
       </span>
     </template>
-    <template #cell-payment_status="{ row }">{{ PAYMENT_STATUS[row.payment_status] || row.payment_status }}</template>
+    <template #cell-payment_status="{ row }"><span class="inline-flex whitespace-nowrap rounded-full px-3 py-1 text-label-sm" :class="paymentBadge(row.payment_status)">{{ PAYMENT_STATUS[row.payment_status] || row.payment_status }}</span></template>
     <template #cell-created_at="{ row }"><span class="whitespace-nowrap">{{ formatDate(row.created_at) }}</span></template>
     <template #cell-actions="{ row }">
       <div class="flex items-center justify-center gap-1"><IconAction v-if="canPrint(row)" icon="printer" label="Cetak resi" :subject="row.order_number" @click="printLabel(row)" /><IconAction icon="eye" label="Lihat detail" :subject="row.order_number" @click="open(row)" /></div>
     </template>
   </DataTable>
 
-  <AppModal ref="dialog" variant="read" size="2xl" :title="detail?.order_number || 'Detail pesanan'" subtitle="Detail pesanan">
+  <AppModal ref="dialog" variant="read" size="4xl" :title="detail?.order_number || 'Detail pesanan'" subtitle="Detail pesanan">
     <p v-if="detailError" role="alert" class="text-body-sm text-error">{{ detailError }}</p>
     <p v-else-if="!detail" role="status" class="text-secondary">Memuat detail...</p>
     <div v-else class="space-y-space-md text-body-sm">
-      <!-- Ringkasan status: tiga kartu sejajar, warna menandai arti -->
-      <dl class="grid gap-2 sm:grid-cols-3">
-        <div class="rounded-2xl border border-border bg-background/60 p-3">
-          <dt class="text-label-sm uppercase tracking-wide text-secondary">Pesanan</dt>
-          <dd class="mt-1.5"><span class="inline-flex rounded-full px-2.5 py-1 text-label-md" :class="TONE_CLASS[orderTone(detail.status)]">{{ ORDER_STATUS[detail.status] || detail.status }}</span></dd>
+      <!-- Ringkasan: total besar di kiri, tiga status di kanan -->
+      <div class="grid gap-space-md rounded-3xl border border-border bg-gradient-to-br from-accent-tint-12 to-background/60 p-4 sm:p-5 lg:grid-cols-[minmax(0,2fr)_minmax(0,3fr)] lg:items-center">
+        <div class="min-w-0">
+          <p class="text-label-sm uppercase tracking-wide text-secondary">Total pesanan</p>
+          <p class="mt-1 truncate font-heading text-headline-md tabular-nums">{{ rupiah(detail.total) }}</p>
+          <p class="mt-1 text-secondary">{{ formatDate(detail.created_at) }} · {{ detail.items.length }} jenis item</p>
         </div>
-        <div class="rounded-2xl border border-border bg-background/60 p-3">
-          <dt class="text-label-sm uppercase tracking-wide text-secondary">Pembayaran</dt>
-          <dd class="mt-1.5"><span class="inline-flex rounded-full px-2.5 py-1 text-label-md" :class="TONE_CLASS[PAYMENT_TONE[detail.payment_status] || 'neutral']">{{ PAYMENT_STATUS[detail.payment_status] || detail.payment_status }}</span></dd>
-        </div>
-        <div class="rounded-2xl border border-border bg-background/60 p-3">
-          <dt class="text-label-sm uppercase tracking-wide text-secondary">Pengiriman<template v-if="shipment?.provider === 'biteship'"> · Biteship</template></dt>
-          <dd class="mt-1.5"><span class="inline-flex rounded-full px-2.5 py-1 text-label-md" :class="TONE_CLASS[shippingBadge.tone]">{{ shippingBadge.label }}</span></dd>
-        </div>
-      </dl>
+        <dl class="grid gap-3 sm:grid-cols-3">
+          <div class="max-sm:flex max-sm:items-center max-sm:justify-between max-sm:gap-3 rounded-2xl border border-primary bg-info-surface p-3 shadow-[4px_4px_0_0_var(--color-primary)] transition-[transform,box-shadow] duration-150 ease-out-strong [@media(hover:hover)]:hover:-translate-x-px [@media(hover:hover)]:hover:-translate-y-px [@media(hover:hover)]:hover:shadow-[6px_6px_0_0_var(--color-primary)]">
+            <dt class="text-label-sm uppercase tracking-wide text-info">Pesanan</dt>
+            <dd class="mt-1.5 max-sm:mt-0"><span class="inline-flex rounded-full px-3 py-1 text-label-md" :class="orderBadge(detail.status)">{{ ORDER_STATUS[detail.status] || detail.status }}</span></dd>
+          </div>
+          <div class="max-sm:flex max-sm:items-center max-sm:justify-between max-sm:gap-3 rounded-2xl border border-primary bg-accent-tint-20 p-3 shadow-[4px_4px_0_0_var(--color-primary)] transition-[transform,box-shadow] duration-150 ease-out-strong [@media(hover:hover)]:hover:-translate-x-px [@media(hover:hover)]:hover:-translate-y-px [@media(hover:hover)]:hover:shadow-[6px_6px_0_0_var(--color-primary)]">
+            <dt class="text-label-sm uppercase tracking-wide text-primary">Pembayaran</dt>
+            <dd class="mt-1.5 max-sm:mt-0"><span class="inline-flex rounded-full px-3 py-1 text-label-md" :class="paymentBadge(detail.payment_status)">{{ PAYMENT_STATUS[detail.payment_status] || detail.payment_status }}</span></dd>
+          </div>
+          <div class="max-sm:flex max-sm:items-center max-sm:justify-between max-sm:gap-3 rounded-2xl border border-primary bg-success-surface p-3 shadow-[4px_4px_0_0_var(--color-primary)] transition-[transform,box-shadow] duration-150 ease-out-strong [@media(hover:hover)]:hover:-translate-x-px [@media(hover:hover)]:hover:-translate-y-px [@media(hover:hover)]:hover:shadow-[6px_6px_0_0_var(--color-primary)]">
+            <dt class="text-label-sm uppercase tracking-wide text-success">Pengiriman<template v-if="shipment?.provider === 'biteship'"> · Biteship</template></dt>
+            <dd class="mt-1.5 max-sm:mt-0"><span class="inline-flex rounded-full px-3 py-1 text-label-md" :class="`${BADGE} ${SHIPPING_COLOR[shippingBadge.label] || 'bg-secondary'}`">{{ shippingBadge.label }}</span></dd>
+          </div>
+        </dl>
+      </div>
 
+      <!-- Dua kolom di layar lebar: pekerjaan (pengiriman, item) di kiri, konteks pelanggan dan riwayat di kanan -->
+      <div class="grid items-start gap-space-md lg:grid-cols-[minmax(0,3fr)_minmax(0,2fr)]">
+        <div class="min-w-0 space-y-space-md animate-rise">
       <OrderReviewCard v-if="detail.review" :order="detail" @updated="refresh" />
-
       <!-- Kartu pengiriman: kurir, resi, waktu, lalu aksi -->
       <section class="rounded-2xl border border-border p-4" aria-labelledby="od-ship">
         <div class="flex flex-wrap items-center justify-between gap-2">
@@ -238,29 +266,6 @@ async function refresh() {
         </dl>
         <div class="mt-space-sm"><OrderActions :order="detail" :show-waybill="false" @updated="refresh" /></div>
       </section>
-
-      <section class="grid gap-space-md rounded-2xl border border-border p-4 sm:grid-cols-2">
-        <div>
-          <h3 class="font-heading text-headline-sm">Pemesan</h3>
-          <p class="mt-1 text-label-md">{{ detail.customer_name }}</p>
-          <span v-if="detail.repeat_order" class="mt-1 inline-flex items-center gap-1 whitespace-nowrap rounded-full bg-success-surface px-2 py-0.5 text-label-sm text-success" :title="`${detail.completed_orders} pesanan selesai atas nomor WhatsApp ini`"><AdminIcon name="sparkles" :size="12" />Repeat order</span>
-          <p>{{ detail.customer_phone }}</p>
-          <p class="break-all text-secondary">{{ detail.customer_email }}</p>
-          <a
-            v-if="auth.can('templates.manage') && customerWaLink(detail.customer_phone, `Halo ${detail.customer_name}, kami dari Tuffero terkait pesanan ${detail.order_number}.`)"
-            :href="customerWaLink(detail.customer_phone, `Halo ${detail.customer_name}, kami dari Tuffero terkait pesanan ${detail.order_number}.`)"
-            target="_blank"
-            rel="noopener noreferrer"
-            class="mt-2 inline-flex min-h-10 items-center gap-1.5 rounded-full border border-secondary px-4 text-label-md transition-[transform,background-color] duration-[160ms] ease-out-strong hover:bg-accent-tint-15 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary active:scale-[0.97]"
-          ><AdminIcon name="chat" :size="16" />Hubungi pelanggan</a>
-        </div>
-        <div>
-          <h3 class="font-heading text-headline-sm">Alamat tujuan</h3>
-          <p class="mt-1">{{ detail.shipping_address.street }}, {{ detail.shipping_address.district }}, {{ detail.shipping_address.city }}, {{ detail.shipping_address.province }} {{ detail.shipping_address.postal_code }}</p>
-          <a v-if="detail.shipping_address.latitude != null" :href="`https://www.google.com/maps?q=${Number(detail.shipping_address.latitude)},${Number(detail.shipping_address.longitude)}`" target="_blank" rel="noopener noreferrer" class="mt-1 inline-flex items-center gap-1 text-label-md underline focus-visible:outline-2 focus-visible:outline-primary"><AdminIcon name="pin" :size="16" />Lihat titik rumah di peta</a>
-        </div>
-      </section>
-
       <section class="rounded-2xl border border-border p-4">
         <h3 class="font-heading text-headline-sm">Item</h3>
         <ul class="mt-1 space-y-1">
@@ -277,17 +282,44 @@ async function refresh() {
           <div class="flex justify-between text-label-md"><dt>Total</dt><dd>{{ rupiah(detail.total) }}</dd></div>
         </dl>
       </section>
-
+      <CustomerHistory :url="`/admin/orders/${detail.id}/customer-history`" @navigate="dialog.close()" />
       <section v-if="detail.cancellations.length" class="rounded-2xl border border-border p-4">
         <h3 class="font-heading text-headline-sm">Pengajuan pembatalan</h3>
         <ul class="mt-1 space-y-1">
           <li v-for="item in detail.cancellations" :key="item.request_number"><span class="font-mono">{{ item.request_number }}</span>: {{ CANCELLATION_STATUS[item.status] || item.status }}</li>
         </ul>
       </section>
+        </div>
 
+        <div class="min-w-0 space-y-space-md animate-rise" style="animation-delay: 60ms">
+          <section class="grid gap-space-md rounded-2xl border border-border p-4">
+            <div class="flex items-start gap-3">
+              <span class="grid size-11 shrink-0 place-items-center rounded-full bg-accent-tint-20 text-label-md text-primary" aria-hidden="true">{{ detail.customer_name.trim().split(/\s+/).slice(0, 2).map((part) => part[0]).join('').toUpperCase() }}</span>
+              <div class="min-w-0">
+                <h3 class="font-heading text-headline-sm">Pemesan</h3>
+                <p class="text-label-md">{{ detail.customer_name }}</p>
+                <span v-if="detail.repeat_order" class="mt-1 inline-flex items-center gap-1 whitespace-nowrap rounded-full bg-success-surface px-2 py-0.5 text-label-sm text-success" :title="`${detail.completed_orders} pesanan selesai atas nomor WhatsApp ini`"><AdminIcon name="sparkles" :size="12" />Repeat order</span>
+                <p>{{ detail.customer_phone }}</p>
+                <p class="break-all text-secondary">{{ detail.customer_email }}</p>
+              </div>
+            </div>
+            <a
+              v-if="auth.can('templates.manage') && customerWaLink(detail.customer_phone, `Halo ${detail.customer_name}, kami dari Tuffero terkait pesanan ${detail.order_number}.`)"
+              :href="customerWaLink(detail.customer_phone, `Halo ${detail.customer_name}, kami dari Tuffero terkait pesanan ${detail.order_number}.`)"
+              target="_blank"
+              rel="noopener noreferrer"
+              class="inline-flex min-h-10 items-center justify-center gap-1.5 rounded-full border border-secondary px-4 text-label-md transition-[transform,background-color] duration-[160ms] ease-out-strong hover:bg-accent-tint-15 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary active:scale-[0.97]"
+            ><AdminIcon name="chat" :size="16" />Hubungi pelanggan</a>
+            <div class="border-t border-border pt-space-md">
+              <h3 class="flex items-center gap-2 font-heading text-headline-sm"><AdminIcon name="pin" :size="18" />Alamat tujuan</h3>
+              <p class="mt-1">{{ detail.shipping_address.street }}, {{ detail.shipping_address.district }}, {{ detail.shipping_address.city }}, {{ detail.shipping_address.province }} {{ detail.shipping_address.postal_code }}</p>
+              <a v-if="detail.shipping_address.latitude != null" :href="`https://www.google.com/maps?q=${Number(detail.shipping_address.latitude)},${Number(detail.shipping_address.longitude)}`" target="_blank" rel="noopener noreferrer" class="mt-1 inline-flex min-h-10 items-center gap-1 text-label-md underline focus-visible:outline-2 focus-visible:outline-primary">Lihat titik rumah di peta</a>
+            </div>
+          </section>
       <ReplyPicker :url="`/admin/orders/${detail.id}/reply-templates`" />
       <FollowUps :url="`/admin/orders/${detail.id}/follow-ups`" />
-      <CustomerHistory :url="`/admin/orders/${detail.id}/customer-history`" @navigate="dialog.close()" />
+        </div>
+      </div>
 
       <!-- Dua tab: catatan staf dan riwayat. Panel memakai hidden supaya jumlah catatan tetap termuat untuk lencana -->
       <section aria-label="Catatan dan riwayat">

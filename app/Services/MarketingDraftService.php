@@ -39,7 +39,9 @@ class MarketingDraftService
     {
         return DB::transaction(function () use ($data, $actor, $origin, $externalId) {
             $draft = new MarketingDraft($data);
-            $draft->forceFill(['status' => MarketingDraft::DRAFT, 'origin' => $origin, 'external_id' => $externalId, 'created_by_user_id' => $actor?->id])->save();
+            // Nomor tertinggi dikunci supaya dua draf baru bersamaan tidak mendapat nomor yang sama (indeks unik sebagai pengaman).
+            $number = (int) MarketingDraft::withTrashed()->orderByDesc('number')->lockForUpdate()->value('number') + 1;
+            $draft->forceFill(['number' => $number, 'status' => MarketingDraft::DRAFT, 'origin' => $origin, 'external_id' => $externalId, 'created_by_user_id' => $actor?->id])->save();
 
             AuditLog::record('marketing_draft.created', $draft, ['title' => $draft->title, 'type' => $draft->type, 'origin' => $origin], $actor?->id);
 
@@ -148,6 +150,11 @@ class MarketingDraftService
             $draft = MarketingDraft::lockForUpdate()->findOrFail($draft->id);
             $this->guard($draft, $from, 'Status draf sudah berubah. Muat ulang halaman.');
 
+            // Riset tren bahan baca tim, bukan konten untuk diunggah: berhenti di Disetujui.
+            if ($action === 'post' && $draft->type === 'trend_report') {
+                throw ValidationException::withMessages(['status' => 'Riset tren tidak diposting. Cukup disetujui.']);
+            }
+
             $fields = ['status' => $to];
             if ($action === 'submit') {
                 $fields += ['submitted_at' => now(), 'reviewed_by_user_id' => null, 'reviewed_at' => null, 'review_note' => null];
@@ -202,7 +209,7 @@ class MarketingDraftService
     {
         $read = fn (string $key, int $default) => (int) (Setting::where('key', $key)->value('value') ?? $default);
 
-        return ['posts_per_week' => $read('marketing.posts_per_week', 3), 'videos_per_week' => $read('marketing.videos_per_week', 2)];
+        return ['videos_per_week' => $read('marketing.videos_per_week', 2)];
     }
 
     private function queueStoryboard(MarketingDraft $draft): void

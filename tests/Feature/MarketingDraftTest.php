@@ -34,7 +34,7 @@ class MarketingDraftTest extends TestCase
     /** @param array<string, mixed> $override */
     private function payload(array $override = []): array
     {
-        return ['type' => 'caption', 'platform' => 'instagram', 'title' => 'Nastar Lebaran', 'body' => 'Isi caption <b>uji</b>', ...$override];
+        return ['type' => 'video_script', 'platform' => 'instagram', 'title' => 'Nastar Lebaran', 'body' => 'Isi rencana <b>uji</b>', ...$override];
     }
 
     private function draft(string $status = 'draft'): MarketingDraft
@@ -43,6 +43,21 @@ class MarketingDraftTest extends TestCase
         $draft->forceFill(['status' => $status, 'created_by_user_id' => $this->staff('marketing')->id])->save();
 
         return $draft;
+    }
+
+    public function test_the_list_comes_newest_created_first_and_exposes_created_at(): void
+    {
+        $this->travelTo(now()->subDays(2));
+        $old = $this->draft();
+        $this->travelBack();
+        $recent = $this->draft();
+        $recent->forceFill(['scheduled_on' => now()->addDays(5)])->save();
+        $old->forceFill(['scheduled_on' => now()->addDay()])->save();
+
+        $items = $this->actingAs($this->staff('marketing'))->getJson(self::URL)->assertOk()->json('data.items');
+
+        $this->assertSame([$recent->public_id, $old->public_id], array_column($items, 'id'), 'Terbaru dibuat dulu, bukan menurut jadwal');
+        $this->assertNotNull($items[0]['created_at']);
     }
 
     public function test_every_role_can_view_but_only_marketing_and_super_admin_can_manage(): void
@@ -99,6 +114,24 @@ class MarketingDraftTest extends TestCase
         $this->actingAs($owner)->postJson(self::URL."/{$draft->public_id}/decide", ['decision' => 'reject', 'note' => 'Terlalu panjang'])->assertOk()->assertJsonPath('data.status', 'rejected');
 
         $this->actingAs($this->staff('marketing'))->patchJson(self::URL."/{$draft->public_id}", $this->payload(['title' => 'Revisi']))->assertOk()->assertJsonPath('data.status', 'draft')->assertJsonPath('data.review_note', null);
+    }
+
+    public function test_caption_and_calendar_item_can_no_longer_be_created(): void
+    {
+        $marketing = $this->staff('marketing');
+
+        foreach (['caption', 'calendar_item'] as $type) {
+            $this->actingAs($marketing)->postJson(self::URL, $this->payload(['type' => $type]))->assertUnprocessable()->assertJsonValidationErrors('type');
+        }
+    }
+
+    public function test_a_trend_report_cannot_be_marked_as_posted(): void
+    {
+        $draft = new MarketingDraft(['type' => 'trend_report', 'title' => 'Riset', 'body' => 'x', 'sources' => 's', 'source_period' => 'p']);
+        $draft->forceFill(['status' => 'approved'])->save();
+
+        $this->actingAs($this->staff('marketing'))->postJson(self::URL."/{$draft->public_id}/move", ['action' => 'post'])->assertUnprocessable();
+        $this->assertSame('approved', $draft->fresh()->status);
     }
 
     public function test_invalid_transitions_are_refused(): void
@@ -167,16 +200,15 @@ class MarketingDraftTest extends TestCase
     {
         $marketing = $this->staff('marketing');
         $this->actingAs($marketing)->postJson(self::URL, $this->payload(['scheduled_on' => now()->toDateString()]))->assertCreated();
-        $this->actingAs($marketing)->postJson(self::URL, $this->payload(['type' => 'video_script', 'scheduled_on' => now()->toDateString()]))->assertCreated();
 
         $this->actingAs($marketing)->getJson(self::URL)->assertOk()
-            ->assertJsonPath('data.frequency', ['posts_per_week' => 3, 'videos_per_week' => 2])
-            ->assertJsonPath('data.week', ['posts' => 1, 'videos' => 1]);
+            ->assertJsonPath('data.frequency', ['videos_per_week' => 2])
+            ->assertJsonPath('data.week', ['videos' => 1]);
     }
 
     public function test_only_super_admin_changes_the_frequency_setting(): void
     {
-        $setting = Setting::where('key', 'marketing.posts_per_week')->firstOrFail();
+        $setting = Setting::where('key', 'marketing.videos_per_week')->firstOrFail();
 
         $this->actingAs($this->staff('store-admin'))->patchJson("/api/v1/admin/settings/{$setting->key}", ['value' => 5])->assertForbidden();
         $this->actingAs($this->staff('marketing'))->patchJson("/api/v1/admin/settings/{$setting->key}", ['value' => 5])->assertForbidden();

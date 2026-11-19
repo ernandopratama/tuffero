@@ -8,7 +8,7 @@ const props = defineProps({
     variant: { type: String, default: 'read', validator: (v) => ['create', 'read', 'update', 'delete'].includes(v) },
     title: { type: String, required: true },
     subtitle: { type: String, default: '' },
-    size: { type: String, default: 'lg', validator: (v) => ['md', 'lg', 'xl', '2xl'].includes(v) },
+    size: { type: String, default: 'lg', validator: (v) => ['md', 'lg', 'xl', '2xl', '3xl', '4xl'].includes(v) },
 });
 const emit = defineEmits(['close']);
 
@@ -18,7 +18,7 @@ const VARIANTS = {
     update: { icon: 'edit', head: 'bg-warning-surface text-warning', chip: 'bg-warning text-surface' },
     delete: { icon: 'trash', head: 'bg-error-surface text-on-error-surface', chip: 'bg-error text-surface' },
 };
-const SIZES = { md: 'max-w-md', lg: 'max-w-lg', xl: 'max-w-xl', '2xl': 'max-w-2xl' };
+const SIZES = { md: 'max-w-md', lg: 'max-w-lg', xl: 'max-w-xl', '2xl': 'max-w-2xl', '3xl': 'max-w-3xl', '4xl': 'max-w-6xl' };
 
 const dialog = ref(null);
 const titleId = useId();
@@ -36,7 +36,7 @@ defineExpose({ showModal, close });
   <dialog
     ref="dialog"
     :aria-labelledby="titleId"
-    class="m-auto w-[calc(100%-2rem)] overflow-hidden rounded-3xl border border-border bg-surface p-0 text-primary shadow-float backdrop:bg-primary/50 open:animate-pop"
+    class="m-auto w-[calc(100%-1rem)] sm:w-[calc(100%-2rem)] overflow-hidden rounded-3xl border border-border bg-surface p-0 text-primary shadow-float backdrop:bg-primary/50 open:animate-pop"
     :class="SIZES[size]"
     @click="onBackdrop"
     @close="emit('close')"
@@ -58,7 +58,8 @@ defineExpose({ showModal, close });
         </button>
       </header>
 
-      <div class="min-h-0 flex-1 overflow-y-auto px-5 py-5 sm:px-6">
+      <!-- relative: elemen absolut di dalam (mis. input file sr-only) berpatokan pada area gulir ini, bukan pada dialog. Tanpanya, memfokuskan input yang letaknya jauh di bawah menggulir dialog (overflow hidden) dan modal tampak putih di Firefox. -->
+      <div class="relative min-h-0 flex-1 overflow-y-auto px-4 py-5 sm:px-6">
         <slot />
       </div>
 

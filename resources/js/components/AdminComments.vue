@@ -95,6 +95,10 @@ function onKeydown(e) {
 async function submit() {
     saving.value = true;
     error.value = '';
+    flying.value = true;
+    const started = Date.now();
+    await nextTick();
+    centerPlane();
     // Hanya yang namanya masih ada di teks (bisa saja dihapus setelah dipilih).
     const mentions = picked.value.filter((user) => (visibility.value !== 'cs' || user.cs) && body.value.includes(`@${user.name}`)).map((user) => user.id);
     try {
@@ -108,7 +112,34 @@ async function submit() {
         error.value = fields.body?.[0] || fields['mentions.0']?.[0] || message;
     } finally {
         saving.value = false;
+        setTimeout(() => { flying.value = false; }, Math.max(0, 700 - (Date.now() - started)));
     }
+}
+
+// Cermin teks di belakang kolom tulis: nama yang sudah dipilih dari daftar @ diberi warna. Teks asli tetap di <textarea>.
+const mirror = ref(null);
+const syncScroll = () => { if (mirror.value && field.value) mirror.value.scrollTop = field.value.scrollTop; };
+const draftParts = computed(() => {
+    const names = picked.value.map((user) => user.name).filter((name) => body.value.includes(`@${name}`)).sort((a, b) => b.length - a.length);
+    if (!names.length) return [{ text: body.value }];
+    const pattern = new RegExp(`(@(?:${names.map(escapeRegex).join('|')}))`, 'g');
+    return body.value.split(pattern).filter(Boolean).map((text) => ({ text, mention: names.some((name) => text === `@${name}`) }));
+});
+
+// Animasi kirim berjalan saat diklik, minimal 700 ms supaya terlihat walau server cepat.
+const flying = ref(false);
+
+// Pesawat kertas berhenti tepat di tengah tombol: jaraknya dihitung dari ukuran tombol saat teksnya sudah berganti menjadi
+// "Mengirim..." (teks digeser keluar, tetapi lebarnya tetap menentukan lebar tombol), bukan angka tetap.
+const sendButton = ref(null);
+function centerPlane() {
+    const button = sendButton.value;
+    const fly = button?.querySelector('.note-send-fly'); // pembungkus ikon: tidak ikut berputar
+    if (!button || !fly) return;
+    // Ukuran tata letak (offset*), bukan getBoundingClientRect: dialog yang sedang membesar atau tombol yang ditekan ikut
+    // memperkecil hasil getBoundingClientRect, sedangkan translateX dihitung dalam satuan tata letak yang sama.
+    const planeCenter = fly.offsetLeft - button.offsetLeft + fly.offsetWidth / 2;
+    button.style.setProperty('--fly-x', `${button.offsetWidth / 2 - planeCenter}px`);
 }
 
 const escapeRegex = (text) => text.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
@@ -138,7 +169,9 @@ onMounted(load);
     <form v-if="auth.can('comments.create')" class="mt-space-sm" @submit.prevent="submit">
       <label class="block text-label-md">
         Tulis catatan
-        <span class="relative mt-1 block">
+        <span class="relative mt-1 block rounded-xl bg-surface">
+          <!-- Cermin: lapisan di belakang yang mewarnai nama @ yang dipilih; harus memakai ukuran huruf dan jarak yang sama dengan textarea -->
+          <span ref="mirror" class="pointer-events-none absolute inset-0 overflow-hidden whitespace-pre-wrap break-words rounded-xl border border-transparent px-3 py-2 text-body-md font-normal text-transparent" aria-hidden="true"><template v-for="(part, i) in draftParts" :key="i"><mark v-if="part.mention" class="rounded bg-info-surface text-transparent shadow-[0_0_0_1px_var(--color-info)]">{{ part.text }}</mark><template v-else>{{ part.text }}</template></template>&#8203;</span>
           <textarea
             ref="field"
             v-model="body"
@@ -150,8 +183,9 @@ onMounted(load);
             :aria-expanded="options.length > 0"
             :aria-controls="listId"
             :aria-activedescendant="options.length ? `${listId}-${active}` : undefined"
-            class="w-full rounded-xl border border-border bg-surface px-3 py-2 text-body-md focus:border-primary focus:outline-2 focus:outline-primary"
+            class="relative block w-full rounded-xl border border-border bg-transparent px-3 py-2 text-body-md focus:border-primary focus:outline-2 focus:outline-primary"
             @input="detect"
+            @scroll="syncScroll"
             @click="detect"
             @keyup.left="detect"
             @keyup.right="detect"
@@ -190,7 +224,10 @@ onMounted(load);
             <option value="cs">Hanya CS</option>
           </select>
         </label>
-        <button :disabled="saving" class="rounded-full bg-primary px-5 py-2 text-label-md text-background transition-[transform,opacity] duration-[160ms] ease-out-strong hover:opacity-90 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary active:scale-[0.97] disabled:opacity-60">{{ saving ? 'Mengirim...' : 'Kirim catatan' }}</button>
+        <button ref="sendButton" :disabled="saving" class="note-send flex min-h-11 shrink-0 items-center overflow-hidden whitespace-nowrap rounded-full bg-primary py-2 pl-4 pr-5 text-label-md text-background transition-[transform,opacity] duration-[160ms] ease-out-strong hover:opacity-90 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary active:scale-[0.95] disabled:opacity-60" :data-flying="flying || undefined">
+          <span class="note-send-fly"><svg class="note-send-icon" viewBox="0 0 24 24" width="20" height="20" aria-hidden="true"><path fill="currentColor" d="M1.946 9.315c-.522-.174-.527-.455.01-.634l19.087-6.362c.529-.176.832.12.684.638l-5.454 19.086c-.15.529-.455.547-.679.045L12 14l6-8-8 6-8.054-2.685z" /></svg></span>
+          <span class="note-send-label ml-1.5 block">{{ saving ? 'Mengirim...' : 'Kirim catatan' }}</span>
+        </button>
       </div>
     </form>
 
@@ -203,7 +240,7 @@ onMounted(load);
         <span class="ml-space-sm text-secondary">{{ formatDate(comment.created_at) }}</span>
         <span v-if="comment.visibility === 'cs'" class="ml-space-sm rounded-full bg-primary px-2 py-0.5 text-label-sm text-background">Hanya CS</span>
         <span v-if="mentionsMe(comment)" class="ml-space-sm rounded-full bg-accent px-2 py-0.5 text-label-sm">Anda disebut</span>
-        <p class="mt-1 break-words whitespace-pre-line"><template v-for="(part, i) in segments(comment)" :key="i"><span v-if="part.mention" class="rounded bg-accent-tint-20 px-1 font-semibold">{{ part.text }}</span><template v-else>{{ part.text }}</template></template></p>
+        <p class="mt-1 break-words whitespace-pre-line"><template v-for="(part, i) in segments(comment)" :key="i"><span v-if="part.mention" class="rounded bg-info-surface px-1 font-semibold text-info">{{ part.text }}</span><template v-else>{{ part.text }}</template></template></p>
       </li>
     </ul>
 
@@ -218,3 +255,17 @@ onMounted(load);
     </nav>
   </section>
 </template>
+
+<style scoped>
+/* Animasi kirim (pesawat kertas) berjalan saat diklik, bukan saat disorot. */
+.note-send-icon { display: block; transform-origin: center; transition: transform 0.3s ease-in-out; }
+.note-send-label { transition: transform 0.3s ease-in-out; }
+.note-send[data-flying] .note-send-fly { animation: note-send-bob 0.6s ease-in-out infinite alternate; }
+.note-send[data-flying] .note-send-icon { transform: translateX(var(--fly-x, 1.2em)) rotate(45deg) scale(1.1); }
+.note-send[data-flying] .note-send-label { transform: translateX(150%); }
+@keyframes note-send-bob { from { transform: translateY(0.1em); } to { transform: translateY(-0.1em); } }
+@media (prefers-reduced-motion: reduce) {
+  .note-send-icon, .note-send-label { transition: none; }
+  .note-send[data-flying] .note-send-fly { animation: none; }
+}
+</style>

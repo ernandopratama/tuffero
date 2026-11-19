@@ -43,7 +43,14 @@ class MarketingDraft extends Model
 
     public const HERMES = 'hermes';
 
+    /** Semua jenis yang pernah ada (label untuk data lama). */
     public const TYPES = ['video_script' => 'Skrip video', 'caption' => 'Caption', 'calendar_item' => 'Kalender konten', 'trend_report' => 'Riset tren'];
+
+    /**
+     * Jenis yang boleh dibuat sekarang. Skrip video dan kalender konten digabung menjadi satu (rencana video, bertanggal);
+     * caption pindah ke Generator Caption (tabel caption_generations), bukan draf yang diajukan.
+     */
+    public const CREATABLE_TYPES = ['video_script', 'trend_report'];
 
     public const PLATFORMS = ['instagram' => 'Instagram', 'tiktok' => 'TikTok'];
 

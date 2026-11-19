@@ -223,12 +223,12 @@ class AdminPublicIdTest extends TestCase
     {
         $marketing = $this->staff('marketing');
         $this->actingAs($marketing);
-        $id = $this->postJson('/api/v1/admin/marketing-drafts', ['type' => 'caption', 'platform' => 'instagram', 'title' => 'Uji', 'body' => 'Isi draf uji'])->assertCreated()->json('data.id');
+        $id = $this->postJson('/api/v1/admin/marketing-drafts', ['type' => 'video_script', 'platform' => 'instagram', 'title' => 'Uji', 'body' => 'Isi draf uji'])->assertCreated()->json('data.id');
         $this->assertTrue(Str::isUlid($id));
         $numeric = MarketingDraft::where('public_id', $id)->value('id');
 
         $this->patchJson("/api/v1/admin/marketing-drafts/{$numeric}", ['title' => 'X'])->assertStatus(405);
-        $this->patchJson("/api/v1/admin/marketing-drafts/{$id}", ['type' => 'caption', 'platform' => 'instagram', 'title' => 'Uji baru', 'body' => 'Isi draf uji'])->assertOk()->assertJsonPath('data.id', $id);
+        $this->patchJson("/api/v1/admin/marketing-drafts/{$id}", ['type' => 'video_script', 'platform' => 'instagram', 'title' => 'Uji baru', 'body' => 'Isi draf uji'])->assertOk()->assertJsonPath('data.id', $id);
     }
 
     public function test_roles_and_permissions_use_public_ids(): void

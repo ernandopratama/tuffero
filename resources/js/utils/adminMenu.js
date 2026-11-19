@@ -43,6 +43,7 @@ const MENU = [
             { label: 'Ulasan Produk', short: 'Ulasan', icon: 'star', any: ['product_reviews.view'], to: { name: 'AdminProductReviews' } },
             { label: 'Berita Popup', short: 'Berita', icon: 'bell', any: ['news.view'], to: { name: 'AdminNews' } },
             { label: 'Draf Konten', short: 'Draf', icon: 'edit', any: ['marketing_drafts.view'], to: { name: 'AdminMarketingDrafts' } },
+            { label: 'Generator Caption', short: 'Caption', icon: 'sparkles', any: ['marketing_drafts.manage'], to: { name: 'AdminCaptionGenerator' } },
         ],
     },
     {

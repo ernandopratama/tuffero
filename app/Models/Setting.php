@@ -40,7 +40,6 @@ class Setting extends Model
         'discount.max_percent' => ['required', 'integer', 'min:1', 'max:90'],
         'checkout.reservation_minutes' => ['required', 'integer', 'min:5', 'max:1440'],
         'inventory.low_stock_threshold' => ['required', 'integer', 'min:0', 'max:1000'],
-        'marketing.posts_per_week' => ['required', 'integer', 'min:0', 'max:21'],
         'marketing.videos_per_week' => ['required', 'integer', 'min:0', 'max:14'],
     ];
 

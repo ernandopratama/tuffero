@@ -86,7 +86,7 @@ class MarketingStoryboardTest extends TestCase
         Queue::fake();
         $marketing = $this->staff('marketing');
 
-        $this->actingAs($marketing)->postJson(self::URL, ['type' => 'caption', 'title' => 'Caption', 'body' => 'Isi'])->assertCreated()->assertJsonPath('data.storyboard_status', null);
+        $this->actingAs($marketing)->postJson(self::URL, ['type' => 'trend_report', 'title' => 'Riset', 'body' => 'Isi', 'sources' => 'https://contoh.com', 'source_period' => 'p'])->assertCreated()->assertJsonPath('data.storyboard_status', null);
         Queue::assertNothingPushed();
 
         config(['services.anthropic.marketing_enabled' => false]);

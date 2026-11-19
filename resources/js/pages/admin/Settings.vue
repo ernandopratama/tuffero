@@ -181,8 +181,7 @@ const FIELDS = {
     'cancellation.auto_max_per_phone': { label: 'Batas pembatalan langsung per nomor HP (30 hari)', hint: 'Bawaan 2. Setelah batas ini, pembatalan harus lewat pengajuan ke CS.', input: 'number' },
     'cancellation.auto_refund_enabled': { label: 'Refund otomatis lewat Midtrans (0 = mati, 1 = aktif)', hint: 'D-138 tahap 4. Bawaan 0. Hanya kartu dan QRIS, setelah ACC Admin Toko; virtual account tetap manual. Nyalakan hanya setelah akun produksi Midtrans, aktivasi refund, dan saldo terverifikasi.', input: 'number' },
     'cancellation.process_days_max': { label: 'Batas proses pembatalan (hari)', hint: 'Sejak pengajuan sampai dana diterima pelanggan.', input: 'number' },
-    'marketing.posts_per_week': { label: 'Target posting per minggu', hint: 'Caption dan kalender konten. Bawaan 3. Tampil di halaman Draf Konten sebagai target, tidak memblokir apa pun.', input: 'number' },
-    'marketing.videos_per_week': { label: 'Target video per minggu', hint: 'Skrip video. Bawaan 2 (D-062: 1 sampai 2 video). Hanya target tampilan.', input: 'number' },
+    'marketing.videos_per_week': { label: 'Target video per minggu', hint: 'Rencana video. Bawaan 2 (D-062: 1 sampai 2 video). Hanya target tampilan.', input: 'number' },
 };
 
 const press = 'transition-[transform,background-color] duration-[160ms] ease-out-strong focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary active:scale-[0.97] disabled:opacity-60 disabled:active:scale-100';
