@@ -507,6 +507,15 @@ trying*',
             'saved' => 'Profile saved.',
             'failed' => 'Could not save. Try again.',
             'tooMany' => 'Too many attempts. Wait a moment, then try again.',
+            // D-144: install the app, signed-in customers only.
+            'app' => [
+                'title' => 'Tuffero app',
+                'note' => 'Add Tuffero to your phone home screen and open it straight away, without the browser bar, like an app.',
+                'install' => 'Install App',
+                'installed' => 'The Tuffero app is already installed on this device.',
+                'ios' => 'On iPhone or iPad: open this page in Safari, tap the Share button, then choose Add to Home Screen.',
+                'unsupported' => 'The install button is not available in this browser. Open it in Chrome or Samsung Internet, or the app may already be installed on this device.',
+            ],
             'password' => [
                 'title' => 'Password',
                 'note' => 'After changing it, other devices using this account will be signed out.',

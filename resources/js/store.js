@@ -2,7 +2,7 @@
 // Build CSP: logika ada di modul ini, bukan di atribut HTML, supaya CSP kelak tidak perlu unsafe-eval (WEB-10).
 import Alpine from '@alpinejs/csp';
 import { loadLegacyScripts } from './legacy';
-import { accountOrdersPage, accountPage, addressesPage } from './store/account';
+import { accountOrdersPage, accountPage, addressesPage, installApp } from './store/account';
 import { authPage } from './store/auth';
 import { cartButton, cartStore, initAddButtons } from './store/cart';
 import { catalog, product } from './store/catalog';
@@ -23,7 +23,7 @@ const shared = pageData('tf-store-data');
 Alpine.store('toast', toastStore(shared.toast));
 Alpine.store('cart', cartStore(shared.cartCount, shared.cart, Alpine.store('toast')));
 Object.entries({
-    siteHeader: header, bottomNav, pinnedMap, contactPage, gallery, reels, catalog, product, cartPage, checkoutPage, orderPage, lookupPage, refundPage, authPage, accountPage, accountOrdersPage, addressesPage, chatWidget, vouchersPage, accountVouchersPage, countdown, cartButton,
+    siteHeader: header, bottomNav, pinnedMap, contactPage, gallery, reels, catalog, product, cartPage, checkoutPage, orderPage, lookupPage, refundPage, authPage, accountPage, accountOrdersPage, addressesPage, installApp, chatWidget, vouchersPage, accountVouchersPage, countdown, cartButton,
 }).forEach(([name, component]) => Alpine.data(name, component));
 
 window.Alpine = Alpine;

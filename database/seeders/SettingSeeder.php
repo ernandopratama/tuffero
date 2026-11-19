@@ -37,6 +37,9 @@ class SettingSeeder extends Seeder
         ['key' => 'checkout.reservation_minutes', 'value' => '60', 'type' => 'int', 'group' => 'checkout', 'is_public' => false],
         ['key' => 'inventory.low_stock_threshold', 'value' => '30', 'type' => 'int', 'group' => 'inventory', 'is_public' => false],
         ['key' => 'marketing.videos_per_week', 'value' => '2', 'type' => 'int', 'group' => 'marketing', 'is_public' => false],
+        // D-144: aplikasi terpasang toko dan admin, bawaan mati; dinyalakan Super Admin.
+        ['key' => 'pwa.store_enabled', 'value' => '0', 'type' => 'int', 'group' => 'pwa', 'is_public' => false],
+        ['key' => 'pwa.admin_enabled', 'value' => '0', 'type' => 'int', 'group' => 'pwa', 'is_public' => false],
     ];
 
     public function run(): void

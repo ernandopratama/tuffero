@@ -507,6 +507,15 @@ Anda coba*',
             'saved' => 'Profil tersimpan.',
             'failed' => 'Gagal menyimpan. Coba lagi.',
             'tooMany' => 'Terlalu banyak percobaan. Tunggu sebentar, lalu coba lagi.',
+            // D-144: pasang aplikasi, hanya untuk pelanggan yang sudah masuk.
+            'app' => [
+                'title' => 'Aplikasi Tuffero',
+                'note' => 'Pasang Tuffero di layar utama HP, lalu buka langsung tanpa bilah browser seperti aplikasi.',
+                'install' => 'Pasang Aplikasi',
+                'installed' => 'Aplikasi Tuffero sudah terpasang di perangkat ini.',
+                'ios' => 'Di iPhone atau iPad: buka halaman ini di Safari, ketuk tombol Bagikan, lalu pilih Tambahkan ke Layar Utama.',
+                'unsupported' => 'Tombol pasang belum tersedia di browser ini. Buka di Chrome atau Samsung Internet, atau aplikasi mungkin sudah terpasang di perangkat ini.',
+            ],
             'password' => [
                 'title' => 'Kata sandi',
                 'note' => 'Setelah diubah, perangkat lain yang memakai akun ini akan keluar.',

@@ -12,6 +12,7 @@
 	@case('calendar')<rect x="3" y="5" width="18" height="16" rx="2"/><path d="M3 10h18M8 3v4M16 3v4"/>@break
 	@case('clock')<circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/>@break
 	@case('flash')<path d="M13 2 4 14h7l-1 8 9-12h-7l1-8Z"/>@break
+	@case('phone')<rect x="6" y="2" width="12" height="20" rx="2.5"/><path d="M11 18h2"/>@break
 	@case('chevron')<path d="m9 6 6 6-6 6"/>@break
 	@case('back')<path d="M19 12H5M11 18l-6-6 6-6"/>@break
 	@default<path d="M5 12h14M13 6l6 6-6 6"/>

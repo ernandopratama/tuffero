@@ -96,3 +96,8 @@ html:has(dialog[open]) {
 dialog[open] {
     overscroll-behavior: contain;
 }
+
+/* iOS memperbesar layar saat input di bawah 16px diketuk; di layar sentuh semua input admin 16px (sengaja di luar layer agar menang dari utilitas teks). */
+@media (pointer: coarse) {
+    input:not([type=checkbox], [type=radio], [type=range], [type=file], [type=color]), select, textarea { font-size: 16px; }
+}

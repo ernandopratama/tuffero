@@ -6,6 +6,7 @@ import ActivityCard from '../../components/ActivityCard.vue';
 import MfaResetDialog from '../../components/MfaResetDialog.vue';
 import UsernameDialog from '../../components/UsernameDialog.vue';
 import NotificationPrefsCard from '../../components/NotificationPrefsCard.vue';
+import InstallAppCard from '../../components/InstallAppCard.vue';
 import SessionsCard from '../../components/SessionsCard.vue';
 import { useAuthStore } from '../../stores/auth';
 import api from '../../utils/api';
@@ -295,6 +296,7 @@ onMounted(load);
       </div>
 
       <SessionsCard class="mt-4" />
+      <InstallAppCard class="mt-4" />
       <NotificationPrefsCard class="mt-4" />
       <ActivityCard class="mt-4" />
       <MfaResetDialog ref="mfaDialog" @replaced="onMfaReplaced" />

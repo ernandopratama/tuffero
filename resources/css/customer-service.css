@@ -278,3 +278,8 @@
     .cs-typing i { animation: none; opacity: 0.6; }
     .cs-head-btn, .cs-chip, .cs-send { transition: none; }
 }
+
+/* iOS memperbesar layar saat input di bawah 16px diketuk; di layar sentuh input dibuat 16px. */
+@media (pointer: coarse) {
+    .cs-field input, .cs-field select { font-size: 16px; }
+}

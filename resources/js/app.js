@@ -1,4 +1,6 @@
 import './bootstrap';
+// Pendengar beforeinstallprompt harus terpasang sejak awal (D-144).
+import './pwaInstall';
 import { createApp } from 'vue';
 import { createPinia } from 'pinia';
 import router from './router';

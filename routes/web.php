@@ -1,9 +1,14 @@
 <?php
 
+use App\Http\Controllers\PwaManifestController;
 use App\Http\Controllers\Store\GoogleAuthController;
 use App\Http\Controllers\Store\StorefrontController;
 use App\Http\Middleware\SetStoreContext;
 use Illuminate\Support\Facades\Route;
+
+// Manifest PWA (D-144). Didaftarkan sebelum /admin/{any?} supaya tidak tertangkap SPA.
+Route::get('/manifest.webmanifest', PwaManifestController::class)->defaults('app', 'store');
+Route::get('/admin/manifest.webmanifest', PwaManifestController::class)->defaults('app', 'admin');
 
 // Area admin: Vue 3 SPA dengan Blade sendiri (D-053). CSS Bootstrap template toko menimpa token design system.
 Route::view('/login', 'admin');

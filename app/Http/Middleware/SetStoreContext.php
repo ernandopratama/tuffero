@@ -3,6 +3,7 @@
 namespace App\Http\Middleware;
 
 use App\Services\CartService;
+use App\Support\PwaApp;
 use App\Support\StoreSite;
 use Closure;
 use Illuminate\Http\Request;
@@ -48,6 +49,8 @@ class SetStoreContext
             'storeUser' => $user,
             'storeRole' => $user?->getRoleNames()->first(),
             'cartCount' => $this->cart->count(),
+            // D-144: manifest dan tombol pasang aplikasi hanya untuk pelanggan yang sudah masuk.
+            'pwaStore' => PwaApp::forCustomer($user),
         ]);
 
         return $next($request);

@@ -119,6 +119,23 @@
 							<button type="submit" class="tf-btn tf-btn-block" :disabled="savingPw">{{ $c['password']['submit'] }}</button>
 						</form>
 					</section>
+
+					@if ($pwaStore)
+						{{-- D-144: pasang aplikasi toko. Android dan Chrome memakai dialog bawaan; iPhone hanya petunjuk. --}}
+						<section class="tf-shop-card tf-acct-card" aria-labelledby="ac-s-app" x-data="installApp">
+							<div class="tf-acct-tile-head">
+								<span class="tf-acct-ico">@include('store.partials.account-icon', ['name' => 'phone'])</span>
+								<h2 id="ac-s-app">{{ $c['app']['title'] }}</h2>
+							</div>
+							<p class="tf-shop-note">{{ $c['app']['note'] }}</p>
+							<div aria-live="polite">
+								<template x-if="state === 'installed'"><p class="tf-auth-notice">{{ $c['app']['installed'] }}</p></template>
+								<template x-if="state === 'ready'"><button type="button" class="tf-btn tf-btn-block tf-acct-install" :disabled="busy" @click="install">{{ $c['app']['install'] }}</button></template>
+								<template x-if="state === 'ios'"><p class="tf-auth-notice">{{ $c['app']['ios'] }}</p></template>
+								<template x-if="state === 'unsupported'"><p class="tf-auth-notice">{{ $c['app']['unsupported'] }}</p></template>
+							</div>
+						</section>
+					@endif
 				</div>
 			</div>
 		</template>

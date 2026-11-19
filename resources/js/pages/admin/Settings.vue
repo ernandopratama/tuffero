@@ -156,6 +156,7 @@ const GROUPS = {
     refund: { label: 'Refund', icon: 'undo', text: 'Batas waktu klaim dan proses refund.' },
     cancellation: { label: 'Pembatalan', icon: 'x', text: 'Batas proses pengajuan dan pembatalan langsung pesanan belum dibayar.' },
     marketing: { label: 'Konten marketing', icon: 'megaphone', text: 'Target frekuensi konten per minggu (D-062). Hanya Super Admin yang bisa mengubahnya.' },
+    pwa: { label: 'Aplikasi terpasang (PWA)', icon: 'sparkles', text: 'Pasang Tuffero di layar utama HP seperti aplikasi (D-144). Hanya Super Admin yang bisa mengubahnya.' },
 };
 const FIELDS = {
     'contact.whatsapp_number': { label: 'Nomor WhatsApp', hint: 'Format internasional, contoh +6281234567890. Tampil ke pelanggan.', input: 'tel' },
@@ -182,6 +183,8 @@ const FIELDS = {
     'cancellation.auto_refund_enabled': { label: 'Refund otomatis lewat Midtrans (0 = mati, 1 = aktif)', hint: 'D-138 tahap 4. Bawaan 0. Hanya kartu dan QRIS, setelah ACC Admin Toko; virtual account tetap manual. Nyalakan hanya setelah akun produksi Midtrans, aktivasi refund, dan saldo terverifikasi.', input: 'number' },
     'cancellation.process_days_max': { label: 'Batas proses pembatalan (hari)', hint: 'Sejak pengajuan sampai dana diterima pelanggan.', input: 'number' },
     'marketing.videos_per_week': { label: 'Target video per minggu', hint: 'Rencana video. Bawaan 2 (D-062: 1 sampai 2 video). Hanya target tampilan.', input: 'number' },
+    'pwa.store_enabled': { label: 'Aplikasi toko untuk pelanggan (0 = mati, 1 = aktif)', hint: 'Bawaan 0. Bila aktif, pelanggan yang sudah masuk bisa memasang aplikasi Tuffero dari halaman Akun; tamu tidak. Mematikannya menghentikan pemasangan baru, tetapi aplikasi yang sudah terpasang di HP tidak ikut terhapus dan hanya membuka website biasa.', input: 'number' },
+    'pwa.admin_enabled': { label: 'Aplikasi admin untuk staf (0 = mati, 1 = aktif)', hint: 'Bawaan 0. Bila aktif, semua role staf yang sudah masuk bisa memasang Tuffero Admin dari halaman Profil. Mematikannya menghentikan pemasangan baru; aplikasi yang sudah terpasang tidak ikut terhapus.', input: 'number' },
 };
 
 const press = 'transition-[transform,background-color] duration-[160ms] ease-out-strong focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary active:scale-[0.97] disabled:opacity-60 disabled:active:scale-100';
@@ -258,8 +261,8 @@ onMounted(() => {
 
   <div v-else class="mt-space-lg">
     <div class="space-y-space-lg">
-      <section v-if="auth.can('settings.manage')" id="sistem" class="rounded-3xl border border-border bg-surface p-space-lg shadow-card" aria-labelledby="title-system">
-        <div class="flex flex-wrap items-start justify-between gap-3">
+      <details v-if="auth.can('settings.manage')" id="sistem" open class="group rounded-3xl border border-border bg-surface p-space-lg shadow-card" aria-labelledby="title-system">
+        <summary class="flex cursor-pointer list-none [&::-webkit-details-marker]:hidden flex-wrap items-center justify-between gap-3">
           <div class="flex items-start gap-3">
             <span class="grid size-10 shrink-0 place-items-center rounded-2xl bg-accent-tint-15" aria-hidden="true"><AdminIcon name="warehouse" :size="18" /></span>
             <div>
@@ -267,10 +270,11 @@ onMounted(() => {
               <p class="text-body-sm text-secondary">Database, cache, penyimpanan, disk, konfigurasi, penjadwal, dan antrean. Semua dicek di server ini.</p>
             </div>
           </div>
-          <button type="button" :disabled="systemBusy" :class="`inline-flex min-h-11 items-center gap-1.5 rounded-full bg-accent px-4 text-label-md hover:bg-accent-hover ${press}`" @click="loadSystemHealth(true)">
+          <button type="button" :disabled="systemBusy" :class="`ml-auto inline-flex min-h-11 items-center gap-1.5 rounded-full bg-accent px-4 text-label-md hover:bg-accent-hover ${press}`" @click.prevent="loadSystemHealth(true)">
             <AdminIcon name="check" :size="16" />{{ systemBusy ? 'Memeriksa...' : 'Periksa ulang' }}
           </button>
-        </div>
+          <AdminIcon name="chevron-down" :size="20" class="shrink-0 transition-transform duration-200 group-open:rotate-180" aria-hidden="true" />
+        </summary>
 
         <p v-if="systemError" role="alert" class="mt-space-sm flex items-center gap-1 text-body-sm text-error"><AdminIcon name="alert" :size="14" />{{ systemError }}</p>
 
@@ -283,16 +287,17 @@ onMounted(() => {
           </li>
         </ul>
         <p v-if="systemCheckedAt" class="mt-space-sm text-label-sm text-secondary">Diperiksa {{ formatDate(systemCheckedAt) }}</p>
-      </section>
+      </details>
 
-      <section v-if="auth.can('settings.manage') && securityChecks.length" id="keamanan" class="rounded-3xl border border-border bg-surface p-space-lg shadow-card" aria-labelledby="title-security">
-        <div class="flex items-start gap-3">
+      <details v-if="auth.can('settings.manage') && securityChecks.length" id="keamanan" class="group rounded-3xl border border-border bg-surface p-space-lg shadow-card" aria-labelledby="title-security">
+        <summary class="flex cursor-pointer list-none [&::-webkit-details-marker]:hidden items-start gap-3">
           <span class="grid size-10 shrink-0 place-items-center rounded-2xl bg-accent-tint-15" aria-hidden="true"><AdminIcon name="shield" :size="18" /></span>
           <div>
             <h2 id="title-security" class="font-heading text-headline-sm">Keamanan akun</h2>
             <p class="text-body-sm text-secondary">Hanya jumlah dan sebaran. Email, IP, dan password tidak ditampilkan. Batasnya usulan dan tidak memblokir apa pun.</p>
           </div>
-        </div>
+          <AdminIcon name="chevron-down" :size="20" class="ml-auto mt-1 shrink-0 transition-transform duration-200 group-open:rotate-180" aria-hidden="true" />
+        </summary>
 
         <ul class="mt-space-md divide-y divide-border border-t border-border">
           <li v-for="item in securityChecks" :key="item.key" class="flex flex-wrap items-start gap-x-3 gap-y-1 py-space-sm">
@@ -302,16 +307,17 @@ onMounted(() => {
           </li>
         </ul>
         <router-link :to="{ name: 'AdminAudit' }" :class="`mt-space-sm inline-flex rounded-full border border-border px-3 py-1 text-label-md hover:bg-accent-tint-15 ${press}`">Buka audit log</router-link>
-      </section>
+      </details>
 
-      <section v-if="auth.can('settings.manage') && stuckOrders.length" id="macet" class="rounded-3xl border border-border bg-surface p-space-lg shadow-card" aria-labelledby="title-stuck">
-        <div class="flex items-start gap-3">
+      <details v-if="auth.can('settings.manage') && stuckOrders.length" id="macet" class="group rounded-3xl border border-border bg-surface p-space-lg shadow-card" aria-labelledby="title-stuck">
+        <summary class="flex cursor-pointer list-none [&::-webkit-details-marker]:hidden items-start gap-3">
           <span class="grid size-10 shrink-0 place-items-center rounded-2xl bg-accent-tint-15" aria-hidden="true"><AdminIcon name="receipt" :size="18" /></span>
           <div>
             <h2 id="title-stuck" class="font-heading text-headline-sm">Pesanan macet</h2>
             <p class="text-body-sm text-secondary">Hanya menandai pesanan yang patut dilihat. Batas waktunya usulan dan belum diputuskan tim, jadi bukan SLA. Tidak ada yang diubah otomatis.</p>
           </div>
-        </div>
+          <AdminIcon name="chevron-down" :size="20" class="ml-auto mt-1 shrink-0 transition-transform duration-200 group-open:rotate-180" aria-hidden="true" />
+        </summary>
 
         <ul class="mt-space-md divide-y divide-border border-t border-border">
           <li v-for="item in stuckOrders" :key="item.key" class="flex flex-wrap items-start gap-x-3 gap-y-1 py-space-sm">
@@ -321,10 +327,10 @@ onMounted(() => {
             <router-link v-if="item.count" :to="{ name: item.to }" :class="`shrink-0 rounded-full border border-border px-3 py-1 text-label-md hover:bg-accent-tint-15 ${press}`">Buka</router-link>
           </li>
         </ul>
-      </section>
+      </details>
 
-      <section v-if="auth.can('settings.manage')" id="integrasi" class="rounded-3xl border border-border bg-surface p-space-lg shadow-card" aria-labelledby="title-integrations">
-        <div class="flex flex-wrap items-start justify-between gap-3">
+      <details v-if="auth.can('settings.manage')" id="integrasi" class="group rounded-3xl border border-border bg-surface p-space-lg shadow-card" aria-labelledby="title-integrations">
+        <summary class="flex cursor-pointer list-none [&::-webkit-details-marker]:hidden flex-wrap items-center justify-between gap-3">
           <div class="flex items-start gap-3">
             <span class="grid size-10 shrink-0 place-items-center rounded-2xl bg-accent-tint-15" aria-hidden="true"><AdminIcon name="shield" :size="18" /></span>
             <div>
@@ -332,10 +338,11 @@ onMounted(() => {
               <p class="text-body-sm text-secondary">Status Midtrans dan Biteship dari konfigurasi, riwayat webhook, dan cek API terakhir. Kunci dan rahasia tidak pernah ditampilkan.</p>
             </div>
           </div>
-          <button type="button" :disabled="checking" :class="`inline-flex min-h-11 items-center gap-1.5 rounded-full bg-accent px-4 text-label-md hover:bg-accent-hover ${press}`" @click="checkNow">
+          <button type="button" :disabled="checking" :class="`ml-auto inline-flex min-h-11 items-center gap-1.5 rounded-full bg-accent px-4 text-label-md hover:bg-accent-hover ${press}`" @click.prevent="checkNow">
             <AdminIcon name="check" :size="16" />{{ checking ? 'Memeriksa...' : 'Cek ke API sekarang' }}
           </button>
-        </div>
+          <AdminIcon name="chevron-down" :size="20" class="shrink-0 transition-transform duration-200 group-open:rotate-180" aria-hidden="true" />
+        </summary>
 
         <p v-if="integrationError" role="alert" class="mt-space-sm flex items-center gap-1 text-body-sm text-error"><AdminIcon name="alert" :size="14" />{{ integrationError }}</p>
 
@@ -401,13 +408,14 @@ onMounted(() => {
           </ul>
           <p class="mt-space-sm text-label-sm text-secondary">{{ servicesCheckedAt ? `Cek API terakhir ${formatDate(servicesCheckedAt)}.` : 'Cek API belum pernah dijalankan. Tekan Cek ke API sekarang.' }}</p>
         </div>
-      </section>
+      </details>
 
-      <section v-for="group in groups" :key="group.key" class="rounded-3xl border border-border bg-surface p-space-lg shadow-card" :aria-labelledby="`title-${group.key}`">
-        <div class="flex items-start gap-3">
+      <details v-for="group in groups" :key="group.key" class="group rounded-3xl border border-border bg-surface p-space-lg shadow-card" :aria-labelledby="`title-${group.key}`">
+        <summary class="flex cursor-pointer list-none [&::-webkit-details-marker]:hidden items-start gap-3">
           <span class="grid size-10 shrink-0 place-items-center rounded-2xl bg-accent-tint-15" aria-hidden="true"><AdminIcon :name="group.icon" :size="18" /></span>
           <div><h2 :id="`title-${group.key}`" class="font-heading text-headline-sm">{{ group.label }}</h2><p class="text-body-sm text-secondary">{{ group.text }}</p></div>
-        </div>
+          <AdminIcon name="chevron-down" :size="20" class="ml-auto mt-1 shrink-0 transition-transform duration-200 group-open:rotate-180" aria-hidden="true" />
+        </summary>
 
         <form
           v-for="setting in group.items"
@@ -445,7 +453,7 @@ onMounted(() => {
             <p v-else-if="rows[setting.key].success" role="status" class="mt-1.5 flex items-center gap-1 text-body-sm text-success"><AdminIcon name="check" :size="14" />Tersimpan.</p>
           </div>
         </form>
-      </section>
+      </details>
     </div>
   </div>
 </template>

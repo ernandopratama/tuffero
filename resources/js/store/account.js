@@ -1,5 +1,6 @@
 import { addressPicker, mix } from './addressPicker';
 import api from './api';
+import { installState, onInstallChange, promptInstall } from '../pwaInstall';
 import { pageData } from './site';
 import { rupiah } from './shop';
 
@@ -259,5 +260,25 @@ export const addressesPage = () => mix(addressPicker('ad'), {
     makeDefault(a) { return this.act(() => api.post(`/account/addresses/${a.id}/default`), this.words.saved); },
     remove(a) {
         if (window.confirm(this.words.confirmDelete.replace('{label}', a.label))) this.act(() => api.delete(`/account/addresses/${a.id}`), this.words.deleted);
+    },
+});
+
+// Kartu Aplikasi Tuffero di /akun (D-144). Kartu hanya dirender bila aplikasi toko menyala; manifest ada di layout untuk pelanggan yang sudah masuk.
+export const installApp = () => ({
+    state: installState(),
+    busy: false,
+
+    init() {
+        onInstallChange(() => { this.state = installState(); });
+    },
+
+    async install() {
+        this.busy = true;
+        try {
+            await promptInstall();
+        } finally {
+            this.busy = false;
+            this.state = installState();
+        }
     },
 });

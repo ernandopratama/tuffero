@@ -2,8 +2,18 @@
 <html lang="{{ $locale }}">
 <head>
 	<meta charset="utf-8">
-	<meta name="viewport" content="width=device-width, initial-scale=1.0">
+	<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
 	@include('store.partials.seo')
+	@if ($pwaStore ?? false)
+		{{-- D-144: aplikasi terpasang hanya ditawarkan ke pelanggan yang sudah masuk. --}}
+		<link rel="manifest" href="/manifest.webmanifest">
+		<meta name="theme-color" content="#2B1B14">
+		<meta name="apple-mobile-web-app-capable" content="yes">
+		<meta name="mobile-web-app-capable" content="yes">
+		<meta name="apple-mobile-web-app-title" content="Tuffero">
+		<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+		<link rel="apple-touch-icon" href="{{ asset('images/pwa/store-apple-180.png') }}">
+	@endif
 	<link rel="shortcut icon" type="image/x-icon" href="{{ asset('images/Logo/Tuffero Icon - NoBckgrnd.webp') }}">
 	<link href="{{ asset('css/bootstrap.min.css') }}?v={{ filemtime(public_path('css/bootstrap.min.css')) }}" rel="stylesheet" media="screen">
 	<link rel="stylesheet" href="{{ asset('css/swiper-bundle.min.css') }}?v={{ filemtime(public_path('css/swiper-bundle.min.css')) }}">

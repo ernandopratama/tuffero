@@ -3053,3 +3053,22 @@ html .tf-hero-content.is-welcome{ padding-top: 44px; }
 	.tf-legal-list summary, .tf-legal-list summary svg, .tf-legal-list details::details-content{ transition: none; }
 	.tf-legal-list details[open] .tf-legal-body{ animation: none; }
 }
+
+/* Siap HP dan PWA (audit responsif 2026-11-19). */
+/* iOS memperbesar layar saat input di bawah 16px diketuk; di layar sentuh input dibuat 16px. */
+@media (pointer: coarse){
+	.tf-cat-search input, .tf-vpick-code input{ font-size: 16px; }
+}
+/* Area sentuh minimal 44px tanpa mengubah tampilan tombol. */
+.tf-cart{ position: relative; }
+.tf-cart::before, .tf-pill::before{ content: ""; position: absolute; inset: -7px 0; }
+/* viewport-fit=cover di layout toko: konten tidak masuk ke area poni (HP miring) atau status bar (PWA layar penuh). env() bernilai 0 di perangkat tanpa poni. */
+body{ padding-left: env(safe-area-inset-left); padding-right: env(safe-area-inset-right); }
+.tf-mainbar{ padding-top: env(safe-area-inset-top); }
+.tf-top{ right: max(20px, env(safe-area-inset-right)); }
+@media (max-width: 991px){
+	.tf-mobile{ top: calc(72px + env(safe-area-inset-top)); left: env(safe-area-inset-left); right: env(safe-area-inset-right); }
+}
+
+/* Kartu Aplikasi Tuffero di /akun (D-144). */
+.tf-acct-install{ margin-top: 16px; }
