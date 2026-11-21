@@ -59,6 +59,7 @@ use App\Http\Controllers\Api\V1\Store\OrderController;
 use App\Http\Controllers\Api\V1\Store\PhoneOtpController;
 use App\Http\Controllers\Api\V1\Store\RefundController as StoreRefundController;
 use App\Http\Controllers\Api\V1\Store\RegisterController;
+use App\Http\Controllers\Api\V1\WhatsAppWebhookController;
 use App\Http\Middleware\HermesToken;
 use Illuminate\Support\Facades\Route;
 
@@ -73,6 +74,8 @@ Route::prefix('v1')->group(function () {
     // Notifikasi Midtrans: tanpa sesi dan CSRF, keaslian dari signature_key (BR-11).
     Route::post('/webhooks/midtrans', MidtransWebhookController::class)->middleware('throttle:120,1');
     Route::post('/webhooks/biteship', BiteshipWebhookController::class)->middleware('throttle:120,1');
+    Route::get('/webhooks/whatsapp', [WhatsAppWebhookController::class, 'verify'])->middleware('throttle:120,1');
+    Route::post('/webhooks/whatsapp', [WhatsAppWebhookController::class, 'receive'])->middleware('throttle:120,1');
     // Laporan riset dari Hermes Agent (D-079): token bersama, bukan sesi. Batas ketat karena hanya jadwal mingguan yang memakainya.
     Route::post('/integrations/hermes/drafts', HermesDraftController::class)->middleware([HermesToken::class, 'throttle:hermes-ingest']);
     // Ringkasan pengingat untuk Hermes (hanya baca, tanpa data pelanggan): dasar pesan Telegram yang tahu isi dashboard.

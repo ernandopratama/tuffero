@@ -102,6 +102,9 @@ return [
         'graph_version' => env('WHATSAPP_GRAPH_VERSION', 'v24.0'),
         // Checkout tamu wajib OTP (BR-02). Nyalakan hanya setelah Meta dan Turnstile siap, karena tanpa itu tamu tidak bisa checkout.
         'otp_required' => (bool) env('WHATSAPP_OTP_REQUIRED', false),
+        // Webhook Meta: token verifikasi bebas (diisi sama di dashboard Meta) dan App Secret untuk tanda tangan.
+        'webhook_verify_token' => env('WHATSAPP_WEBHOOK_VERIFY_TOKEN'),
+        'app_secret' => env('WHATSAPP_APP_SECRET'),
     ],
 
     // Rahasia Turnstile untuk memeriksa token di server. Kosong di luar local berarti permintaan ditolak.
