@@ -333,7 +333,7 @@ class OrderController extends Controller
             'service_code' => strtoupper((string) $order->shipping_service),
             'routing_code' => $order->shipment->routing_code,
             'ship_date' => ($order->shipment->shipped_at ?? $order->shipment->created_at)?->format('Y-m-d'),
-            'sender' => ['name' => 'Tuffero Patisserie', 'city' => $warehouse?->city, 'address' => $warehouse?->address, 'postal_code' => $warehouse?->postal_code, 'phone' => $warehouse?->phone],
+            'sender' => ['name' => 'Tuffero Bakery', 'city' => $warehouse?->city, 'address' => $warehouse?->address, 'postal_code' => $warehouse?->postal_code, 'phone' => $warehouse?->phone],
             'recipient' => [
                 'name' => $address['recipient'] ?? $order->customer_name,
                 'phone' => $address['phone'] ?? $order->customer_phone,

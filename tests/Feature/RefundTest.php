@@ -477,7 +477,7 @@ class RefundTest extends TestCase
         $order->shipment->forceFill(['status' => 'returned'])->save();
         $row = $list('shipment_problems')['rows'][0];
         $this->assertStringContainsString($order->order_number, $row['title']);
-        $this->assertSame('Dikembalikan', $row['chip']['text']);
+        $this->assertSame('Paket dikembalikan', $row['chip']['text']);
         $this->assertSame(['cari' => $order->order_number], $row['query']);
 
         $order->shipment->forceFill(['status' => 'delivered'])->save();

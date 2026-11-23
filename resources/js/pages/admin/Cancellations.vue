@@ -15,9 +15,10 @@ import { useDataTable } from '../../composables/useDataTable';
 import api from '../../utils/api';
 import { apiError } from '../../utils/apiError';
 import { formatDate } from '../../utils/datetime';
-import { CANCELLATION_STATUS, PAYMENT_STATUS, TONE_CLASS, rupiah } from '../../utils/orderLabels';
+import { CANCELLATION_STATUS, PAYMENT_STATUS, rupiah } from '../../utils/orderLabels';
 import { useAuthStore } from '../../stores/auth';
 import PageHeader from '../../components/ui/PageHeader.vue';
+import StatusBadge from '../../components/ui/StatusBadge.vue';
 
 const auth = useAuthStore();
 
@@ -27,7 +28,6 @@ const NEXT = {
     validated: { path: 'approve', label: 'ACC Admin Toko', permission: 'orders.cancel' },
 };
 const STATUS_TONE = { submitted: 'warn', validated: 'info', approved: 'ok', rejected: 'bad', refunded: 'neutral' };
-const DOT = { ok: 'bg-success', warn: 'bg-warning', info: 'bg-info', bad: 'bg-error', neutral: 'bg-secondary' };
 const REJECT_PERMISSION = { submitted: 'orders.cancel_request', validated: 'orders.cancel' };
 
 const COLUMNS = [
@@ -175,9 +175,7 @@ async function submitReject() {
     </template>
     <template #cell-status="{ row }">
       <div class="flex flex-col items-center gap-1.5">
-        <span class="inline-flex items-center gap-1.5 whitespace-nowrap rounded-full px-2.5 py-1 text-label-sm" :class="TONE_CLASS[toneOf(row)]">
-          <i class="size-1.5 rounded-full" :class="DOT[toneOf(row)]" aria-hidden="true"></i>{{ CANCELLATION_STATUS[row.status] || row.status }}
-        </span>
+        <StatusBadge :tone="toneOf(row)">{{ CANCELLATION_STATUS[row.status] || row.status }}</StatusBadge>
         <span v-if="row.is_overdue" class="inline-flex items-center gap-1 whitespace-nowrap text-label-sm text-error"><AdminIcon name="alert" :size="14" />Lewat batas proses</span>
         <span v-if="row.auto_refund_status === 'done'" class="inline-flex items-center gap-1 whitespace-nowrap text-label-sm text-success"><AdminIcon name="check" :size="14" />Dana dikembalikan otomatis</span>
         <span v-else-if="row.auto_refund_status === 'failed'" class="block max-w-[14rem] break-words text-center text-label-sm text-error">Refund otomatis gagal: {{ row.auto_refund_error }}</span>

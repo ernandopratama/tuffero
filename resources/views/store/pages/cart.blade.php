@@ -1,4 +1,4 @@
-@extends('store.layouts.app')
+@extends('store.layouts.app', ['legacy' => false])
 
 @section('content')
 	<script type="application/json" id="tf-cart-data">{{ $site->json(['customer' => $storeUser && ! $storeRole, ...\Illuminate\Support\Arr::only($c, ['insufficient', 'removeLabel', 'removed', 'updateFailed', 'selectLabel', 'selectAll', 'removeSelected', 'unavailableTitle', 'total', 'count', 'variant', 'checkoutCount', 'off', 'offFixed', 'min', 'upTo', 'until', 'voucherHint', 'voucherCount', 'voucherEmptyMember', 'voucherEmptyGuest', 'voucherOpen', 'voucherAppliedBar', 'voucher', 'errors', 'tooMany'])]) }}</script>

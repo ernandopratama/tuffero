@@ -112,8 +112,9 @@ async function replaceImage() {
     }
 }
 
+const confirmingRemove = ref(false);
+
 async function remove() {
-    if (!window.confirm(`Hapus "${editing.value.title}"? Foto hilang dari daftar dan toko; riwayatnya tetap tercatat.`)) return;
     saving.value = true;
     formError.value = '';
     try {
@@ -167,7 +168,7 @@ async function remove() {
     </template>
   </DataTable>
 
-  <AppModal ref="dialog" :variant="editing ? (canManage ? 'update' : 'read') : 'create'" size="xl" :title="editing ? (canManage ? 'Ubah foto' : 'Detail foto') : 'Tambah foto'">
+  <AppModal ref="dialog" :variant="editing ? (canManage ? 'update' : 'read') : 'create'" size="xl" :title="editing ? (canManage ? 'Ubah foto' : 'Detail foto') : 'Tambah foto'" @close="confirmingRemove = false">
     <form id="gallery-form" class="space-y-space-md" @submit.prevent="save">
       <p v-if="formError" role="alert" class="rounded bg-error-surface px-3 py-2 text-body-sm text-on-error-surface">{{ formError }}</p>
       <fieldset :disabled="!canManage" class="space-y-space-md">
@@ -227,7 +228,14 @@ async function remove() {
     </section>
 
     <template #footer>
-      <button v-if="canManage && editing" type="button" :disabled="saving" class="mr-auto rounded px-3 py-2 text-label-md text-error underline focus-visible:outline-2 focus-visible:outline-primary disabled:opacity-60" @click="remove">Hapus</button>
+      <template v-if="canManage && editing">
+        <button v-if="!confirmingRemove" type="button" :disabled="saving" class="mr-auto rounded px-3 py-2 text-label-md text-error underline focus-visible:outline-2 focus-visible:outline-primary disabled:opacity-60" @click="confirmingRemove = true">Hapus</button>
+        <span v-else role="alert" class="mr-auto flex min-w-0 flex-wrap items-center gap-2 text-body-sm">
+          <span class="min-w-0">Hapus "{{ editing.title }}"? Foto hilang dari daftar dan toko; riwayatnya tetap tercatat.</span>
+          <button type="button" :disabled="saving" class="rounded bg-error px-3 py-2 text-label-md text-surface hover:bg-error/90 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary disabled:opacity-60" @click="remove">Ya, hapus</button>
+          <button type="button" :disabled="saving" class="rounded border border-secondary px-3 py-2 text-label-md hover:bg-accent-tint-15 focus-visible:outline-2 focus-visible:outline-primary" @click="confirmingRemove = false">Batal</button>
+        </span>
+      </template>
       <button type="button" class="rounded border border-secondary px-4 py-2 text-label-md hover:bg-accent-tint-15 focus-visible:outline-2 focus-visible:outline-primary" @click="dialog.close()">Tutup</button>
       <button v-if="canManage" form="gallery-form" :disabled="saving" class="rounded bg-accent px-4 py-2 text-label-md hover:bg-accent-hover focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary disabled:opacity-60">{{ saving ? 'Menyimpan...' : 'Simpan' }}</button>
     </template>

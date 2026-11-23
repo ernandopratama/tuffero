@@ -228,7 +228,7 @@
 					<p class="tf-eyebrow tf-eyebrow-gold">{{ $t['features']['eyebrow'] }}</p>
 					<h2 class="tf-h3 text-anime-style-2" data-cursor="-opaque">{{ $site->rich($t['features']['title']) }}</h2>
 					<p class="tf-small-lead">{{ $t['features']['lead'] }}</p>
-					<a href="#" class="tf-btn tf-btn-small">{{ $t['features']['more'] }} {{ $site->icon('north_east', 12) }}</a>
+					<a href="{{ $site->route('about') }}" class="tf-btn tf-btn-small">{{ $t['features']['more'] }} {{ $site->icon('north_east', 12) }}</a>
 				</div>
 				<div class="tf-feature-list">
 					@foreach ($t['features']['items'] as $i => [$title, $text])
@@ -320,7 +320,7 @@
 					<div class="tf-best wow fadeInUp">
 						<h3>{{ $t['offers']['bestTitle'] }}</h3>
 						<p>{{ $t['offers']['bestText'] }}</p>
-						<a href="#" class="tf-more">{{ $t['offers']['bestLink'] }} {{ $site->icon('north_east', 12) }}</a>
+						<a href="{{ $site->route('services') }}#hampers" class="tf-more">{{ $t['offers']['bestLink'] }} {{ $site->icon('north_east', 12) }}</a>
 						<figure class="image-anime"><img loading="lazy" decoding="async" src="{{ $thumb('Nastar Cookies') }}" {{ $site->imageSize($thumb('Nastar Cookies')) }} alt="{{ $t['offers']['bestAlt'] }}"></figure>
 						<span>{{ $t['offers']['bestTag'] }}</span>
 					</div>

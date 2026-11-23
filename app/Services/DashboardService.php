@@ -766,7 +766,7 @@ class DashboardService
 
     /** Status paket Biteship yang bermasalah dan label tampilannya (sama dengan yang diberitahukan ke staf, D-082). */
     private const SHIPMENT_PROBLEMS = [
-        'returned' => 'Dikembalikan', 'return_in_transit' => 'Dalam pengembalian', 'rejected' => 'Ditolak penerima', 'cancelled' => 'Dibatalkan kurir',
+        'returned' => 'Paket dikembalikan', 'return_in_transit' => 'Paket dalam pengembalian', 'rejected' => 'Ditolak penerima', 'cancelled' => 'Dibatalkan kurir',
         'courier_not_found' => 'Kurir tidak ditemukan', 'on_hold' => 'Ditahan', 'disposed' => 'Dimusnahkan',
     ];
 

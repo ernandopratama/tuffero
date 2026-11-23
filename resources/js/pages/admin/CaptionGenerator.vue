@@ -163,12 +163,12 @@ onMounted(() => {
     </form>
 
     <section aria-labelledby="hasil" class="space-y-space-md">
-      <h2 id="hasil" class="flex items-center gap-2 font-heading text-headline-sm"><span class="size-3 rounded-full bg-[#2E6B3E]" aria-hidden="true"></span>Hasil</h2>
+      <h2 id="hasil" class="flex items-center gap-2 font-heading text-headline-sm"><span class="size-3 rounded-full bg-success" aria-hidden="true"></span>Hasil</h2>
       <PressLoader v-if="busy" label="Membuat caption" :size="10" :height="380" />
       <p v-else-if="!result" class="rounded-3xl border border-dashed border-border p-space-md text-center text-body-sm text-secondary">Tiga variasi caption muncul di sini.</p>
       <ol v-else class="space-y-3">
-        <li v-for="(caption, index) in result.captions" :key="index" class="rounded-3xl border border-l-4 border-[#2E6B3E]/30 border-l-[#2E6B3E] bg-[#E6F4EA] p-space-md shadow-card">
-          <p class="inline-flex rounded-full bg-[#2E6B3E] px-2.5 py-0.5 text-label-sm uppercase tracking-wide text-surface">Variasi {{ index + 1 }}</p>
+        <li v-for="(caption, index) in result.captions" :key="index" class="rounded-3xl border border-l-4 border-success/30 border-l-[#2E6B3E] bg-[#E6F4EA] p-space-md shadow-card">
+          <p class="inline-flex rounded-full bg-success px-2.5 py-0.5 text-label-sm uppercase tracking-wide text-surface">Variasi {{ index + 1 }}</p>
           <p class="mt-1 whitespace-pre-line break-words text-body-md">{{ caption }}</p>
           <div class="mt-3 flex items-center justify-between gap-2">
             <span class="text-body-sm tabular-nums text-secondary">{{ caption.length }} karakter</span>

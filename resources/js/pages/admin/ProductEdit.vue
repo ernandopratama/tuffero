@@ -7,6 +7,7 @@ import IconAction from '../../components/ui/IconAction.vue';
 import RupiahInput from '../../components/ui/RupiahInput.vue';
 import api from '../../utils/api';
 import { apiError } from '../../utils/apiError';
+import { useUnsavedGuard } from '../../composables/useUnsavedGuard';
 import { formatDate, fromLocalInput, toLocalInput } from '../../utils/datetime';
 import { useAuthStore } from '../../stores/auth';
 import PageHeader from '../../components/ui/PageHeader.vue';
@@ -43,6 +44,13 @@ const trBusy = ref(false);
 const trAiBusy = ref(false);
 const trError = ref('');
 const trNote = ref('');
+
+// Peringatan saat halaman ditinggalkan dengan info atau terjemahan yang berubah dan belum disimpan.
+// Pembanding dikunci setiap data produk dimuat atau disimpan (setProduct).
+const snapshot = () => JSON.stringify([info, tr.mode, tr.name_en, tr.description_en, tr.variants]);
+const baseline = ref('');
+const dirty = computed(() => canManage.value && baseline.value !== '' && snapshot() !== baseline.value);
+useUnsavedGuard(dirty);
 
 const imageInput = ref(null);
 const imageAlt = ref('');
@@ -146,6 +154,7 @@ function setProduct(data) {
         variants: Object.fromEntries(data.variants.map((item) => [item.id, item.name_en || ''])),
     });
     Object.assign(info, { name: data.name, description: data.description || '', badges: (data.badges || []).join(', '), category_id: data.product_category_id ?? '', type_id: data.product_type_id ?? '' });
+    baseline.value = snapshot();
 }
 
 // Kategori dan jenis yang bisa dipilih: yang aktif, ditambah yang sedang dipakai produk ini walau sudah nonaktif.

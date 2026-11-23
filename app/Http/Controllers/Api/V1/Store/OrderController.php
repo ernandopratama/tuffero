@@ -41,6 +41,8 @@ class OrderController extends Controller
             'status' => $order->status,
             'payment_status' => $order->payment_status,
             'shipping_status' => $order->shipping_status,
+            // Pesanan tamu (tanpa akun): halaman bayar meminta pembeli menyimpan tautan bertoken.
+            'is_guest' => $order->user_id === null,
             'customer_name' => $order->customer_name,
             'customer_email' => $order->customer_email,
             'customer_phone' => $order->customer_phone,

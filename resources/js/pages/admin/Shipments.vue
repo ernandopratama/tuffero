@@ -8,10 +8,11 @@ import FilterSelect from '../../components/ui/FilterSelect.vue';
 import IconAction from '../../components/ui/IconAction.vue';
 import PageHeader from '../../components/ui/PageHeader.vue';
 import TableToolbar from '../../components/ui/TableToolbar.vue';
+import StatusBadge from '../../components/ui/StatusBadge.vue';
 import { useDataTable } from '../../composables/useDataTable';
 import { useAuthStore } from '../../stores/auth';
 import { formatDate } from '../../utils/datetime';
-import { SHIPPING_STATUS, TONE_CLASS } from '../../utils/orderLabels';
+import { SHIPPING_STATUS } from '../../utils/orderLabels';
 
 const COLUMNS = [
     { key: 'order_number', label: 'Nomor' },
@@ -87,7 +88,7 @@ function onUpdated() {
       <span class="block text-body-sm uppercase text-secondary">{{ row.shipping_service }}</span>
     </template>
     <template #cell-shipping_status="{ row }">
-      <span class="inline-flex whitespace-nowrap rounded-full px-2.5 py-1 text-label-sm" :class="TONE_CLASS[SHIPPING_TONE[row.shipping_status] || 'neutral']">{{ SHIPPING_STATUS[row.shipping_status] || row.shipping_status }}</span>
+      <StatusBadge :dot="false" :tone="SHIPPING_TONE[row.shipping_status] || 'neutral'">{{ SHIPPING_STATUS[row.shipping_status] || row.shipping_status }}</StatusBadge>
     </template>
     <template #cell-shipped_at="{ row }">
       <span class="whitespace-nowrap" :class="row.shipped_at ? '' : 'text-secondary'">{{ row.shipped_at ? formatDate(row.shipped_at) : 'Belum dikirim' }}</span>

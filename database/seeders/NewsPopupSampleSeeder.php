@@ -8,7 +8,7 @@ use Illuminate\Database\Seeder;
 
 /**
  * Berita Popup contoh (carousel popup di toko): tiga item tayang (Promo, Update, Berita) dan satu draf. Teks dua bahasa,
- * tanpa gambar. Isi hanya contoh dan tidak menyebut harga atau klaim. Aman diulang: item dikenali dari judulnya.
+ * gambar acak dari public/images/Produk. Isi hanya contoh dan tidak menyebut harga atau klaim. Aman diulang: item dikenali dari judulnya.
  * Ditolak di production. Jalankan dengan php artisan db:seed --class=NewsPopupSampleSeeder.
  */
 class NewsPopupSampleSeeder extends Seeder
@@ -32,6 +32,11 @@ class NewsPopupSampleSeeder extends Seeder
         foreach ($rows as $row) {
             $item = NewsItem::firstOrCreate(['title' => $row['title']], $row);
             $made += $item->wasRecentlyCreated ? 1 : 0;
+
+            // Item lama tanpa gambar ikut diberi gambar; gambar yang sudah ada (termasuk unggahan admin) tidak ditimpa.
+            if (! $item->image_path && ($path = $this->sampleImage('news'))) {
+                $item->forceFill(['image_path' => $path])->save();
+            }
         }
 
         $this->command?->info("{$made} berita popup contoh dibuat.");

@@ -66,6 +66,11 @@ const preview = computed(() => ({
     image: editing.value?.image_url || '',
 }));
 
+// Di popup toko, gambar mengisi sisa tinggi kartu: berita tanpa tombol mendapat gambar lebih tinggi daripada yang bertombol.
+const imageShape = computed(() => (preview.value.cta
+    ? { aspect: 'aspect-[16/10]', hint: 'Disarankan 1280 × 800 px (16:10), karena berita ini punya tombol.' }
+    : { aspect: 'aspect-[4/3]', hint: 'Disarankan 1280 × 960 px (4:3): tanpa tombol, gambar tampil lebih tinggi mengisi popup.' }));
+
 async function load() {
     loading.value = true;
     loadError.value = '';
@@ -360,7 +365,7 @@ onMounted(load);
           </div>
           <label v-if="canManage" class="flex cursor-pointer items-center gap-3 rounded-2xl border border-dashed border-secondary px-4 py-3 transition-colors duration-150 hover:bg-accent-tint-12 has-[:focus-visible]:outline-2 has-[:focus-visible]:outline-offset-2 has-[:focus-visible]:outline-primary">
             <AdminIcon name="plus" :size="20" class="shrink-0 text-secondary" />
-            <span class="min-w-0"><span class="block break-all text-label-md">{{ imageName || 'Pilih gambar' }}</span><span class="block text-body-sm text-secondary">JPG, JPEG, atau PNG, maksimal 3 MB. Otomatis diubah ke WebP.</span></span>
+            <span class="min-w-0"><span class="block break-all text-label-md">{{ imageName || 'Pilih gambar' }}</span><span class="block text-body-sm text-secondary">JPG, JPEG, atau PNG, maksimal 3 MB. Otomatis diubah ke WebP.</span><span class="block text-body-sm text-secondary">{{ imageShape.hint }} Taruh objek utama di tengah, tepi gambar bisa terpotong.</span></span>
             <input ref="imageInput" type="file" accept="image/jpeg,image/png" class="sr-only" @change="onPick">
           </label>
           <p v-if="imageError" role="alert" class="text-body-sm text-error">{{ imageError }}</p>
@@ -370,7 +375,7 @@ onMounted(load);
       <aside class="lg:col-span-2" aria-label="Pratinjau popup">
         <p class="mb-2 text-label-md">Pratinjau</p>
         <div class="overflow-hidden rounded-3xl border border-border bg-surface p-space-md shadow-card lg:sticky lg:top-0">
-          <div class="aspect-[16/9] overflow-hidden rounded-2xl bg-gradient-to-br from-accent-tint-20 to-accent-tint-12">
+          <div :class="imageShape.aspect" class="overflow-hidden rounded-2xl bg-gradient-to-br from-accent-tint-20 to-accent-tint-12">
             <img v-if="preview.image" :src="preview.image" alt="" class="size-full object-cover">
           </div>
           <span class="mt-3 inline-flex rounded-full px-2.5 py-1 text-label-sm" :class="KINDS[form.kind]?.badge">{{ preview.badge }}</span>

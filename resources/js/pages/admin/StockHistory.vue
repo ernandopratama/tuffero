@@ -5,6 +5,7 @@ import DataTable from '../../components/ui/DataTable.vue';
 import FilterSelect from '../../components/ui/FilterSelect.vue';
 import PageHeader from '../../components/ui/PageHeader.vue';
 import TableToolbar from '../../components/ui/TableToolbar.vue';
+import StatusBadge from '../../components/ui/StatusBadge.vue';
 import { useDataTable } from '../../composables/useDataTable';
 import api from '../../utils/api';
 import { apiError } from '../../utils/apiError';
@@ -117,7 +118,7 @@ onMounted(async () => {
       <span class="text-body-sm text-secondary">{{ row.variant }} · <span class="font-mono">{{ row.sku }}</span> · {{ row.warehouse }}</span>
     </template>
     <template #cell-type="{ row }">
-      <span class="inline-flex whitespace-nowrap rounded-full px-2.5 py-0.5 text-label-sm" :class="TONE_CLASS[MOVEMENTS[row.type]?.tone || 'neutral']">{{ MOVEMENTS[row.type]?.label || row.type }}</span>
+      <StatusBadge :dot="false" size="sm" :tone="MOVEMENTS[row.type]?.tone || 'neutral'">{{ MOVEMENTS[row.type]?.label || row.type }}</StatusBadge>
       <span v-if="row.order_number" class="mt-1 block text-body-sm text-secondary">{{ row.order_number }}</span>
     </template>
     <template #cell-quantity_change="{ row }">

@@ -1,4 +1,4 @@
-@extends('store.layouts.app')
+@extends('store.layouts.app', ['legacy' => false])
 
 @php
 	$when = fn ($date) => $date->copy()->locale(app()->getLocale())->translatedFormat('j M Y, H:i');

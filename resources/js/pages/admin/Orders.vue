@@ -1,5 +1,5 @@
 <script setup>
-import { computed, nextTick, ref, watch } from 'vue';
+import { computed, nextTick, onMounted, ref, watch } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import AdminComments from '../../components/AdminComments.vue';
 import CustomerHistory from '../../components/CustomerHistory.vue';
@@ -24,20 +24,20 @@ import PageHeader from '../../components/ui/PageHeader.vue';
 
 // Lencana status di ringkasan detail: warna penuh dan tegas (bukan pastel) supaya status terbaca sekilas.
 const SOLID_TONE = { ok: 'bg-success text-surface', info: 'bg-info text-surface', warn: 'bg-warning text-surface', bad: 'bg-error text-surface', neutral: 'bg-secondary text-surface' };
-// Satu warna per status: tidak ada dua status berbeda yang sama warnanya. Hanya kata yang sama di dua kolom (Kedaluwarsa, Dibatalkan, Menunggu) berbagi warna.
+// Satu warna per status: tidak ada dua status berbeda yang sama warnanya. Hanya kata yang sama di dua kolom (Kedaluwarsa, Dibatalkan, Menunggu pembayaran, Dana dikembalikan) berbagi warna.
 const BADGE = 'text-surface';
 const ORDER_COLOR = {
-    awaiting_approval: 'bg-[#A16207]', rejected: 'bg-[#9D174D]', pending_payment: 'bg-[#C2410C]', paid: 'bg-[#2E6B3E]', processing: 'bg-[#1D4ED8]',
-    shipped: 'bg-[#6D28D9]', completed: 'bg-[#0F766E]', expired: 'bg-[#6D4C3D]', cancelled: 'bg-[#BA1A1A]', refunded: 'bg-[#475569]',
+    awaiting_approval: 'bg-st-yellow-700', rejected: 'bg-st-pink-800', pending_payment: 'bg-st-orange-700', paid: 'bg-success', processing: 'bg-st-blue-700',
+    shipped: 'bg-st-violet-700', completed: 'bg-st-teal-700', expired: 'bg-secondary', cancelled: 'bg-error', refunded: 'bg-st-fuchsia-800',
 };
-const PAYMENT_COLOR = { pending: 'bg-[#C2410C]', paid: 'bg-[#4D7C0F]', expired: 'bg-[#6D4C3D]', cancelled: 'bg-[#BA1A1A]', refund_pending: 'bg-[#0E7490]', refunded: 'bg-[#86198F]' };
+const PAYMENT_COLOR = { pending: 'bg-st-orange-700', paid: 'bg-st-lime-700', expired: 'bg-secondary', cancelled: 'bg-error', refund_pending: 'bg-st-cyan-700', refunded: 'bg-st-fuchsia-800' };
 // Warna badge pengiriman per label (status internal dan status paket Biteship), semuanya berbeda.
 const SHIPPING_COLOR = {
-    'Belum diproses': 'bg-[#64748B]', Dikemas: 'bg-[#047857]', Dikirim: 'bg-[#5B21B6]', Diterima: 'bg-[#4D7C0F]',
-    'Menunggu kurir': 'bg-[#0369A1]', 'Kurir ditugaskan': 'bg-[#115E59]', 'Kurir menjemput': 'bg-[#1E3A8A]', 'Paket diambil': 'bg-[#4F46E5]',
-    'Dalam pengiriman': 'bg-[#2563EB]', 'Sedang diantar': 'bg-[#9333EA]', Terkirim: 'bg-[#166534]', Tertahan: 'bg-[#854D0E]',
-    'Kurir belum ditemukan': 'bg-[#C2410C]', 'Dalam pengembalian': 'bg-[#DB2777]', Dikembalikan: 'bg-[#86198F]', 'Ditolak kurir': 'bg-[#4A044E]',
-    'Dibatalkan kurir': 'bg-[#991B1B]', Dimusnahkan: 'bg-[#1F2937]',
+    'Belum diproses': 'bg-st-slate-500', Dikemas: 'bg-st-emerald-700', Dikirim: 'bg-st-violet-800', Diterima: 'bg-st-lime-700',
+    'Menunggu kurir': 'bg-st-sky-700', 'Kurir ditugaskan': 'bg-st-teal-800', 'Kurir menjemput': 'bg-st-blue-900', 'Paket diambil': 'bg-st-indigo-600',
+    'Dalam pengiriman': 'bg-st-blue-600', 'Sedang diantar': 'bg-st-purple-600', Tertahan: 'bg-st-yellow-800',
+    'Kurir belum ditemukan': 'bg-st-orange-700', 'Paket dalam pengembalian': 'bg-st-pink-600', 'Paket dikembalikan': 'bg-st-fuchsia-800', 'Ditolak kurir': 'bg-st-fuchsia-950',
+    'Dibatalkan kurir': 'bg-st-red-800', Dimusnahkan: 'bg-st-gray-800',
 };
 const orderBadge = (status) => `${BADGE} ${ORDER_COLOR[status] || 'bg-secondary'}`;
 const paymentBadge = (status) => `${BADGE} ${PAYMENT_COLOR[status] || 'bg-secondary'}`;
@@ -71,6 +71,9 @@ const printLabel = (row) => window.open(`${router.resolve({ name: 'AdminOrderLab
 const dialog = ref(null);
 const detail = ref(null);
 const detailError = ref('');
+// Detail pesanan ikut ?buka=<id>: bisa dibagikan, ditandai, dan bertahan saat halaman dimuat ulang. replace, bukan push, supaya riwayat browser tidak penuh.
+const opened = ref(false);
+const setBuka = (id) => router.replace({ query: { ...route.query, buka: id ? String(id) : undefined } });
 
 const historyLabel = (history) => HISTORY_LABELS[history.status_type]?.[history.to_status] || history.to_status;
 const HISTORY_TONE = { order: 'bg-info-surface text-info', payment: 'bg-success-surface text-success', shipping: 'bg-warning-surface text-warning' };
@@ -148,14 +151,26 @@ async function loadDetail(id) {
 }
 
 async function open(order) {
+    opened.value = true;
     detail.value = null;
     counts.value = { notes: undefined, history: undefined };
     tab.value = 'notes';
+    if (String(route.query.buka || '') !== String(order.id)) setBuka(order.id);
     dialog.value.showModal();
     await loadDetail(order.id);
     loadSeen();
     setCount('history', detail.value?.histories?.length ?? 0);
 }
+
+function onClose() {
+    opened.value = false;
+    if (route.query.buka) setBuka(null);
+}
+watch(() => route.query.buka, (id) => {
+    if (id && !opened.value) open({ id });
+    else if (!id && opened.value) dialog.value.close();
+});
+onMounted(() => { if (route.query.buka) open({ id: route.query.buka }); });
 
 async function refresh() {
     await loadDetail(detail.value.id);
@@ -213,7 +228,7 @@ async function refresh() {
     </template>
   </DataTable>
 
-  <AppModal ref="dialog" variant="read" size="4xl" :title="detail?.order_number || 'Detail pesanan'" subtitle="Detail pesanan">
+  <AppModal ref="dialog" variant="read" size="4xl" :title="detail?.order_number || 'Detail pesanan'" subtitle="Detail pesanan" @close="onClose">
     <p v-if="detailError" role="alert" class="text-body-sm text-error">{{ detailError }}</p>
     <p v-else-if="!detail" role="status" class="text-secondary">Memuat detail...</p>
     <div v-else class="space-y-space-md text-body-sm">

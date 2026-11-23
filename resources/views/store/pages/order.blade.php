@@ -1,10 +1,10 @@
-@extends('store.layouts.app')
+@extends('store.layouts.app', ['legacy' => false])
 
 {{-- Satu halaman, beberapa tampilan menurut status pesanan dari server:
      menunggu bayar = FigCraft "11 Pembayaran" (Snap, D-096), Snap gagal = "11c", kedaluwarsa = "11b",
      dibayar/diproses/dikirim = "05 Status Pesanan", selesai = "06 Pesanan Selesai". --}}
 @section('content')
-	<script type="application/json" id="tf-order-data">{{ $site->json(['ref' => $ref, 'words' => ['status' => $c['status'], 'cancelStatus' => $c['cancel']['status'], 'cancelErrors' => $c['cancel']['errors'], 'tooMany' => $c['cancel']['tooMany'], 'review' => $c['review'], 'cancelFailed' => $c['cancel']['failed'], 'cancelNowErrors' => $c['cancel']['now']['errors'], 'cancelNowFailed' => $c['cancel']['now']['failed'], 'payFailed' => $c['payFailed'], 'payExpired' => $c['payExpired'], ...\Illuminate\Support\Arr::only($c, ['payEyebrow', 'payBefore', 'reviewDue', 'how', 'products', 'shippingWith', 'expiredText', 'failedText', 'heading', 'carrierHeading', 'carrierStage', 'carrierEnd', 'thanks', 'stageLabel', 'stageState', 'itemsCount', 'doneTitle', 'itemsBadge', 'stillPending', 'checking', 'paidCheck', 'copy', 'copied', 'stages']), 'track' => $c['track']], 'pay' => $pay]) }}</script>
+	<script type="application/json" id="tf-order-data">{{ $site->json(['ref' => $ref, 'words' => ['status' => $c['status'], 'cancelStatus' => $c['cancel']['status'], 'cancelErrors' => $c['cancel']['errors'], 'tooMany' => $c['cancel']['tooMany'], 'review' => $c['review'], 'cancelFailed' => $c['cancel']['failed'], 'cancelNowErrors' => $c['cancel']['now']['errors'], 'cancelNowFailed' => $c['cancel']['now']['failed'], 'payFailed' => $c['payFailed'], 'payExpired' => $c['payExpired'], ...\Illuminate\Support\Arr::only($c, ['payEyebrow', 'payBefore', 'reviewDue', 'how', 'products', 'shippingWith', 'expiredText', 'failedText', 'heading', 'carrierHeading', 'carrierStage', 'carrierEnd', 'thanks', 'stageLabel', 'stageState', 'itemsCount', 'doneTitle', 'itemsBadge', 'stillPending', 'checking', 'paidCheck', 'copy', 'copied', 'stages', 'link']), 'track' => $c['track']], 'pay' => $pay]) }}</script>
 	<main class="tf-co tf-od" x-data="orderPage">
 		<template x-if="showFlow">
 			<div>@include('store.partials.flow-steps', ['steps' => $c['flow'], 'label' => $c['flowLabel'], 'variant' => 'inline'])</div>
@@ -394,5 +394,34 @@
 				</div>
 			</template>
 		</div>
+
+		{{-- Tamu: tautan bertoken adalah satu-satunya kunci pesanan. Modal hanya bisa ditutup dengan X setelah kotak "sudah menyalin" dicentang; pilihan diingat per pesanan di perangkat ini. --}}
+		<template x-if="needsLinkSave">
+			<dialog x-ref="linkDialog" class="tf-lm" aria-labelledby="lm-title" aria-describedby="lm-lead" x-init="openLink" @cancel.prevent="">
+				<div class="tf-lm-sheet">
+					<button type="button" class="tf-lm-close" aria-label="{{ $c['link']['close'] }}" :disabled="!linkAck" @click="closeLink">{{ $site->lineIcon('close', 18) }}</button>
+					<div class="tf-lm-top">
+						<span class="tf-lm-badge" aria-hidden="true">{{ $site->lineIcon('link', 26) }}</span>
+						<p class="tf-lm-hint" role="status" x-show="!linkAck"><span class="tf-lm-dot" aria-hidden="true"></span>{{ $c['link']['closeHint'] }}</p>
+					</div>
+					<h2 id="lm-title">{{ $c['link']['title'] }}</h2>
+					<p id="lm-lead" class="tf-lm-lead">{{ $c['link']['lead'] }}</p>
+					<div class="tf-lm-field">
+						<label for="lm-url">{{ $c['link']['field'] }}</label>
+						<div class="tf-lm-url">
+							<input id="lm-url" x-ref="linkField" type="text" readonly :value="linkUrl" @focus="$event.target.select()">
+							<button type="button" class="tf-lm-copy" autofocus @click="copyLinkField">{{ $site->lineIcon('copy', 16) }} <span x-text="linkCopyText"></span></button>
+						</div>
+						<template x-if="linkCopyFailed"><p class="tf-shop-issue" role="alert">{{ $c['link']['copyFailed'] }}</p></template>
+					</div>
+					<ul class="tf-lm-points">
+						@foreach ($c['link']['points'] as $point)
+							<li>{{ $site->lineIcon('check', 16) }}<span>{{ $point }}</span></li>
+						@endforeach
+					</ul>
+					<label class="tf-lm-ack"><input type="checkbox" x-model="linkAck"><span class="tf-lm-box" aria-hidden="true">{{ $site->lineIcon('check', 16) }}</span><span>{{ $c['link']['ack'] }}</span></label>
+				</div>
+			</dialog>
+		</template>
 	</main>
 @endsection

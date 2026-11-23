@@ -51,12 +51,15 @@ class CampaignSampleSeeder extends Seeder
     {
         $campaign = Campaign::where('title', $title)->first();
 
-        if ($campaign) {
-            return $campaign;
+        if (! $campaign) {
+            $campaign = new Campaign(['title' => $title, 'description' => $description, 'starts_at' => $starts, 'ends_at' => $ends, 'is_flash' => $flash, 'is_active' => $active]);
+            $campaign->forceFill(['slug' => $this->uniqueSlug($title)])->save();
         }
 
-        $campaign = new Campaign(['title' => $title, 'description' => $description, 'starts_at' => $starts, 'ends_at' => $ends, 'is_flash' => $flash, 'is_active' => $active]);
-        $campaign->forceFill(['slug' => $this->uniqueSlug($title)])->save();
+        // Gambar contoh (tampil di popup berita dan halaman promo); gambar yang sudah ada tidak ditimpa.
+        if (! $campaign->image_path && ($path = $this->sampleImage('campaigns'))) {
+            $campaign->forceFill(['image_path' => $path])->save();
+        }
 
         return $campaign;
     }

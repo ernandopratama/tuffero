@@ -33,5 +33,11 @@ initSite();
 initAddButtons(Alpine.store('cart'));
 initHome();
 initNewsPopup();
-// Skrip template mengubah tinggi bagian (SplitText, Swiper), jadi jangkar dihitung ulang setelahnya.
-loadLegacyScripts().then(() => setTimeout(scrollToHash, 200));
+if (window.tufferoLegacy === false) {
+    // Halaman tanpa animasi templat (layout menandai 'legacy' => false): jQuery dan GSAP tidak dimuat, jadi loader dilepas di sini.
+    window.dispatchEvent(new Event('tuffero:app-ready'));
+    setTimeout(scrollToHash, 0);
+} else {
+    // Skrip template mengubah tinggi bagian (SplitText, Swiper), jadi jangkar dihitung ulang setelahnya.
+    loadLegacyScripts().then(() => setTimeout(scrollToHash, 200));
+}

@@ -7,11 +7,12 @@ import IconAction from '../../components/ui/IconAction.vue';
 import FilterSelect from '../../components/ui/FilterSelect.vue';
 import PageHeader from '../../components/ui/PageHeader.vue';
 import TableToolbar from '../../components/ui/TableToolbar.vue';
+import StatusBadge from '../../components/ui/StatusBadge.vue';
 import { useDataTable } from '../../composables/useDataTable';
 import api from '../../utils/api';
 import { apiError } from '../../utils/apiError';
 import { formatDate } from '../../utils/datetime';
-import { PAYMENT_STATUS, TONE_CLASS, rupiah } from '../../utils/orderLabels';
+import { PAYMENT_STATUS, rupiah } from '../../utils/orderLabels';
 import { useAuthStore } from '../../stores/auth';
 
 const auth = useAuthStore();
@@ -27,7 +28,6 @@ const COLUMNS = computed(() => [
 ]);
 const press = 'transition-[transform,background-color] duration-[160ms] ease-out-strong focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary active:scale-[0.97] disabled:opacity-60 disabled:active:scale-100';
 const PAYMENT_TONE = { paid: 'ok', pending: 'warn', refund_pending: 'warn', refunded: 'info', cancelled: 'bad', expired: 'neutral' };
-const DOT = { ok: 'bg-success', warn: 'bg-warning', info: 'bg-info', bad: 'bg-error', neutral: 'bg-secondary' };
 
 const { rows, meta, page, perPage, search, filter, loading, error, load } = useDataTable('/admin/payments', { filters: { payment_status: '' } });
 
@@ -99,10 +99,8 @@ function remaining(row) {
     </template>
     <template #cell-total="{ row }"><span class="whitespace-nowrap text-label-md tabular-nums">{{ rupiah(row.total) }}</span></template>
     <template #cell-payment_status="{ row }">
-      <span class="inline-flex items-center gap-1.5 whitespace-nowrap rounded-full px-2.5 py-1 text-label-sm" :class="TONE_CLASS[toneOf(row)]">
-        <i class="size-1.5 rounded-full" :class="DOT[toneOf(row)]" aria-hidden="true"></i>{{ PAYMENT_STATUS[row.payment_status] || row.payment_status }}
-      </span>
-      <span v-if="row.needs_refund" class="mt-1 block text-label-sm text-error">Dana masuk setelah pesanan ditutup. Perlu dikembalikan.</span>
+      <StatusBadge :tone="toneOf(row)">{{ PAYMENT_STATUS[row.payment_status] || row.payment_status }}</StatusBadge>
+      <span v-if="row.needs_refund" class="mt-1 block text-label-sm text-error">Dana masuk setelah pesanan ditutup. Dana perlu dikembalikan.</span>
     </template>
     <template #cell-paid_at="{ row }">
       <span class="whitespace-nowrap" :class="row.paid_at ? '' : 'text-secondary'">{{ row.paid_at ? formatDate(row.paid_at) : 'Belum dibayar' }}</span>

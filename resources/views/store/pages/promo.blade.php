@@ -1,4 +1,4 @@
-@extends('store.layouts.app')
+@extends('store.layouts.app', ['legacy' => false])
 
 @php
 	$when = fn ($date) => $date->copy()->locale(app()->getLocale())->translatedFormat('j M Y, H:i');
@@ -9,7 +9,7 @@
 	<script type="application/json" id="tf-vouchers-data">{{ $site->json([...$c['claim'], 'customer' => $storeUser && ! $storeRole, 'signIn' => $site->route('account'), 'campaign' => $campaign->slug]) }}</script>
 	<script type="application/json" id="tf-promo-data">{{ $site->json(\Illuminate\Support\Arr::only($c, ['days', 'ended'])) }}</script>
 	<main class="tf-wrap tf-shop tf-campaign">
-		<a href="{{ $site->route('promos') }}" class="tf-promo-back">@include('store.partials.account-icon', ['name' => 'back']){{ $c['title'] }}</a>
+		<a href="{{ $site->route('promos') }}" class="tf-promo-back"><span class="top-key"></span><span class="text">{{ $c['title'] }}</span><span class="bottom-key-1"></span><span class="bottom-key-2"></span></a>
 		<header class="tf-promo-head">
 			@if ($campaign->image_path)
 				<img class="tf-promo-banner" src="/storage/{{ $campaign->image_path }}" alt="{{ $campaign->title }}" width="1200" height="400" decoding="async">

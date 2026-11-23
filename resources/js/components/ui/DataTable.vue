@@ -17,7 +17,8 @@ const props = defineProps({
     minWidth: { type: String, default: 'min-w-[720px]' },
     pageSizes: { type: Array, default: () => [10, 25, 50, 75, 100] },
     // Di layar sempit (di bawah md) tiap baris menjadi kartu: judul kolom tampil di depan isi sel, tanpa geser mendatar.
-    stack: { type: Boolean, default: false },
+    // Bawaan aktif (audit UI 2026-11-21, A-02): tabel tanpa mode kartu menyembunyikan kolom Status dan Aksi di HP. Pakai :stack="false" hanya bila kartu tidak cocok.
+    stack: { type: Boolean, default: true },
 });
 // Kelas statis (bukan hasil rakitan string) supaya Tailwind mendeteksinya.
 const STACK_CELL = 'max-md:block max-md:px-0 max-md:py-1.5 max-md:text-left max-md:before:mb-0.5 max-md:before:block max-md:before:text-label-sm max-md:before:uppercase max-md:before:tracking-wide max-md:before:text-secondary max-md:before:content-[attr(data-label)]';
@@ -85,13 +86,13 @@ const pages = computed(() => {
         <div class="flex flex-wrap items-center gap-x-4 gap-y-2">
           <label class="flex items-center gap-2">
             Baris
-            <select v-model.number="perPage" class="h-9 cursor-pointer rounded-full border border-border bg-surface px-3 text-body-sm text-primary focus:border-primary focus:outline-2 focus:outline-offset-1 focus:outline-primary">
+            <select v-model.number="perPage" class="h-9 pointer-coarse:h-11 cursor-pointer rounded-full border border-secondary bg-surface px-3 text-body-sm text-primary focus:border-primary focus:outline-2 focus:outline-offset-1 focus:outline-primary">
               <option v-for="n in pageSizes" :key="n" :value="n">{{ n }}</option>
             </select>
           </label>
 
           <nav class="flex items-center gap-1" aria-label="Halaman">
-            <button type="button" :disabled="page <= 1" class="flex size-9 items-center justify-center rounded-full border border-border text-primary transition-colors hover:bg-accent-tint-15 focus-visible:outline-2 focus-visible:outline-primary disabled:opacity-40 disabled:hover:bg-transparent" aria-label="Halaman sebelumnya" @click="page -= 1">
+            <button type="button" :disabled="page <= 1" class="flex size-9 pointer-coarse:size-11 items-center justify-center rounded-full border border-secondary text-primary transition-colors hover:bg-accent-tint-15 focus-visible:outline-2 focus-visible:outline-primary disabled:opacity-40 disabled:hover:bg-transparent" aria-label="Halaman sebelumnya" @click="page -= 1">
               <AdminIcon name="chevron-down" :size="16" class="rotate-90" />
             </button>
             <template v-for="(n, i) in pages" :key="i">
@@ -99,13 +100,13 @@ const pages = computed(() => {
               <button
                 v-else
                 type="button"
-                class="h-9 min-w-9 rounded-full px-3 text-label-md transition-colors focus-visible:outline-2 focus-visible:outline-primary"
+                class="h-9 min-w-9 pointer-coarse:h-11 pointer-coarse:min-w-11 rounded-full px-3 text-label-md transition-colors focus-visible:outline-2 focus-visible:outline-primary"
                 :class="n === page ? 'bg-accent text-primary' : 'text-primary hover:bg-accent-tint-15'"
                 :aria-current="n === page ? 'page' : undefined"
                 @click="page = n"
               >{{ n }}</button>
             </template>
-            <button type="button" :disabled="page >= meta.last_page" class="flex size-9 items-center justify-center rounded-full border border-border text-primary transition-colors hover:bg-accent-tint-15 focus-visible:outline-2 focus-visible:outline-primary disabled:opacity-40 disabled:hover:bg-transparent" aria-label="Halaman berikutnya" @click="page += 1">
+            <button type="button" :disabled="page >= meta.last_page" class="flex size-9 pointer-coarse:size-11 items-center justify-center rounded-full border border-secondary text-primary transition-colors hover:bg-accent-tint-15 focus-visible:outline-2 focus-visible:outline-primary disabled:opacity-40 disabled:hover:bg-transparent" aria-label="Halaman berikutnya" @click="page += 1">
               <AdminIcon name="chevron-down" :size="16" class="-rotate-90" />
             </button>
           </nav>

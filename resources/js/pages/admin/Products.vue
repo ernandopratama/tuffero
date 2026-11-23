@@ -217,7 +217,7 @@ onMounted(async () => {
       <input type="checkbox" class="size-5 cursor-pointer accent-primary" :checked="row.id in selected" :aria-label="`Pilih ${row.name}`" @change="toggle(row)">
     </template>
     <template #cell-name="{ row }">
-      <div class="inline-flex max-w-sm items-center gap-3 text-left">
+      <div class="inline-flex max-w-full items-center gap-3 text-left md:max-w-sm">
         <img v-if="row.images[0]" :src="row.images[0].url" :alt="row.images[0].alt || row.name" width="56" height="56" loading="lazy" class="size-14 shrink-0 rounded-2xl border border-border object-cover">
         <span v-else class="grid size-14 shrink-0 place-items-center rounded-2xl border border-dashed border-border bg-accent-tint-12 text-secondary" aria-hidden="true"><AdminIcon name="tag" :size="20" /></span>
         <span class="min-w-0">

@@ -15,18 +15,22 @@
 		<link rel="apple-touch-icon" href="{{ asset('images/pwa/store-apple-180.png') }}">
 	@endif
 	<link rel="shortcut icon" type="image/x-icon" href="{{ asset('images/Logo/Tuffero Icon - NoBckgrnd.webp') }}">
+	{{-- Halaman bertanda 'legacy' => false (keranjang, checkout, akun, dll.) tidak memakai animasi templat: tanpa jQuery, GSAP, Swiper, dan CSS pendampingnya. Bootstrap dan custom.css tetap, karena tata letak masih bergantung pada keduanya. --}}
+	@php $tfLegacy = $legacy ?? true; @endphp
 	<link href="{{ asset('css/bootstrap.min.css') }}?v={{ filemtime(public_path('css/bootstrap.min.css')) }}" rel="stylesheet" media="screen">
-	<link rel="stylesheet" href="{{ asset('css/swiper-bundle.min.css') }}?v={{ filemtime(public_path('css/swiper-bundle.min.css')) }}">
-	<link href="{{ asset('css/animate.css') }}?v={{ filemtime(public_path('css/animate.css')) }}" rel="stylesheet">
-	<link rel="stylesheet" href="{{ asset('css/magnific-popup.css') }}?v={{ filemtime(public_path('css/magnific-popup.css')) }}">
-	<link rel="stylesheet" href="{{ asset('css/mousecursor.css') }}?v={{ filemtime(public_path('css/mousecursor.css')) }}">
+	@if ($tfLegacy)
+		<link rel="stylesheet" href="{{ asset('css/swiper-bundle.min.css') }}?v={{ filemtime(public_path('css/swiper-bundle.min.css')) }}">
+		<link href="{{ asset('css/animate.css') }}?v={{ filemtime(public_path('css/animate.css')) }}" rel="stylesheet">
+		<link rel="stylesheet" href="{{ asset('css/magnific-popup.css') }}?v={{ filemtime(public_path('css/magnific-popup.css')) }}">
+		<link rel="stylesheet" href="{{ asset('css/mousecursor.css') }}?v={{ filemtime(public_path('css/mousecursor.css')) }}">
+	@endif
 	<link href="{{ asset('css/custom.css') }}?v={{ filemtime(public_path('css/custom.css')) }}" rel="stylesheet" media="screen">
 	<link href="{{ asset('css/tuffero-landing.css') }}?v={{ filemtime(public_path('css/tuffero-landing.css')) }}" rel="stylesheet" media="screen">
 	<link href="{{ asset('css/tuffero-loader.css') }}?v={{ filemtime(public_path('css/tuffero-loader.css')) }}" rel="stylesheet">
 
 	@fonts
 	{{-- Versi berkas public/js (waktu ubah) untuk resources/js/legacy.js, yang memuat jQuery dan plugin templat secara dinamis. --}}
-	<script>window.tufferoAssetV = @json(collect(glob(public_path('js/*.js')))->mapWithKeys(fn ($file) => [basename($file) => filemtime($file)]));</script>
+	<script>window.tufferoLegacy = @json($tfLegacy);@if ($tfLegacy) window.tufferoAssetV = @json(collect(glob(public_path('js/*.js')))->mapWithKeys(fn ($file) => [basename($file) => filemtime($file)]));@endif</script>
 	<script src="{{ asset('js/tuffero-loader.js') }}?v={{ filemtime(public_path('js/tuffero-loader.js')) }}" defer></script>
 	<noscript><style>.tf-page-loader, .tuffero-loader { display: none !important; } .wow { visibility: visible !important; } .tf-cat-card[hidden] { display: flex !important; }</style></noscript>
 	<script>

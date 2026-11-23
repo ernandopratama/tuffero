@@ -15,6 +15,8 @@ import { TONE_CLASS } from '../../utils/orderLabels';
 import { useAuthStore } from '../../stores/auth';
 import PageHeader from '../../components/ui/PageHeader.vue';
 import AddButton from '../../components/ui/AddButton.vue';
+import StatusBadge from '../../components/ui/StatusBadge.vue';
+import FormField from '../../components/ui/FormField.vue';
 
 const auth = useAuthStore();
 const canManage = computed(() => auth.can('vouchers.manage'));
@@ -30,7 +32,6 @@ const COLUMNS = [
     { key: 'actions', label: 'Aksi' },
 ];
 const AUDIENCES = { all: 'Semua pelanggan', guest: 'Non Member (tanpa akun)', member: 'Member (sudah login)' };
-const DOT = { ok: 'bg-success', warn: 'bg-warning', bad: 'bg-error', info: 'bg-info', neutral: 'bg-secondary' };
 
 const press = 'transition-[transform,background-color] duration-[160ms] ease-out-strong focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary active:scale-[0.97] disabled:opacity-60 disabled:active:scale-100';
 const field = 'mt-1 block w-full rounded-2xl border border-secondary bg-surface px-3 py-2 text-body-md font-normal focus:outline-2 focus:outline-primary disabled:opacity-70';
@@ -238,9 +239,7 @@ async function save() {
       <span v-else class="text-secondary">Tanpa batas waktu</span>
     </template>
     <template #cell-status="{ row }">
-      <span class="inline-flex items-center gap-1.5 whitespace-nowrap rounded-full px-2.5 py-1 text-label-sm" :class="TONE_CLASS[stateOf(row).tone]">
-        <i class="size-1.5 rounded-full" :class="DOT[stateOf(row).tone]" aria-hidden="true"></i>{{ stateOf(row).label }}
-      </span>
+      <StatusBadge :tone="stateOf(row).tone">{{ stateOf(row).label }}</StatusBadge>
     </template>
     <template #cell-actions="{ row }">
       <div class="flex items-center justify-center gap-1"><IconAction :icon="canManage ? 'edit' : 'eye'" :label="canManage ? 'Ubah' : 'Lihat'" :subject="row.code" @click="open(row)" /></div>
@@ -270,24 +269,18 @@ async function save() {
         </fieldset>
 
         <div class="grid gap-space-md sm:grid-cols-2">
-          <label class="block text-label-md">
-            Kode
+          <FormField label="Kode" :error="fieldErrors.code">
             <input v-model="form.code" required maxlength="40" :class="field" class="font-mono uppercase">
-            <span v-if="fieldErrors.code" class="mt-1 block text-body-sm font-normal text-error">{{ fieldErrors.code[0] }}</span>
-          </label>
-          <label class="block text-label-md">
-            Untuk siapa
+          </FormField>
+          <FormField label="Untuk siapa" :error="fieldErrors.audience">
             <select v-if="!isShipping" v-model="form.audience" :class="field">
               <option v-for="(label, value) in AUDIENCES" :key="value" :value="value">{{ label }}</option>
             </select>
             <span v-else :class="field" class="text-secondary">{{ AUDIENCES.member }}</span>
-            <span v-if="fieldErrors.audience" class="mt-1 block text-body-sm font-normal text-error">{{ fieldErrors.audience[0] }}</span>
-          </label>
-          <label class="block text-label-md sm:col-span-2">
-            Keterangan di daftar voucher <span class="font-normal text-secondary">(opsional)</span>
+          </FormField>
+          <FormField label="Keterangan di daftar voucher" optional :error="fieldErrors.description" class="sm:col-span-2">
             <input v-model="form.description" maxlength="150" placeholder="Contoh: Diskon spesial pelanggan baru" :class="field">
-            <span v-if="fieldErrors.description" class="mt-1 block text-body-sm font-normal text-error">{{ fieldErrors.description[0] }}</span>
-          </label>
+          </FormField>
         </div>
 
         <fieldset v-if="!isShipping" class="grid gap-2 sm:grid-cols-2">
@@ -299,28 +292,22 @@ async function save() {
         </fieldset>
 
         <div class="grid gap-space-md sm:grid-cols-2">
-          <label class="block text-label-md">
-            {{ isShipping ? 'Potongan ongkir (Rp)' : form.type === 'percent' ? 'Diskon (%)' : 'Potongan (Rp)' }}
+          <FormField :label="isShipping ? 'Potongan ongkir (Rp)' : form.type === 'percent' ? 'Diskon (%)' : 'Potongan (Rp)'" :error="fieldErrors.value">
             <input v-if="isShipping" v-model.number="form.value" type="number" required min="1000" max="25000" :class="field">
             <input v-else v-model.number="form.value" type="number" required min="1" :max="form.type === 'percent' ? 100 : undefined" :class="field">
             <span v-if="isShipping" class="mt-1 block text-body-sm font-normal text-secondary">Rp1.000 sampai Rp25.000. Tidak pernah melebihi ongkir.</span>
-            <span v-if="fieldErrors.value" class="mt-1 block text-body-sm font-normal text-error">{{ fieldErrors.value[0] }}</span>
-          </label>
+          </FormField>
           <label v-if="form.type === 'percent' && !isShipping" class="block text-label-md">
             Batas diskon <span class="font-normal text-secondary">(Rp, opsional)</span>
             <input v-model.number="form.max_discount" type="number" min="1" :class="field">
             <span v-if="fieldErrors.max_discount" class="mt-1 block text-body-sm font-normal text-error">{{ fieldErrors.max_discount[0] }}</span>
           </label>
-          <label class="block text-label-md">
-            Minimum belanja (Rp)
+          <FormField label="Minimum belanja (Rp)" :error="fieldErrors.min_subtotal">
             <input v-model.number="form.min_subtotal" type="number" min="0" :class="field">
-            <span v-if="fieldErrors.min_subtotal" class="mt-1 block text-body-sm font-normal text-error">{{ fieldErrors.min_subtotal[0] }}</span>
-          </label>
-          <label class="block text-label-md">
-            Kuota <span class="font-normal text-secondary">(opsional)</span>
+          </FormField>
+          <FormField label="Kuota" optional :error="fieldErrors.quota">
             <input v-model.number="form.quota" type="number" min="1" :class="field">
-            <span v-if="fieldErrors.quota" class="mt-1 block text-body-sm font-normal text-error">{{ fieldErrors.quota[0] }}</span>
-          </label>
+          </FormField>
           <label class="block text-label-md">
             Batas pakai per pelanggan
             <input v-model.number="form.per_customer_limit" type="number" min="1" :class="field">
@@ -353,11 +340,9 @@ async function save() {
             Mulai <span class="font-normal text-secondary">(opsional)</span>
             <input v-model="form.starts_at" type="datetime-local" :class="field">
           </label>
-          <label class="block text-label-md">
-            Selesai <span class="font-normal text-secondary">(opsional)</span>
+          <FormField label="Selesai" optional :error="fieldErrors.ends_at">
             <input v-model="form.ends_at" type="datetime-local" :class="field">
-            <span v-if="fieldErrors.ends_at" class="mt-1 block text-body-sm font-normal text-error">{{ fieldErrors.ends_at[0] }}</span>
-          </label>
+          </FormField>
         </div>
 
         <fieldset v-if="isShipping">

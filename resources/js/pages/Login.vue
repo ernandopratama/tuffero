@@ -215,7 +215,7 @@ const ghostBtn = 'inline-flex h-10 items-center justify-center gap-2 rounded-ful
     <div class="w-full space-y-4 rounded-lg border border-border bg-surface p-6 pt-8 text-primary shadow-card transition-[max-width] duration-300 ease-out-strong sm:p-8 sm:pt-10" :class="step === 'setup' ? 'max-w-md lg:max-w-3xl' : 'max-w-sm'">
       <div class="text-center">
         <h1 class="font-heading text-headline-md">{{ title }}</h1>
-        <p v-if="step === 'credentials'" class="mt-1 text-body-sm text-secondary">Kelola pesanan, stok, dan operasional Tuffero Patisserie.</p>
+        <p v-if="step === 'credentials'" class="mt-1 text-body-sm text-secondary">Kelola pesanan, stok, dan operasional Tuffero Bakery.</p>
         <p v-else-if="step === 'challenge'" class="mt-1 text-body-sm text-secondary" role="status" :aria-busy="emailSending">
           <!-- Mengirim kode: teks bergelombang huruf demi huruf (naik dan membesar bergantian) -->
           <template v-if="emailSending">

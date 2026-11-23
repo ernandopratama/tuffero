@@ -1,4 +1,4 @@
-@extends('store.layouts.app')
+@extends('store.layouts.app', ['legacy' => false])
 
 @section('content')
 	<script type="application/json" id="tf-lookup-data">{{ $site->json(\Illuminate\Support\Arr::only($c, ['tooMany', 'failed'])) }}</script>

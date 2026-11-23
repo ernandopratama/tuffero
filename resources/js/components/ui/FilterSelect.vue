@@ -21,8 +21,8 @@ const list = computed(() => (Array.isArray(props.options)
     <span class="pointer-events-none absolute left-3.5 top-1/2 -translate-y-1/2 text-secondary"><AdminIcon name="filter" :size="16" /></span>
     <select
       v-model="model"
-      class="h-10 w-full max-w-full cursor-pointer appearance-none rounded-full border bg-surface pl-9 pr-9 text-body-sm focus:border-primary focus:outline-2 focus:outline-offset-1 focus:outline-primary"
-      :class="model === '' || model === null ? 'border-border text-secondary' : 'border-primary text-primary'"
+      class="h-10 pointer-coarse:h-11 w-full max-w-full cursor-pointer appearance-none rounded-full border bg-surface pl-9 pr-9 text-body-sm focus:border-primary focus:outline-2 focus:outline-offset-1 focus:outline-primary"
+      :class="model === '' || model === null ? 'border-secondary text-secondary' : 'border-primary text-primary'"
     >
       <option value="">{{ label }}: {{ allLabel }}</option>
       <option v-for="o in list" :key="o.value" :value="o.value">{{ label }}: {{ o.label }}</option>

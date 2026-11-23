@@ -136,9 +136,10 @@ export const product = () => ({
         this.sku = data.sku;
         this.path = data.path;
         this.words = data.words;
-        // Bilah beli di bawah layar (mobile) muncul setelah tombol utama keluar dari layar.
+        // Bilah beli di bawah layar (mobile) tampil selama tombol utama belum terlihat: harga dan tombol beli sudah ada di layar pertama,
+        // yang sebelumnya tertutup navbar bawah (audit UI 2026-11-21, T-03). Bilah hanya ada di mobile (CSS), jadi desktop tidak terpengaruh.
         if ('IntersectionObserver' in window) {
-            new IntersectionObserver(([e]) => { this.stickyOn = !e.isIntersecting && e.boundingClientRect.top < 0; }).observe(this.$refs.cta);
+            new IntersectionObserver(([e]) => { this.stickyOn = !e.isIntersecting; }).observe(this.$refs.cta);
         }
     },
     get photoSrc() { return this.photos[this.active]?.src; },

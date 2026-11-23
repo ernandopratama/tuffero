@@ -52,13 +52,7 @@
 							@endforeach
 						</ul>
 					@endif
-					<div class="tf-pd-share">
-						<span>{{ $p['share'] }}</span>
-						<a href="{{ $waHref }}" target="_blank" rel="noopener noreferrer" aria-label="{{ $p['shareWa'] }} ({{ $newTab }})">
-							<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M7.9 20A9 9 0 1 0 4 16.1L2 22Z"></path></svg>WhatsApp
-						</a>
-						@include('store.partials.slide-button', ['label' => $p['copyLink'], 'copyText' => false])
-					</div>
+					@include('store.partials.product-share', ['class' => 'is-gallery'])
 				</div>
 
 				<div class="tf-pd-info wow fadeInUp" data-wow-delay="0.1s">
@@ -107,6 +101,7 @@
 						<button type="button" class="tf-pd-add" @click="addCurrent">{{ $site->icon('shopping_bag', 20) }}{{ $p['addShort'] }}</button>
 						<button type="button" class="tf-btn" @click="buyNow">{{ $p['buyShort'] }}</button>
 					</div>
+					@include('store.partials.product-share', ['class' => 'is-info'])
 				</div>
 			</div>
 		</section>

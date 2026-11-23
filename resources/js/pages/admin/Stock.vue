@@ -14,6 +14,7 @@ import { apiError } from '../../utils/apiError';
 import { TONE_CLASS } from '../../utils/orderLabels';
 import { useAuthStore } from '../../stores/auth';
 import PageHeader from '../../components/ui/PageHeader.vue';
+import StatusBadge from '../../components/ui/StatusBadge.vue';
 
 const auth = useAuthStore();
 const dateFormat = new Intl.DateTimeFormat('id-ID', { dateStyle: 'medium', timeStyle: 'short' });
@@ -30,7 +31,6 @@ const MOVEMENTS = {
 };
 
 // Batas "menipis" tiap baris dari server: batas varian bila diisi, jika tidak batas bawaan Pengaturan (D-055).
-const DOT = { ok: 'bg-success', warn: 'bg-warning', bad: 'bg-error' };
 const level = (row) => {
     if (row.available <= 0) return { label: 'Habis', tone: 'bad' };
     if (row.available < row.low_stock) return { label: 'Menipis', tone: 'warn' };
@@ -265,10 +265,14 @@ onMounted(async () => {
     @retry="load"
   >
     <template #head-select>
-      <input type="checkbox" class="size-5 cursor-pointer accent-primary" :checked="allOnPage" :indeterminate.prop="someOnPage && !allOnPage" aria-label="Pilih semua varian di halaman ini" @change="togglePickAll">
+      <label class="flex items-center justify-center pointer-coarse:size-11">
+        <input type="checkbox" class="size-5 cursor-pointer accent-primary" :checked="allOnPage" :indeterminate.prop="someOnPage && !allOnPage" aria-label="Pilih semua varian di halaman ini" @change="togglePickAll">
+      </label>
     </template>
     <template #cell-select="{ row }">
-      <input type="checkbox" class="size-5 cursor-pointer accent-primary" :checked="row.variant_id in picked" :aria-label="`Pilih ${row.sku}`" @change="togglePick(row)">
+      <label class="flex items-center justify-center pointer-coarse:size-11">
+        <input type="checkbox" class="size-5 cursor-pointer accent-primary" :checked="row.variant_id in picked" :aria-label="`Pilih ${row.sku}`" @change="togglePick(row)">
+      </label>
     </template>
     <template #cell-product="{ row }">
       <span class="block text-label-md" :class="row.is_active ? '' : 'text-secondary'">{{ row.product }}</span>
@@ -280,9 +284,7 @@ onMounted(async () => {
     <template #cell-reserved="{ row }"><span class="tabular-nums" :class="row.reserved ? '' : 'text-secondary'">{{ row.reserved }}</span></template>
     <template #cell-available="{ row }">
       <span class="block text-label-md tabular-nums">{{ row.available }}</span>
-      <span class="mt-1 inline-flex items-center gap-1.5 whitespace-nowrap rounded-full px-2.5 py-0.5 text-label-sm" :class="TONE_CLASS[level(row).tone]">
-        <i class="size-1.5 rounded-full" :class="DOT[level(row).tone]" aria-hidden="true"></i>{{ level(row).label }}
-      </span>
+      <StatusBadge class="mt-1" :tone="level(row).tone" size="sm">{{ level(row).label }}</StatusBadge>
     </template>
     <template #cell-actions="{ row }">
       <div class="flex items-center justify-center gap-1 max-md:justify-start">

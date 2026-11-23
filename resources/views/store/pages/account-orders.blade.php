@@ -1,4 +1,4 @@
-@extends('store.layouts.app')
+@extends('store.layouts.app', ['legacy' => false])
 
 @section('content')
 	<script type="application/json" id="tf-orders-data">{{ $site->json(['items' => $c['items'], 'status' => $pg['order']['status']]) }}</script>

@@ -2,23 +2,23 @@
 export const ORDER_STATUS = {
     awaiting_approval: 'Menunggu persetujuan',
     rejected: 'Ditolak admin',
-    pending_payment: 'Menunggu bayar',
+    pending_payment: 'Menunggu pembayaran',
     paid: 'Dibayar',
     processing: 'Diproses',
     shipped: 'Dikirim',
     completed: 'Selesai',
     expired: 'Kedaluwarsa',
     cancelled: 'Dibatalkan',
-    refunded: 'Dana kembali',
+    refunded: 'Dana dikembalikan',
 };
 
 export const PAYMENT_STATUS = {
-    pending: 'Menunggu',
+    pending: 'Menunggu pembayaran',
     paid: 'Lunas',
     expired: 'Kedaluwarsa',
     cancelled: 'Dibatalkan',
-    refund_pending: 'Perlu dikembalikan',
-    refunded: 'Dikembalikan',
+    refund_pending: 'Dana perlu dikembalikan',
+    refunded: 'Dana dikembalikan',
 };
 
 export const SHIPPING_STATUS = {
@@ -36,11 +36,11 @@ export const CARRIER_STATUS = {
     picked: { label: 'Paket diambil', tone: 'info' },
     in_transit: { label: 'Dalam pengiriman', tone: 'info' },
     dropping_off: { label: 'Sedang diantar', tone: 'info' },
-    delivered: { label: 'Terkirim', tone: 'ok' },
+    delivered: { label: 'Diterima', tone: 'ok' },
     on_hold: { label: 'Tertahan', tone: 'warn' },
     courier_not_found: { label: 'Kurir belum ditemukan', tone: 'warn' },
-    return_in_transit: { label: 'Dalam pengembalian', tone: 'bad' },
-    returned: { label: 'Dikembalikan', tone: 'bad' },
+    return_in_transit: { label: 'Paket dalam pengembalian', tone: 'bad' },
+    returned: { label: 'Paket dikembalikan', tone: 'bad' },
     rejected: { label: 'Ditolak kurir', tone: 'bad' },
     cancelled: { label: 'Dibatalkan kurir', tone: 'bad' },
     disposed: { label: 'Dimusnahkan', tone: 'bad' },

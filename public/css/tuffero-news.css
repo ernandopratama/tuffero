@@ -1,5 +1,7 @@
 /* Popup berita beranda (D-085). Dimuat oleh resources/js/store/newsPopup.js hanya saat popup akan tampil,
-   jadi tidak menambah CSS yang memblokir render halaman. Memakai variabel :root dari tuffero-landing.css. */
+   jadi tidak menambah CSS yang memblokir render halaman. Memakai variabel :root dari tuffero-landing.css.
+   Tata letak: gambar besar mengisi bagian atas kartu, label jenis + tanggal di kotak kaca di atas gambar, judul,
+   teks, tombol selebar kartu, lalu navigasi carousel. Tombol tutup emas menempel di luar sudut kanan atas. */
 
 dialog.tf-news{
 	--news-ink: var(--tf-ink, #2B1B14);
@@ -8,10 +10,15 @@ dialog.tf-news{
 	--news-line: var(--tf-line, #E3D5C0);
 	--news-ivory: var(--tf-ivory, #F6F0E5);
 	--news-ease: var(--tf-ease-out, cubic-bezier(0.23, 1, 0.32, 1));
+	--news-pad: 28px;
+	/* Jarak gambar ke tepi kartu: lebih kecil dari --news-pad, jadi gambar lebih lebar dari teks di bawahnya. */
+	--news-inset: 14px;
+	/* Ukuran popup dikunci: lebar dan tinggi tetap, apa pun isi slide. Sisa tinggi diisi gambar (lihat .tf-news-media). */
+	--news-height: min(660px, calc(100dvh - 48px));
 
-	width: min(520px, calc(100vw - 32px));
+	width: min(640px, calc(100vw - 48px));
 	max-width: none;
-	max-height: calc(100dvh - 32px);
+	max-height: calc(100dvh - 48px);
 	margin: auto;
 	padding: 0;
 	border: 0;
@@ -20,8 +27,10 @@ dialog.tf-news{
 	font-family: var(--tf-sans, "Be Vietnam Pro", sans-serif);
 	overflow: visible;
 }
-dialog.tf-news::backdrop{ background: rgb(43 27 20 / 0.5); }
+dialog.tf-news::backdrop{ background: rgb(43 27 20 / 0.55); }
 body:has(dialog.tf-news[open]){ overflow: hidden; }
+/* Ruang scrollbar tetap dipesan saat scroll dikunci, supaya halaman di belakang tidak bergeser. */
+html:has(dialog.tf-news[open]){ scrollbar-gutter: stable; }
 
 /* Masuk: naik sedikit dan membesar dari 0,96 (tidak pernah dari 0). Keluar lebih cepat dari masuk. */
 dialog.tf-news[open]{ animation: tf-news-in 240ms var(--news-ease); }
@@ -35,17 +44,19 @@ dialog.tf-news.is-closing::backdrop{ animation: tf-news-fade 160ms ease-out reve
 .tf-news-card{
 	display: flex;
 	flex-direction: column;
-	max-height: calc(100dvh - 32px);
+	height: var(--news-height);
 	overflow: hidden;
-	border: 1px solid var(--news-line);
+	padding: var(--news-inset) 0 24px;
+	box-sizing: border-box;
 	border-radius: 24px;
 	background: #fff;
-	box-shadow: 0 24px 60px -20px rgb(43 27 20 / 0.45), 0 4px 12px rgb(43 27 20 / 0.12);
+	box-shadow: 0 24px 60px -20px rgb(43 27 20 / 0.5), 0 4px 12px rgb(43 27 20 / 0.12);
 }
 
-.tf-news-head{ display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 14px 12px 0 24px; }
-.tf-news-eyebrow{ display: flex; align-items: center; gap: 10px; margin: 0; color: var(--news-brown); font-size: 12px; font-weight: 600; letter-spacing: 0.12em; text-transform: uppercase; }
-.tf-news-eyebrow::before{ content: ""; width: 22px; height: 1px; background: var(--news-gold); }
+/* Judul popup dan pengumuman slide: hanya untuk pembaca layar. */
+.tf-news-eyebrow,
+.tf-news-status{ position: absolute; width: 1px; height: 1px; margin: -1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
+.tf-news-eyebrow:focus{ outline: none; }
 
 .tf-news-close,
 .tf-news-nav{
@@ -59,25 +70,38 @@ dialog.tf-news.is-closing::backdrop{ animation: tf-news-fade 160ms ease-out reve
 	background: transparent;
 	color: var(--news-ink);
 	font: inherit;
-	font-size: 28px;
-	line-height: 1;
+	line-height: 0;
 	cursor: pointer;
 	transition: transform 160ms ease-out, background-color 160ms ease;
 }
-.tf-news-nav{ border: 1px solid var(--news-line); font-size: 24px; }
+.tf-news-close{
+	position: absolute;
+	top: -14px;
+	right: -14px;
+	z-index: 2; /* selalu di atas kartu dan gambar */
+	background: var(--news-gold);
+	box-shadow: 0 0 0 4px #fff, 0 6px 16px -4px rgb(43 27 20 / 0.45);
+}
+.tf-news-nav{ border: 1px solid var(--news-line); }
+.tf-news-close svg,
+.tf-news-nav svg{ width: 20px; height: 20px; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
+.tf-news-close svg{ stroke-width: 2.2; }
 .tf-news-close:active,
 .tf-news-nav:active,
 .tf-news-cta:active{ transform: scale(0.97); }
-.tf-news-nav:disabled{ opacity: 0.35; cursor: default; }
+.tf-news-nav:disabled{ opacity: 0.45; cursor: default; }
 .tf-news-nav:disabled:active{ transform: none; }
 @media (hover: hover) and (pointer: fine){
-	.tf-news-close:hover,
+	.tf-news-close:hover{ background: #D8B978; }
 	.tf-news-nav:not(:disabled):hover{ background: var(--news-ivory); }
 }
 .tf-news-close:focus-visible,
 .tf-news-nav:focus-visible,
-.tf-news-cta:focus-visible,
-.tf-news-viewport:focus-visible{ outline: 2px solid var(--news-gold); outline-offset: 2px; }
+.tf-news-cta:focus-visible{ outline: 2px solid var(--news-gold); outline-offset: 2px; }
+.tf-news-cta:focus-visible{ outline-color: var(--news-ink); }
+.tf-news-close:focus-visible{ outline-color: var(--news-ink); }
+/* Kartu memotong isi di luar batasnya, jadi garis fokus carousel digambar di dalam. */
+.tf-news-viewport:focus-visible{ outline: 2px solid var(--news-gold); outline-offset: -2px; }
 
 /* Carousel: geser asli browser (scroll-snap), tanpa pustaka. */
 .tf-news-viewport{
@@ -86,58 +110,160 @@ dialog.tf-news.is-closing::backdrop{ animation: tf-news-fade 160ms ease-out reve
 	scroll-snap-type: x mandatory;
 	overscroll-behavior-x: contain;
 	scrollbar-width: none;
+	flex: 1 1 auto;
 	min-height: 0;
 }
 .tf-news-viewport::-webkit-scrollbar{ display: none; }
-.tf-news-track{ display: flex; margin: 0; padding: 0; list-style: none; }
-.tf-news-slide{ flex: 0 0 100%; box-sizing: border-box; padding: 14px 24px 8px; scroll-snap-align: start; scroll-snap-stop: always; }
+.tf-news-track{ display: flex; min-height: 100%; margin: 0; padding: 0; list-style: none; }
+.tf-news-slide{ display: flex; flex-direction: column; flex: 0 0 100%; box-sizing: border-box; padding: 0 var(--news-pad); scroll-snap-align: start; scroll-snap-stop: always; }
 
-/* Ukuran gambar dipesan lewat aspect-ratio, jadi tidak ada loncatan tata letak saat gambar tiba. */
-.tf-news-media{ width: 100%; aspect-ratio: 16 / 9; max-height: 36dvh; overflow: hidden; border-radius: 16px; background: linear-gradient(135deg, #F0E2C2, #F8EFD9); }
-.tf-news-media img{ display: block; width: 100%; height: 100%; object-fit: cover; }
-.tf-news-media.is-blank{ background: radial-gradient(circle at 30% 30%, #F4E6C4, #E8D3A0 70%); }
+/* Gambar mengisi semua sisa tinggi slide, jadi tidak ada ruang kosong: slide tanpa tombol (berita, update) mendapat gambar
+   lebih tinggi daripada slide promo yang bertombol. Teks panjang memendekkan gambar sampai batas min-height, baru menggulir.
+   Tinggi kartu tetap, jadi tidak ada loncatan tata letak saat gambar tiba. */
+/* Margin negatif melebarkan gambar dari tepi teks (--news-pad) ke dekat tepi kartu (--news-inset); teks tetap selebar semula.
+   Sudut gambar = sudut kartu dikurangi jaraknya, supaya lengkungannya sejajar. */
+.tf-news-media{ position: relative; flex: 1 1 0; min-height: 180px; margin-inline: calc(var(--news-inset) - var(--news-pad)); overflow: hidden; border-radius: calc(24px - var(--news-inset)); background: linear-gradient(135deg, #F0E2C2, #F8EFD9); }
+.tf-news-media img{ position: absolute; inset: 0; display: block; width: 100%; height: 100%; object-fit: cover; }
 
-.tf-news-body{ padding-top: 16px; }
+/* Label jenis + tanggal. Di atas gambar: kotak kaca gelap di kiri bawah. Tanpa gambar: pil berwarna di atas judul. */
+.tf-news-tag{ display: flex; flex-wrap: wrap; align-items: center; gap: 6px 10px; margin-bottom: 12px; }
 .tf-news-badge{ display: inline-flex; align-items: center; padding: 4px 11px; border-radius: 999px; background: #F3EADB; color: var(--news-brown); font-size: 12px; font-weight: 600; }
 .tf-news-badge.is-flash,
 .tf-news-badge.is-promo{ background: #FCF1EE; color: #A63A2B; }
 .tf-news-badge.is-campaign{ background: #FBF1D9; color: #7A5A1E; }
 .tf-news-badge.is-update{ background: #F4F8EE; color: #3F6B2C; }
-.tf-news-title{ margin: 10px 0 6px; color: var(--news-ink); font-family: var(--tf-serif, "EB Garamond", serif); font-size: 26px; font-weight: 500; line-height: 1.15; overflow-wrap: anywhere; }
+.tf-news-note{ color: var(--news-brown); font-size: 13px; }
+
+.tf-news-media .tf-news-tag{
+	position: absolute;
+	left: 14px;
+	bottom: 14px;
+	max-width: calc(100% - 28px);
+	box-sizing: border-box;
+	flex-direction: column;
+	align-items: flex-start;
+	gap: 2px;
+	margin: 0;
+	padding: 10px 18px 12px;
+	border: 1px solid rgb(255 255 255 / 0.5);
+	border-radius: 12px;
+	background: rgb(43 27 20 / 0.42);
+	-webkit-backdrop-filter: blur(8px);
+	backdrop-filter: blur(8px);
+	color: #fff;
+}
+.tf-news-media .tf-news-badge{ padding: 0; border-radius: 0; background: none; color: #fff; font-size: 22px; font-weight: 600; line-height: 1.25; }
+.tf-news-media .tf-news-note{ color: rgb(255 255 255 / 0.92); font-size: 14px; line-height: 1.4; }
+
+.tf-news-media + .tf-news-body{ padding-top: 22px; }
+/* Slide tanpa gambar: kartu hanya punya --news-inset di atas, jadi tambah sisanya supaya teks tidak menempel. */
+.tf-news-body:first-child{ padding-top: calc(var(--news-pad) - var(--news-inset)); }
+.tf-news-title{ margin: 0 0 8px; color: var(--news-ink); font-family: var(--tf-serif, "EB Garamond", serif); font-size: 30px; font-weight: 500; line-height: 1.15; overflow-wrap: anywhere; }
 .tf-news-text{ margin: 0; color: var(--news-brown); font-size: 15px; line-height: 1.55; overflow-wrap: anywhere; }
-.tf-news-note{ margin: 8px 0 0; color: var(--news-brown); font-size: 13px; opacity: 0.8; }
+
+/* Tombol pil rata kanan, tanpa bayangan: latar cokelat #6D4C3D, teks gading, ikon panah dalam lingkaran gading (miring ↗).
+   Saat DIKLIK (kelas .is-going dari newsPopup.js, bukan hover): lingkaran emas menyapu dari kiri sampai menutup tombol,
+   teks berubah gelap, panah berputar ke → di atas lingkaran gading, lalu halaman tujuan dibuka setelah animasi (CTA_MS). */
 .tf-news-cta{
-	display: inline-flex;
+	position: relative;
+	isolation: isolate;
+	overflow: hidden;
+	display: flex;
 	align-items: center;
-	min-height: 44px;
-	margin-top: 14px;
+	justify-content: center;
+	gap: 12px;
+	width: min(100%, 340px); /* tidak selebar teks; rata kanan */
+	min-height: 52px;
+	margin: 20px 0 0 auto;
 	padding: 0 24px;
+	box-sizing: border-box;
+	border: 2px solid var(--news-brown);
 	border-radius: 999px;
-	background: var(--news-gold);
-	color: var(--news-ink);
-	font-size: 15px;
+	background: var(--news-brown);
+	color: var(--news-ivory);
+	font-size: 16px;
 	font-weight: 600;
 	text-decoration: none;
-	transition: transform 160ms ease-out, background-color 160ms ease;
+	-webkit-tap-highlight-color: transparent;
+	transition: transform 160ms ease-out, color 300ms ease, border-color 300ms ease;
 }
-@media (hover: hover) and (pointer: fine){ .tf-news-cta:hover{ background: #D8B978; color: var(--news-ink); } }
+.tf-news-cta.is-going{ color: var(--news-ink); border-color: var(--news-gold); }
+.tf-news-cta::before{
+	content: "";
+	position: absolute;
+	z-index: -1;
+	top: 50%;
+	left: -100%;
+	width: 100%;
+	aspect-ratio: 1;
+	border-radius: 50%;
+	background: var(--news-gold);
+	transform: translateY(-50%);
+	transition: left 420ms var(--news-ease), transform 420ms var(--news-ease);
+}
+.tf-news-cta.is-going::before{ left: 0; transform: translateY(-50%) scale(1.5); }
+.tf-news-cta-icon{
+	flex: none;
+	width: 32px;
+	height: 32px;
+	padding: 7px;
+	box-sizing: border-box;
+	border: 1px solid var(--news-ivory);
+	border-radius: 50%;
+	fill: none;
+	stroke: currentColor;
+	stroke-width: 2;
+	stroke-linecap: round;
+	stroke-linejoin: round;
+	transform: rotate(45deg);
+	transition: transform 300ms linear, background-color 300ms linear, border-color 300ms linear;
+}
+.tf-news-cta.is-going .tf-news-cta-icon{ transform: rotate(90deg); border-color: transparent; background: var(--news-ivory); }
 
-.tf-news-foot{ display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 6px 16px 16px; }
-.tf-news-dots{ display: flex; align-items: center; gap: 10px; }
-.tf-news-dot{ width: 8px; height: 8px; border-radius: 50%; background: #DCCBAE; transition: transform 200ms var(--news-ease), background-color 200ms ease; }
-.tf-news-dot.is-on{ background: var(--news-gold); transform: scale(1.4); }
+/* Padding kiri-kanan sama dengan slide, supaya panah sejajar dengan tepi gambar dan teks. */
+.tf-news-foot{ display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 20px var(--news-pad) 0; }
+.tf-news-dots{ display: flex; align-items: center; gap: 20px; }
+/* Titik bisa diklik (mouse/sentuh); keyboard memakai panah. Area klik diperbesar lewat ::after. */
+.tf-news-dot{ position: relative; width: 8px; height: 8px; padding: 0; border: 0; border-radius: 50%; background: #DCCBAE; cursor: pointer; transition: width 200ms var(--news-ease), height 200ms var(--news-ease), background-color 200ms ease; }
+.tf-news-dot::after{ content: ""; position: absolute; inset: -9px; }
+.tf-news-dot.is-on{ width: 12px; height: 12px; background: var(--news-gold); }
 
-/* HP: lembar dari bawah, bukan kotak di tengah layar yang menutupi isi halaman. */
+/* Cincin progres (hitung mundur slide, selama --news-auto): di luar titik aktif, tidak mengubah tata letak. Berhenti dan
+   hilang begitu pengunjung mengambil alih (.is-manual). Dimulai dari atas, searah jarum jam, mengisi #6D4C3D. */
+.tf-news-ring{ position: absolute; top: 50%; left: 50%; width: 26px; height: 26px; margin: -13px 0 0 -13px; overflow: visible; pointer-events: none; opacity: 0; transform: rotate(-90deg); }
+.tf-news-ring circle{ fill: none; stroke-width: 2; }
+.tf-news-ring-track{ stroke: var(--news-brown); opacity: 0.18; }
+.tf-news-ring-fill{ stroke: var(--news-brown); stroke-linecap: round; stroke-dasharray: 100; stroke-dashoffset: 100; }
+.tf-news-dot.is-on .tf-news-ring{ opacity: 1; }
+.tf-news-dot.is-on .tf-news-ring-fill{ animation: tf-news-ring var(--news-auto, 5s) linear forwards; }
+.tf-news.is-manual .tf-news-ring{ display: none; }
+@keyframes tf-news-ring{ to{ stroke-dashoffset: 0; } }
+
+/* HP: lembar dari bawah, bukan kotak di tengah layar yang menutupi isi halaman. Tombol tutup di atas lembar. */
 @media (max-width: 640px){
-	dialog.tf-news{ width: 100%; margin: auto 0 0; }
-	.tf-news-card{ border-bottom-left-radius: 0; border-bottom-right-radius: 0; padding-bottom: env(safe-area-inset-bottom); }
+	dialog.tf-news{ --news-pad: 20px; --news-inset: 10px; --news-height: min(620px, calc(100dvh - 72px)); width: 100%; max-height: calc(100dvh - 72px); margin: auto 0 0; }
+	.tf-news-card{ padding-bottom: calc(16px + env(safe-area-inset-bottom)); border-bottom-left-radius: 0; border-bottom-right-radius: 0; }
+	.tf-news-close{ top: -56px; right: 16px; box-shadow: 0 6px 16px -4px rgb(43 27 20 / 0.45); }
 	dialog.tf-news[open]{ animation-name: tf-news-sheet-in; }
 	dialog.tf-news.is-closing{ animation-name: tf-news-sheet-out; }
-	.tf-news-slide{ padding: 12px 20px 6px; }
-	.tf-news-title{ font-size: 24px; }
+	.tf-news-title{ font-size: 26px; }
+	.tf-news-media .tf-news-badge{ font-size: 19px; }
+	.tf-news-media .tf-news-note{ font-size: 13px; }
+	.tf-news-foot{ padding-top: 16px; }
 }
 /* Layar pendek (HP mendatar, jendela kecil): gambar dipendekkan supaya judul dan tombol tetap terlihat tanpa menggulir. */
-@media (max-height: 640px){ .tf-news-media{ max-height: 24dvh; } .tf-news-title{ font-size: 22px; } }
+@media (max-height: 640px){ .tf-news-media{ min-height: 120px; } .tf-news-title{ font-size: 22px; } }
+/* Sangat pendek (HP mendatar, ±375px): semua dirapatkan supaya tombol tetap terlihat tanpa menggulir. */
+@media (max-height: 500px){
+	.tf-news-card{ padding-bottom: 12px; }
+	.tf-news-media{ min-height: 72px; }
+	.tf-news-media .tf-news-tag{ left: 10px; bottom: 10px; padding: 6px 12px 7px; }
+	.tf-news-media .tf-news-badge{ font-size: 15px; }
+	.tf-news-media .tf-news-note{ font-size: 12px; }
+	.tf-news-media + .tf-news-body{ padding-top: 12px; }
+	.tf-news-cta{ min-height: 44px; margin-top: 12px; }
+	.tf-news-foot{ padding-top: 8px; }
+}
 @keyframes tf-news-sheet-in{ from{ opacity: 0; transform: translateY(32px); } }
 @keyframes tf-news-sheet-out{ to{ opacity: 0; transform: translateY(24px); } }
 
@@ -146,5 +272,7 @@ dialog.tf-news.is-closing::backdrop{ animation: tf-news-fade 160ms ease-out reve
 	dialog.tf-news[open]{ animation-name: tf-news-fade; }
 	dialog.tf-news.is-closing{ animation-name: tf-news-fade-out; }
 	@keyframes tf-news-fade-out{ to{ opacity: 0; } }
-	.tf-news-dot{ transition: none; }
+	.tf-news-dot,
+	.tf-news-cta::before,
+	.tf-news-cta-icon{ transition: none; }
 }

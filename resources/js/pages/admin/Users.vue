@@ -87,16 +87,30 @@ async function save() {
     }
 }
 
-async function resetMfa(user) {
-    if (!window.confirm(`Reset MFA ${user.name}? Saat login berikutnya, pengguna wajib mendaftarkan authenticator lagi.`)) return;
+const mfaDialog = ref(null);
+const mfaTarget = ref(null);
+const mfaBusy = ref(false);
+
+function resetMfa(user) {
+    mfaTarget.value = user;
+    mfaDialog.value.showModal();
+}
+
+async function confirmResetMfa() {
+    const user = mfaTarget.value;
+    mfaBusy.value = true;
     pageNotice.value = '';
     pageError.value = '';
     try {
         await api.post(`/admin/users/${user.id}/reset-mfa`);
         pageNotice.value = `MFA ${user.name} direset.`;
+        mfaDialog.value.close();
         await load();
     } catch (e) {
         pageError.value = apiError(e).message;
+        mfaDialog.value.close();
+    } finally {
+        mfaBusy.value = false;
     }
 }
 
@@ -240,6 +254,14 @@ onMounted(loadRoles);
     <template #footer>
       <button type="button" class="rounded border border-secondary px-4 py-2 text-label-md hover:bg-accent-tint-15 focus-visible:outline-2 focus-visible:outline-primary" @click="dialog.close()">Batal</button>
       <button form="user-form" :disabled="saving" class="rounded bg-accent px-4 py-2 text-label-md hover:bg-accent-hover focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary disabled:opacity-60">{{ saving ? 'Menyimpan...' : 'Simpan' }}</button>
+    </template>
+  </AppModal>
+
+  <AppModal ref="mfaDialog" variant="delete" size="md" title="Reset MFA?" :subtitle="mfaTarget?.name" @close="mfaTarget = null">
+    <p class="text-body-sm">Saat login berikutnya, pengguna wajib mendaftarkan authenticator lagi.</p>
+    <template #footer>
+      <button type="button" class="inline-flex min-h-10 items-center rounded-full border border-secondary px-4 text-label-md hover:bg-accent-tint-15 focus-visible:outline-2 focus-visible:outline-primary" @click="mfaDialog.close()">Batal</button>
+      <button type="button" :disabled="mfaBusy" class="inline-flex min-h-10 items-center gap-1.5 rounded-full bg-error px-4 text-label-md text-surface hover:bg-error/90 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary disabled:opacity-60" @click="confirmResetMfa">{{ mfaBusy ? 'Mereset...' : 'Reset MFA' }}</button>
     </template>
   </AppModal>
 

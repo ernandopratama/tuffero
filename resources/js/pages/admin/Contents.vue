@@ -15,6 +15,7 @@ import { TONE_CLASS } from '../../utils/orderLabels';
 import { useAuthStore } from '../../stores/auth';
 import PageHeader from '../../components/ui/PageHeader.vue';
 import AddButton from '../../components/ui/AddButton.vue';
+import StatusBadge from '../../components/ui/StatusBadge.vue';
 
 // scope 'video' = halaman Video Website; 'promo' = banner dan teks promo.
 // embedded = dipasang di halaman lain (Galeri) yang sudah punya judul sendiri.
@@ -24,7 +25,6 @@ const TYPES = { banner: { label: 'Banner', icon: 'layers' }, text: { label: 'Tek
 const FORM_TYPES = isVideo ? { video: 'Video' } : { banner: 'Banner', text: 'Teks promo' };
 const TYPE_HINTS = { banner: 'Gambar promo di website toko. Butuh gambar sebelum siap tayang.', text: 'Teks promo singkat di website toko.', video: 'Tautan video YouTube, TikTok, atau Instagram.' };
 const PROVIDERS = { youtube: 'YouTube', tiktok: 'TikTok', instagram: 'Instagram' };
-const STATE_DOT = { ok: 'bg-success', info: 'bg-info', neutral: 'bg-secondary' };
 
 const press = 'transition-[transform,background-color] duration-[160ms] ease-out-strong focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary active:scale-[0.97] disabled:opacity-60 disabled:active:scale-100';
 const field = 'mt-1 block w-full rounded-2xl border border-secondary bg-surface px-3 py-2 text-body-md font-normal focus:outline-2 focus:outline-primary disabled:opacity-70';
@@ -234,7 +234,7 @@ watch(() => props.scope, () => {
     @retry="load"
   >
     <template #cell-title="{ row }">
-      <div class="inline-flex max-w-sm items-center gap-3 text-left">
+      <div class="inline-flex max-w-full items-center gap-3 text-left md:max-w-sm">
         <img v-if="row.image_url" :src="row.image_url" :alt="row.title" width="56" height="56" loading="lazy" class="size-14 shrink-0 rounded-2xl border border-border object-cover">
         <span v-else class="grid size-14 shrink-0 place-items-center rounded-2xl border border-dashed border-border bg-accent-tint-12 text-secondary" aria-hidden="true"><AdminIcon :name="TYPES[row.type]?.icon || 'layers'" :size="20" /></span>
         <span class="min-w-0">
@@ -257,9 +257,7 @@ watch(() => props.scope, () => {
       <span v-else class="text-secondary">Tanpa batas waktu</span>
     </template>
     <template #cell-status="{ row }">
-      <span class="inline-flex items-center gap-1.5 whitespace-nowrap rounded-full px-2.5 py-1 text-label-sm" :class="TONE_CLASS[stateOf(row).tone]">
-        <i class="size-1.5 rounded-full" :class="STATE_DOT[stateOf(row).tone]" aria-hidden="true"></i>{{ stateOf(row).label }}
-      </span>
+      <StatusBadge :tone="stateOf(row).tone">{{ stateOf(row).label }}</StatusBadge>
     </template>
     <template #cell-actions="{ row }">
       <div class="flex items-center justify-center gap-1">

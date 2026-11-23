@@ -1,4 +1,4 @@
-@extends('store.layouts.app')
+@extends('store.layouts.app', ['legacy' => false])
 
 @section('content')
 	<script type="application/json" id="tf-account-data">{{ $site->json([...\Illuminate\Support\Arr::only($c, ['hello', 'title', 'errors', 'failed', 'tooMany', 'saved', 'verified', 'unverified', 'noPhone']), 'passwordSaved' => $c['password']['saved'], 'status' => $pg['order']['status']]) }}</script>

@@ -11,8 +11,9 @@ import TableToolbar from '../../components/ui/TableToolbar.vue';
 import { useDataTable } from '../../composables/useDataTable';
 import { useAuthStore } from '../../stores/auth';
 import { formatDate, timeAgo } from '../../utils/datetime';
-import { ORDER_STATUS, ORDER_STATUS_TONE, TONE_CLASS } from '../../utils/orderLabels';
+import { ORDER_STATUS, ORDER_STATUS_TONE } from '../../utils/orderLabels';
 import PageHeader from '../../components/ui/PageHeader.vue';
+import StatusBadge from '../../components/ui/StatusBadge.vue';
 
 const COLUMNS = [
     { key: 'select', label: 'Pilih', srOnly: true, class: 'w-10' },
@@ -29,7 +30,6 @@ const WAYBILL_OPTIONS = { with: 'Sudah ada resi', without: 'Belum ada resi' };
 const SORT_OPTIONS = { newest: 'Terbaru dulu' };
 // Sama dengan OrderController::BULK_LIMIT.
 const BULK_LIMIT = 50;
-const DOT = { ok: 'bg-success', warn: 'bg-warning', bad: 'bg-error', info: 'bg-info', neutral: 'bg-secondary' };
 
 const { rows, meta, page, perPage, search, filter, loading, error, load } = useDataTable('/admin/fulfillment', { filters: { status: '', courier: '', waybill: '', sort: '' } });
 
@@ -172,9 +172,7 @@ const itemCount = (row) => row.items.reduce((sum, item) => sum + item.quantity, 
       <span class="block text-body-sm uppercase text-secondary">{{ row.shipping_service }}</span>
     </template>
     <template #cell-status="{ row }">
-      <span class="inline-flex items-center gap-1.5 whitespace-nowrap rounded-full px-2.5 py-1 text-label-sm" :class="TONE_CLASS[toneOf(row)]">
-        <i class="size-1.5 rounded-full" :class="DOT[toneOf(row)]" aria-hidden="true"></i>{{ ORDER_STATUS[row.status] }}
-      </span>
+      <StatusBadge :tone="toneOf(row)">{{ ORDER_STATUS[row.status] }}</StatusBadge>
       <span v-if="row.waybill_id" class="mt-1 block whitespace-nowrap font-mono text-body-sm text-secondary">{{ row.waybill_id }}</span>
       <span v-else class="mt-1 block text-body-sm text-secondary">Belum ada resi</span>
     </template>

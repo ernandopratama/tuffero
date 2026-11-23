@@ -85,7 +85,8 @@ class PwaAppTest extends TestCase
         $this->turnOn('pwa.admin_enabled');
 
         $this->get('/login')->assertOk()->assertDontSee('rel="manifest"', false);
-        $this->actingAs(User::factory()->create())->get('/admin')->assertOk()->assertDontSee('rel="manifest"', false);
+        // Pelanggan masuk tidak melihat area admin sama sekali (404 toko), jadi tidak ada tautan manifest admin.
+        $this->actingAs(User::factory()->create())->get('/admin')->assertNotFound()->assertDontSee('rel="manifest" href="/admin/manifest.webmanifest"', false);
         $this->actingAs($this->staff('warehouse'))->get('/admin')->assertOk()->assertSee('<link rel="manifest" href="/admin/manifest.webmanifest">', false);
     }
 

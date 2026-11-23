@@ -6,9 +6,10 @@ import DataTable from '../../components/ui/DataTable.vue';
 import IconAction from '../../components/ui/IconAction.vue';
 import PageHeader from '../../components/ui/PageHeader.vue';
 import TableToolbar from '../../components/ui/TableToolbar.vue';
+import StatusBadge from '../../components/ui/StatusBadge.vue';
 import { useDataTable } from '../../composables/useDataTable';
 import { formatDate } from '../../utils/datetime';
-import { REFUND_REASON, REFUND_STATUS_TONE, TONE_CLASS, refundStatusLabel, rupiah } from '../../utils/orderLabels';
+import { REFUND_REASON, REFUND_STATUS_TONE, refundStatusLabel, rupiah } from '../../utils/orderLabels';
 
 // Refund barang bermasalah dan retur produk utuh. Alur: CS menghubungi pelanggan dan memeriksa video, Pemilik memutuskan,
 // CS mencatat transfer manual. Sistem tidak menyetujui apa pun dan tidak memindahkan uang.
@@ -20,7 +21,6 @@ const COLUMNS = [
     { key: 'status', label: 'Status' },
     { key: 'actions', label: 'Aksi' },
 ];
-const DOT = { ok: 'bg-success', warn: 'bg-warning', info: 'bg-info', bad: 'bg-error', neutral: 'bg-secondary' };
 
 // Penyaring cepat per tahap, urut sesuai alur. Angka dari server dan tidak ikut pencarian.
 const TABS = [
@@ -111,9 +111,7 @@ const press = 'transition-[transform,background-color,color] duration-[160ms] ea
       <span v-else-if="row.approved_amount !== null && row.approved_amount !== row.requested_amount" class="block whitespace-nowrap text-label-sm text-secondary">diminta {{ rupiah(row.requested_amount) }}</span>
     </template>
     <template #cell-status="{ row }">
-      <span class="inline-flex items-center gap-1.5 whitespace-nowrap rounded-full px-2.5 py-1 text-label-sm" :class="TONE_CLASS[toneOf(row)]">
-        <i class="size-1.5 rounded-full" :class="DOT[toneOf(row)]" aria-hidden="true"></i>{{ refundStatusLabel(row.status, row.refund_method) }}
-      </span>
+      <StatusBadge :tone="toneOf(row)">{{ refundStatusLabel(row.status, row.refund_method) }}</StatusBadge>
       <span v-if="row.is_overdue" class="mt-1 block text-label-sm text-error">Lewat batas proses</span>
     </template>
     <template #cell-actions="{ row }">

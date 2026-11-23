@@ -38,7 +38,7 @@ const STATUS = {
 };
 
 // Lencana tegas (warna penuh) di ringkasan modal, sama dengan modal Detail pesanan.
-const STATUS_SOLID = { draft: 'bg-[#64748B]', in_review: 'bg-[#B45309]', approved: 'bg-[#2E6B3E]', rejected: 'bg-[#BA1A1A]', posted: 'bg-[#4338CA]' };
+const STATUS_SOLID = { draft: 'bg-[#64748B]', in_review: 'bg-[#B45309]', approved: 'bg-success', rejected: 'bg-error', posted: 'bg-[#4338CA]' };
 const PLATFORM_SOLID = { instagram: 'bg-[#C13584]', tiktok: 'bg-[#111827]' };
 const ORIGIN_SOLID = { ai: 'bg-[#6D28D9]', hermes: 'bg-[#0F766E]' };
 // Kotak ringkasan: garis tegas dan bayangan solid (gaya modal Detail pesanan); di ponsel menjadi baris ringkas.
@@ -133,7 +133,7 @@ const STORYBOARD = {
     waiting: { label: 'Menunggu 2 foto acuan', cls: 'bg-warning-surface text-warning' },
 };
 // Warna penuh untuk lencana storyboard di kartu daftar (latar kartu berwarna per jenis, jadi lencana pastel tidak terbaca).
-const STORYBOARD_SOLID = { pending: 'bg-[#B45309]', ready: 'bg-[#2E6B3E]', failed: 'bg-[#BA1A1A]', waiting: 'bg-[#0369A1]' };
+const STORYBOARD_SOLID = { pending: 'bg-[#B45309]', ready: 'bg-success', failed: 'bg-error', waiting: 'bg-[#0369A1]' };
 const form = reactive({ ...blank });
 
 // Urutan daftar: bawaan yang terbaru dibuat dulu. Pilihan diingat di peramban ini (hanya kenyamanan; boleh gagal tersimpan).

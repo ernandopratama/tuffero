@@ -1,4 +1,4 @@
-@extends('store.layouts.app')
+@extends('store.layouts.app', ['legacy' => false])
 
 @section('content')
 	<script type="application/json" id="tf-account-vouchers-data">{{ $site->json([...$c, 'signIn' => $site->route('account')]) }}</script>

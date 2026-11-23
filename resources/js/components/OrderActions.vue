@@ -1,5 +1,5 @@
 <script setup>
-import { computed, ref } from 'vue';
+import { computed, nextTick, ref } from 'vue';
 import { useRouter } from 'vue-router';
 import api from '../utils/api';
 import { apiError } from '../utils/apiError';
@@ -26,6 +26,24 @@ const note = ref('');
 const correcting = ref(false);
 const busy = ref(false);
 const error = ref('');
+
+// Langkah yang mengubah status pesanan meminta konfirmasi dulu (nomor pesanan ikut tampil) supaya tidak salah ketuk.
+const ASK = {
+    'mark-shipped': { text: 'Status pesanan akan menjadi Dikirim.', button: 'Ya, tandai dikirim' },
+    complete: { text: 'Status pesanan akan menjadi Selesai.', button: 'Ya, tandai selesai' },
+};
+const pending = ref(null);
+const confirmButton = ref(null);
+function ask(path) {
+    pending.value = path;
+    error.value = '';
+    nextTick(() => confirmButton.value?.focus());
+}
+function confirmPending() {
+    const path = pending.value;
+    pending.value = null;
+    run(path);
+}
 
 const METHODS = [
     { key: 'biteship', title: 'Biteship', badge: 'Disarankan', text: 'Resi dibuat otomatis. Kurir menjemput di gudang.' },
@@ -135,9 +153,17 @@ const outline = `flex min-h-10 items-center justify-center gap-1.5 rounded-full 
 
       <div class="flex flex-wrap gap-2">
         <button v-if="canManage && waybillId" type="button" :class="outline" @click="printLabel"><AdminIcon name="printer" :size="16" />Cetak Resi</button>
-        <button v-if="order.status === 'processing' && canManage" type="button" :disabled="busy" :class="primary" @click="run('mark-shipped')"><AdminIcon name="truck" :size="16" />Tandai Dikirim</button>
-        <button v-if="order.status === 'shipped' && canFinish" type="button" :disabled="busy" :class="outline" @click="run('complete')">Tandai Selesai</button>
+        <button v-if="order.status === 'processing' && canManage" type="button" :disabled="busy || !!pending" :class="primary" @click="ask('mark-shipped')"><AdminIcon name="truck" :size="16" />Tandai Dikirim</button>
+        <button v-if="order.status === 'shipped' && canFinish" type="button" :disabled="busy || !!pending" :class="outline" @click="ask('complete')">Tandai Selesai</button>
         <button v-if="order.status === 'shipped' && shipment.provider === 'manual' && canManage && !correcting" type="button" :class="outline" @click="startCorrection">Koreksi resi</button>
+      </div>
+
+      <div v-if="pending" role="group" :aria-label="`Konfirmasi ${order.order_number}`" class="space-y-space-sm rounded-2xl border border-accent/50 bg-accent-tint-12 p-3 motion-safe:animate-pop">
+        <p class="text-body-sm"><strong class="font-mono">{{ order.order_number }}</strong>: {{ ASK[pending].text }}</p>
+        <div class="flex flex-wrap justify-end gap-2">
+          <button type="button" :disabled="busy" :class="outline" @click="pending = null">Batal</button>
+          <button ref="confirmButton" type="button" :disabled="busy" :class="primary" @click="confirmPending">{{ ASK[pending].button }}</button>
+        </div>
       </div>
 
       <form v-if="correcting" class="flex flex-wrap items-end gap-2" @submit.prevent="correct">

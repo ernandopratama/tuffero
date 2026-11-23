@@ -1,4 +1,4 @@
-@extends('store.layouts.app')
+@extends('store.layouts.app', ['legacy' => false])
 
 {{-- Ajukan refund atau retur (D-031, D-097). Tiga langkah dalam satu halaman: cari pesanan, pilih barang dan masalah, konfirmasi.
      Harga, jumlah, dan batas waktu dihitung server; angka di layar hanya perkiraan. Video unboxing tidak diunggah ke situs. --}}
