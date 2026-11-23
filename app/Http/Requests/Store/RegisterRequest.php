@@ -3,7 +3,6 @@
 namespace App\Http\Requests\Store;
 
 use Illuminate\Foundation\Http\FormRequest;
-use Illuminate\Validation\ValidationException;
 
 /**
  * Pendaftaran pelanggan. Pesan galat berupa kode (bukan kalimat) supaya frontend memakai teks terjemahannya sendiri.
@@ -37,9 +36,14 @@ class RegisterRequest extends FormRequest
             return ['captcha_token' => ['nullable', 'string', 'max:2048']];
         }
 
+        // Saluran berikutnya setelah satu saluran terverifikasi: data lain diambil dari sesi.
+        if ($this->is('*/channel')) {
+            return ['channel' => ['required', 'in:email,phone'], 'captcha_token' => ['nullable', 'string', 'max:2048']];
+        }
+
         return [
             'email' => ['required', 'email', 'max:255'],
-            'phone' => ['nullable', 'string', 'regex:/^\+628\d{8,11}$/'],
+            'phone' => ['required', 'string', 'regex:/^\+628\d{8,11}$/'],
             'password' => ['required', 'string', 'min:8', 'max:255'],
             'channel' => ['required', 'in:email,phone'],
             'captcha_token' => ['nullable', 'string', 'max:2048'],
@@ -51,18 +55,10 @@ class RegisterRequest extends FormRequest
     {
         return [
             'email.*' => 'email_invalid',
-            'phone.regex' => 'phone_invalid',
+            'phone.*' => 'phone_invalid',
             'password.*' => 'password_invalid',
             'channel.*' => 'channel_invalid',
             'code.*' => 'otp_invalid',
         ];
-    }
-
-    /** Saluran WhatsApp tanpa nomor tidak bisa dikirimi kode. */
-    protected function passedValidation(): void
-    {
-        if ($this->input('channel') === 'phone' && ! $this->input('phone')) {
-            throw ValidationException::withMessages(['phone' => 'phone_invalid']);
-        }
     }
 }

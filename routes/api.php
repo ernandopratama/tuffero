@@ -128,10 +128,11 @@ Route::prefix('v1')->group(function () {
     Route::middleware(['web'])->prefix('auth')->group(function () {
         Route::post('/login', [AuthController::class, 'login'])->middleware('throttle:login');
 
-        // Daftar pelanggan dengan kode email atau WhatsApp (D-095). Batas kasar per IP; batas kirim yang berbiaya ada di RegistrationService.
+        // Daftar pelanggan: email dan WhatsApp keduanya wajib terverifikasi (D-145). Batas kasar per IP; batas kirim yang berbiaya ada di RegistrationService.
         Route::middleware('throttle:phone-otp')->prefix('register')->group(function () {
             Route::post('/send', [RegisterController::class, 'send']);
             Route::post('/resend', [RegisterController::class, 'resend']);
+            Route::post('/channel', [RegisterController::class, 'channel']);
             Route::post('/verify', [RegisterController::class, 'verify']);
         });
 

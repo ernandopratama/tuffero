@@ -1,3 +1,11 @@
+{{-- Dipakai bersama: login staf (bawaan) dan pendaftaran pelanggan. Teks lain lewat variabel opsional; $name kosong = "Halo,". --}}
+@php
+	$label = $label ?? 'Kode OTP login';
+	$greeting = ($name ?? null) ? 'Halo '.$name.',' : 'Halo,';
+	$intro = $intro ?? 'Masukkan kode One-Time Password (OTP) di atas untuk menyelesaikan masuk ke dashboard Tuffero.';
+	$noticeTitle = $noticeTitle ?? 'Bukan Anda yang masuk?';
+	$notice = $notice ?? 'Abaikan email ini dan segera ganti password Anda. Jangan berikan kode ini kepada siapa pun, termasuk yang mengaku dari Tuffero.';
+@endphp
 <!DOCTYPE html>
 <html lang="id" xmlns="http://www.w3.org/1999/xhtml">
 <head>
@@ -5,7 +13,7 @@
 	<meta name="viewport" content="width=device-width, initial-scale=1">
 	<meta name="color-scheme" content="light dark">
 	<meta name="supported-color-schemes" content="light dark">
-	<title>Kode OTP login Tuffero</title>
+	<title>{{ $label }} Tuffero</title>
 	<style>
 		/* Gaya dasar ada inline (klien email tidak semuanya membaca <style>); blok ini hanya untuk HP dan mode gelap. */
 		@media only screen and (max-width: 520px) {
@@ -25,7 +33,7 @@
 </head>
 <body class="tf-bg" style="margin:0; padding:0; background-color:#F6F0E5; -webkit-text-size-adjust:100%;">
 	{{-- Pratinjau di daftar kotak masuk: kodenya langsung terlihat tanpa membuka email. --}}
-	<div style="display:none; max-height:0; overflow:hidden; opacity:0; mso-hide:all;">Kode OTP Anda {{ $code }}. Berlaku {{ $minutes }} menit.&#847;&zwnj;&nbsp;&#847;&zwnj;&nbsp;&#847;&zwnj;&nbsp;&#847;&zwnj;&nbsp;</div>
+	<div style="display:none; max-height:0; overflow:hidden; opacity:0; mso-hide:all;">{{ $label }} Anda {{ $code }}. Berlaku {{ $minutes }} menit.&#847;&zwnj;&nbsp;&#847;&zwnj;&nbsp;&#847;&zwnj;&nbsp;&#847;&zwnj;&nbsp;</div>
 
 	<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" class="tf-bg" style="background-color:#F6F0E5;">
 		<tr>
@@ -38,7 +46,7 @@
 					</tr>
 					<tr>
 						<td class="tf-card" style="background-color:#FFFFFF; border:1px solid #E3D5C0; border-radius:24px; padding:36px 36px 32px;">
-							<p class="tf-muted" style="margin:0 0 12px; font-family:Arial,Helvetica,sans-serif; font-size:12px; font-weight:700; letter-spacing:1.6px; text-transform:uppercase; color:#6D4C3D;">Kode OTP login</p>
+							<p class="tf-muted" style="margin:0 0 12px; font-family:Arial,Helvetica,sans-serif; font-size:12px; font-weight:700; letter-spacing:1.6px; text-transform:uppercase; color:#6D4C3D;">{{ $label }}</p>
 
 							<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0">
 								<tr>
@@ -51,14 +59,14 @@
 
 							<p class="tf-text" style="margin:14px 0 0; text-align:center; font-family:Arial,Helvetica,sans-serif; font-size:14px; line-height:1.5; color:#6D4C3D;">Berlaku <strong class="tf-ink" style="color:#2B1B14;">{{ $minutes }} menit</strong> dan hanya bisa dipakai sekali.</p>
 
-							<h1 class="tf-ink" style="margin:28px 0 8px; font-family:Georgia,'Times New Roman',serif; font-size:22px; line-height:1.3; font-weight:normal; color:#2B1B14;">Halo {{ $name }},</h1>
-							<p class="tf-text" style="margin:0; font-family:Arial,Helvetica,sans-serif; font-size:15px; line-height:1.6; color:#6D4C3D;">Masukkan kode One-Time Password (OTP) di atas untuk menyelesaikan masuk ke dashboard Tuffero.</p>
+							<h1 class="tf-ink" style="margin:28px 0 8px; font-family:Georgia,'Times New Roman',serif; font-size:22px; line-height:1.3; font-weight:normal; color:#2B1B14;">{{ $greeting }}</h1>
+							<p class="tf-text" style="margin:0; font-family:Arial,Helvetica,sans-serif; font-size:15px; line-height:1.6; color:#6D4C3D;">{{ $intro }}</p>
 
 							<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="margin-top:28px;">
 								<tr>
 									<td class="tf-notice" style="background-color:#F6F0E5; border-radius:14px; padding:14px 16px; font-family:Arial,Helvetica,sans-serif; font-size:13px; line-height:1.55; color:#6D4C3D;">
-										<strong class="tf-ink" style="color:#2B1B14;">Bukan Anda yang masuk?</strong><br>
-										Abaikan email ini dan segera ganti password Anda. Jangan berikan kode ini kepada siapa pun, termasuk yang mengaku dari Tuffero.
+										<strong class="tf-ink" style="color:#2B1B14;">{{ $noticeTitle }}</strong><br>
+										{{ $notice }}
 									</td>
 								</tr>
 							</table>

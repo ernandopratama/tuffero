@@ -15,6 +15,7 @@ class SettingSeeder extends Seeder
     private const SETTINGS = [
         ['key' => 'contact.whatsapp_number', 'value' => '+6281252507880', 'type' => 'string', 'group' => 'contact', 'is_public' => true],
         ['key' => 'contact.admin_email', 'value' => 'macaron.tuffero@gmail.com', 'type' => 'string', 'group' => 'contact', 'is_public' => true],
+        ['key' => 'security.super_admin_whatsapp', 'value' => '+6285117452317', 'type' => 'string', 'group' => 'security', 'is_public' => true],
         ['key' => 'reviews.rating', 'value' => '4.6', 'type' => 'string', 'group' => 'reviews', 'is_public' => true],
         ['key' => 'reviews.count', 'value' => '28', 'type' => 'int', 'group' => 'reviews', 'is_public' => true],
         ['key' => 'antifraud.review_min_total', 'value' => '1000000', 'type' => 'int', 'group' => 'antifraud', 'is_public' => false],

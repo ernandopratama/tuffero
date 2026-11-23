@@ -20,13 +20,17 @@ class RegisterEmailCode extends Notification
 
     public function toMail(object $notifiable): MailMessage
     {
+        // Tampilan HTML yang sama dengan kode OTP login staf (resources/views/emails), plus versi teks biasa.
         return (new MailMessage)
             ->subject('Kode verifikasi pendaftaran Tuffero')
-            ->greeting('Halo,')
-            ->line('Kode verifikasi pendaftaran akun Tuffero Anda:')
-            ->line("**{$this->code}**")
-            ->line("Berlaku {$this->minutes} menit dan hanya bisa dipakai sekali.")
-            ->line('Bukan Anda yang mendaftar? Abaikan email ini. Jangan berikan kode ini kepada siapa pun, termasuk yang mengaku dari Tuffero.')
-            ->salutation('Tuffero');
+            ->view(['emails.mfa-code', 'emails.mfa-code-text'], [
+                'name' => null,
+                'code' => $this->code,
+                'minutes' => $this->minutes,
+                'label' => 'Kode verifikasi pendaftaran',
+                'intro' => 'Masukkan kode di atas untuk memverifikasi email dan menyelesaikan pendaftaran akun Tuffero Anda.',
+                'noticeTitle' => 'Bukan Anda yang mendaftar?',
+                'notice' => 'Abaikan email ini. Jangan berikan kode ini kepada siapa pun, termasuk yang mengaku dari Tuffero.',
+            ]);
     }
 }

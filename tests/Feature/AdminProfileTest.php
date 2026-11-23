@@ -219,23 +219,19 @@ class AdminProfileTest extends TestCase
         $this->assertSame('baru.nama', $user->fresh()->username);
     }
 
-    public function test_whatsapp_code_works_only_for_a_verified_phone(): void
+    public function test_whatsapp_is_not_a_channel_for_staff_even_with_a_verified_phone(): void
     {
         $sender = $this->captureCodes();
-        $user = $this->staff('owner', ['phone' => '+6281200000001', 'phone_verified_at' => null]);
+        $user = $this->staff('owner', ['phone' => '+6281200000001', 'phone_verified_at' => now()]);
         $this->actingAs($user);
 
-        $this->postJson('/api/v1/admin/profile/username/code', ['channel' => 'phone'])->assertUnprocessable();
+        $this->postJson('/api/v1/admin/profile/username/code', ['channel' => 'phone'])->assertUnprocessable()->assertJsonValidationErrors('channel');
+        $this->putJson('/api/v1/admin/profile/username', ['username' => 'owner.baru', 'channel' => 'phone', 'code' => '123456'])->assertUnprocessable()->assertJsonValidationErrors('channel');
+
         $this->assertNull($sender->code);
-
-        $user->forceFill(['phone_verified_at' => now()])->save();
-        $this->postJson('/api/v1/admin/profile/username/code', ['channel' => 'phone'])->assertOk();
-        $this->assertNotNull($sender->code);
-
-        // Kode WhatsApp tidak berlaku untuk saluran email.
-        $this->putJson('/api/v1/admin/profile/username', ['username' => 'owner.baru', 'channel' => 'email', 'code' => $sender->code])->assertUnprocessable();
-        $this->putJson('/api/v1/admin/profile/username', ['username' => 'owner.baru', 'channel' => 'phone', 'code' => $sender->code])->assertOk();
-        $this->assertSame('owner.baru', $user->fresh()->username);
+        Notification::assertNothingSent();
+        $this->assertNull($user->fresh()->username);
+        $this->assertArrayNotHasKey('otp_channels', $this->getJson('/api/v1/admin/profile')->assertOk()->json('data'));
     }
 
     public function test_username_code_is_bound_to_the_account_locks_after_wrong_tries_and_rejects_taken_names(): void
@@ -260,6 +256,30 @@ class AdminProfileTest extends TestCase
         }
         $this->actingAs($user)->putJson('/api/v1/admin/profile/username', ['username' => 'aman', 'channel' => 'email', 'code' => $code])->assertUnprocessable();
         $this->assertNull($user->fresh()->username);
+    }
+
+    public function test_a_rejected_username_never_sends_a_code(): void
+    {
+        // Batas laju rute dilepas: yang diuji validasinya, bukan throttle.
+        $this->withoutMiddleware(ThrottleRequests::class);
+        $sender = $this->captureCodes();
+        $user = $this->staff('owner', ['phone' => '+6281200000002', 'phone_verified_at' => now()]);
+        $this->staff('marketing', ['username' => 'dipakai']);
+        $this->actingAs($user);
+
+        foreach (['dipakai', 'Dipakai', 'ab', 'pakai spasi', '.diawali-titik', str_repeat('a', 31)] as $username) {
+            $this->postJson('/api/v1/admin/profile/username/code', ['username' => $username, 'channel' => 'email'])->assertUnprocessable()->assertJsonValidationErrors('username');
+        }
+
+        Notification::assertNothingSent();
+        $this->assertNull($sender->code);
+
+        // Username yang sah, termasuk milik sendiri atau kosong, tetap boleh meminta kode.
+        $this->postJson('/api/v1/admin/profile/username/code', ['username' => 'nama.sah', 'channel' => 'email'])->assertOk();
+        $this->travel(61)->seconds();
+        $this->postJson('/api/v1/admin/profile/username/code', ['username' => null, 'channel' => 'email'])->assertOk();
+        Notification::assertSentToTimes($user, ProfileChangeCode::class, 2);
+        $this->assertNull($sender->code);
     }
 
     public function test_generic_profile_update_cannot_change_username_and_roleless_accounts_are_refused(): void

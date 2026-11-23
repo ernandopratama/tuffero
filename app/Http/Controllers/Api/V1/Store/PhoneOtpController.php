@@ -20,6 +20,9 @@ class PhoneOtpController extends Controller
 
     public function send(PhoneOtpRequest $request): JsonResponse
     {
+        // Mengikuti saklar WHATSAPP_OTP_REQUIRED: saat mati, tidak ada pesan WhatsApp berbiaya yang bisa diminta lewat endpoint ini.
+        abort_unless(config('services.whatsapp.otp_required'), 404);
+
         return $this->success('Phone OTP processed.', $this->otp->request(
             $request->validated('phone'),
             (string) $request->ip(),
@@ -32,6 +35,8 @@ class PhoneOtpController extends Controller
 
     public function verify(PhoneOtpRequest $request): JsonResponse
     {
+        abort_unless(config('services.whatsapp.otp_required'), 404);
+
         $phone = $request->validated('phone');
 
         if (! $this->otp->verify($phone, (string) $request->validated('code'))) {

@@ -147,6 +147,7 @@ async function copyUrl(url) {
 
 const GROUPS = {
     contact: { label: 'Kontak', icon: 'chat', text: 'Kontak toko yang tampil ke pelanggan.' },
+    security: { label: 'Keamanan akun', icon: 'shield', text: 'Tujuan pesan Lupa kata sandi admin. Hanya Super Admin yang bisa mengubahnya.' },
     reviews: { label: 'Ulasan toko', icon: 'sparkles', text: 'Rating dan jumlah ulasan di halaman produk.' },
     discount: { label: 'Diskon', icon: 'tag', text: 'Batas potongan harga.' },
     inventory: { label: 'Stok', icon: 'warehouse', text: 'Peringatan stok menipis.' },
@@ -160,13 +161,14 @@ const GROUPS = {
 };
 const FIELDS = {
     'contact.whatsapp_number': { label: 'Nomor WhatsApp', hint: 'Format internasional, contoh +6281234567890. Tampil ke pelanggan.', input: 'tel' },
+    'security.super_admin_whatsapp': { label: 'Nomor WhatsApp Super Admin', hint: 'Format internasional, contoh +6281234567890. Tampil di halaman Lupa kata sandi dan menjadi tujuan pesan permintaan atur ulang password staf.', input: 'tel' },
     'contact.admin_email': { label: 'Email admin', hint: 'Tampil ke pelanggan.', input: 'email' },
     'reviews.rating': { label: 'Rating toko (1 sampai 5)', hint: 'Contoh 4.6. Tampil di halaman produk bersama ulasan; samakan dengan sumbernya, mis. Google Maps.', input: 'number' },
     'reviews.count': { label: 'Jumlah ulasan toko', hint: 'Tampil bersama rating.', input: 'number' },
     'antifraud.review_min_total': { label: 'Tandai pesanan untuk ditinjau mulai total (Rp)', hint: 'Bawaan 1000000 (D-132). Pesanan tetap berjalan; Admin Toko diberi tanda dan tenggat tinjau.', input: 'number' },
     'antifraud.approval_min_unpaid': { label: 'Persetujuan Admin Toko mulai total belum dibayar per nomor HP (Rp)', hint: 'Bawaan 3000000 (D-132). Termasuk pesanan baru. Pesanan menunggu persetujuan sebelum bisa dibayar, dan stok ditahan sampai tenggat tinjau.', input: 'number' },
     'antifraud.review_open_hours': { label: 'Tenggat tinjau (jam buka toko)', hint: 'Bawaan 7 = 1 hari kerja (Senin sampai Sabtu 09.00 sampai 16.00 WIB). Waktu berhenti saat toko tutup dan hari Minggu.', input: 'number' },
-    'antifraud.return_block_enabled': { label: 'Blokir otomatis retur berturut-turut (0 = mati, 1 = aktif)', hint: 'D-122. Bawaan 0. Bisa dimatikan di sini, tetapi menyalakannya hanya lewat pengajuan di halaman Pelanggan Diblokir yang disetujui Pemilik (D-133). Hanya mengatur pembuatan blokir otomatis: bila aktif, nomor dan alamat pelanggan yang pesanan terakhirnya (jumlah di bawah) semua berujung retur produk utuh yang disetujui diblokir dari pesanan baru. Blokir yang sudah ada, termasuk yang ditambah manual, tetap berlaku walau ini 0. Admin Toko mencabut di Pelanggan Diblokir.', input: 'number' },
+    'antifraud.return_block_enabled': { label: 'Blokir otomatis retur berturut-turut', hint: 'D-122. Bawaan 0. Bisa dimatikan di sini, tetapi menyalakannya hanya lewat pengajuan di halaman Pelanggan Diblokir yang disetujui Pemilik (D-133). Hanya mengatur pembuatan blokir otomatis: bila aktif, nomor dan alamat pelanggan yang pesanan terakhirnya (jumlah di bawah) semua berujung retur produk utuh yang disetujui diblokir dari pesanan baru. Blokir yang sudah ada, termasuk yang ditambah manual, tetap berlaku walau ini 0. Admin Toko mencabut di Pelanggan Diblokir.', input: 'switch', lockOn: true },
     'antifraud.return_block_streak': { label: 'Jumlah pesanan berturut-turut untuk blokir otomatis', hint: 'Bawaan 3 (D-122). Dihitung dari pesanan terakhir yang sudah diterima atas nomor WhatsApp yang sama; satu pesanan tanpa retur memutus hitungan.', input: 'number' },
     'antifraud.max_orders_per_day': { label: 'Maksimal pesanan per nomor HP dalam 24 jam', hint: 'Dihitung bergulir 24 jam terakhir.', input: 'number' },
     'loyalty.repeat_order_count': { label: 'Tag repeat order mulai pesanan selesai ke-', hint: 'Bawaan 5 (D-135). Dihitung per nomor WhatsApp, termasuk pesanan tamu. Pesanan dengan retur atau refund yang disetujui tidak dihitung.', input: 'number' },
@@ -178,13 +180,13 @@ const FIELDS = {
     'refund.review_sla_hours': { label: 'Batas tinjauan refund (jam)', hint: 'Boleh kosong sampai kebijakan refund disetujui.', input: 'number' },
     'refund.payout_days_max': { label: 'Batas proses refund (hari)', hint: 'Sejak pengajuan sampai dana diterima pelanggan.', input: 'number' },
     'refund.terms_version': { label: 'Versi syarat refund', hint: 'Diisi otomatis setiap Syarat dan Ketentuan diubah (menu Syarat dan Ketentuan). Tidak perlu diubah di sini.', input: 'text' },
-    'cancellation.auto_unpaid_enabled': { label: 'Pembatalan langsung pesanan belum dibayar (0 = mati, 1 = aktif)', hint: 'D-138. Bila aktif, pelanggan membatalkan sendiri pesanan yang belum dibayar tanpa persetujuan. Mati = harus lewat pengajuan ke CS.', input: 'number' },
+    'cancellation.auto_unpaid_enabled': { label: 'Pembatalan langsung pesanan belum dibayar', hint: 'D-138. Bila aktif, pelanggan membatalkan sendiri pesanan yang belum dibayar tanpa persetujuan. Mati = harus lewat pengajuan ke CS.', input: 'switch' },
     'cancellation.auto_max_per_phone': { label: 'Batas pembatalan langsung per nomor HP (30 hari)', hint: 'Bawaan 2. Setelah batas ini, pembatalan harus lewat pengajuan ke CS.', input: 'number' },
-    'cancellation.auto_refund_enabled': { label: 'Refund otomatis lewat Midtrans (0 = mati, 1 = aktif)', hint: 'D-138 tahap 4. Bawaan 0. Hanya kartu dan QRIS, setelah ACC Admin Toko; virtual account tetap manual. Nyalakan hanya setelah akun produksi Midtrans, aktivasi refund, dan saldo terverifikasi.', input: 'number' },
+    'cancellation.auto_refund_enabled': { label: 'Refund otomatis lewat Midtrans', hint: 'D-138 tahap 4. Bawaan 0. Hanya kartu dan QRIS, setelah ACC Admin Toko; virtual account tetap manual. Nyalakan hanya setelah akun produksi Midtrans, aktivasi refund, dan saldo terverifikasi.', input: 'switch' },
     'cancellation.process_days_max': { label: 'Batas proses pembatalan (hari)', hint: 'Sejak pengajuan sampai dana diterima pelanggan.', input: 'number' },
     'marketing.videos_per_week': { label: 'Target video per minggu', hint: 'Rencana video. Bawaan 2 (D-062: 1 sampai 2 video). Hanya target tampilan.', input: 'number' },
-    'pwa.store_enabled': { label: 'Aplikasi toko untuk pelanggan (0 = mati, 1 = aktif)', hint: 'Bawaan 0. Bila aktif, pelanggan yang sudah masuk bisa memasang aplikasi Tuffero dari halaman Akun; tamu tidak. Mematikannya menghentikan pemasangan baru, tetapi aplikasi yang sudah terpasang di HP tidak ikut terhapus dan hanya membuka website biasa.', input: 'number' },
-    'pwa.admin_enabled': { label: 'Aplikasi admin untuk staf (0 = mati, 1 = aktif)', hint: 'Bawaan 0. Bila aktif, semua role staf yang sudah masuk bisa memasang Tuffero Admin dari halaman Profil. Mematikannya menghentikan pemasangan baru; aplikasi yang sudah terpasang tidak ikut terhapus.', input: 'number' },
+    'pwa.store_enabled': { label: 'Aplikasi toko untuk pelanggan', hint: 'Bawaan 0. Bila aktif, pelanggan yang sudah masuk bisa memasang aplikasi Tuffero dari halaman Akun; tamu tidak. Mematikannya menghentikan pemasangan baru, tetapi aplikasi yang sudah terpasang di HP tidak ikut terhapus dan hanya membuka website biasa.', input: 'switch' },
+    'pwa.admin_enabled': { label: 'Aplikasi admin untuk staf', hint: 'Bawaan 0. Bila aktif, semua role staf yang sudah masuk bisa memasang Tuffero Admin dari halaman Profil. Mematikannya menghentikan pemasangan baru; aplikasi yang sudah terpasang tidak ikut terhapus.', input: 'switch' },
 };
 
 const press = 'transition-[transform,background-color] duration-[160ms] ease-out-strong focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary active:scale-[0.97] disabled:opacity-60 disabled:active:scale-100';
@@ -236,6 +238,13 @@ async function save(key) {
     } finally {
         row.busy = false;
     }
+}
+
+async function toggle(key) {
+    const row = rows[key];
+    row.value = row.value === '1' ? '0' : '1';
+    await save(key);
+    if (row.error) row.value = row.saved;
 }
 
 onMounted(() => {
@@ -429,7 +438,22 @@ onMounted(() => {
             <p v-if="rows[setting.key].updatedAt" class="mt-1 text-label-sm text-secondary">Terakhir diubah {{ formatDate(rows[setting.key].updatedAt) }}</p>
           </div>
           <div class="min-w-0">
-            <div class="flex gap-2">
+            <div v-if="FIELDS[setting.key].input === 'switch'" class="flex items-center gap-3 sm:justify-end">
+              <span class="text-label-md" :class="rows[setting.key].value === '1' ? 'text-success' : 'text-error'" aria-hidden="true">{{ rows[setting.key].value === '1' ? 'Aktif' : 'Mati' }}</span>
+              <button
+                :id="setting.key"
+                type="button"
+                role="switch"
+                :aria-checked="rows[setting.key].value === '1'"
+                :aria-describedby="`${setting.key}-hint`"
+                :aria-label="FIELDS[setting.key].label"
+                :disabled="rows[setting.key].busy || (FIELDS[setting.key].lockOn && rows[setting.key].value !== '1')"
+                class="tf-switch"
+                :class="rows[setting.key].value === '1' ? 'is-on' : 'is-off'"
+                @click="toggle(setting.key)"
+              ><span class="tf-switch-knob" aria-hidden="true"></span></button>
+            </div>
+            <div v-else class="flex gap-2">
               <input
                 :id="setting.key"
                 v-model="rows[setting.key].value"

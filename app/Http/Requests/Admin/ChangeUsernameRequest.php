@@ -6,7 +6,10 @@ use App\Services\ProfileOtpService;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
 
-/** Ubah username sendiri: username baru, saluran OTP, dan kodenya. Username kosong berarti menghapus. */
+/**
+ * Ubah username sendiri: username baru, saluran OTP, dan kodenya. Username kosong berarti menghapus.
+ * Rute .../code (kirim kode) memeriksa username dan saluran lebih dulu, tanpa kode, supaya kode berbiaya tidak terbuang untuk username yang pasti ditolak.
+ */
 class ChangeUsernameRequest extends FormRequest
 {
     public function authorize(): bool
@@ -23,11 +26,17 @@ class ChangeUsernameRequest extends FormRequest
     /** @return array<string, mixed> */
     public function rules(): array
     {
-        return [
+        $rules = [
             'username' => [...UpdateUserRequest::USERNAME_RULES, Rule::unique('users', 'username')->ignore($this->user()?->id)],
             'channel' => ['required', Rule::in(ProfileOtpService::CHANNELS)],
             'code' => ['required', 'string', 'size:6'],
         ];
+
+        if ($this->is('*/code')) {
+            unset($rules['code']);
+        }
+
+        return $rules;
     }
 
     /** @return array<string, string> */

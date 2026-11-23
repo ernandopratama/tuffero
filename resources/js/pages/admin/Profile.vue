@@ -60,7 +60,7 @@ const usernameDialog = ref(null);
 
 function fill(data) {
     // Respons simpan profil tidak memuat saluran kode; WhatsApp hanya untuk nomor yang sudah terverifikasi.
-    profile.value = { ...data, otp_channels: data.otp_channels || (data.phone && data.phone_verified ? ['email', 'phone'] : ['email']) };
+    profile.value = data;
     form.name = data.name;
     form.email = data.email;
     form.phone = data.phone || '';
@@ -194,7 +194,7 @@ onMounted(load);
                   <span class="min-w-0 truncate" :class="profile.username ? 'font-mono text-body-md' : 'text-body-sm text-secondary'">{{ profile.username || 'Belum diatur, masuk memakai email' }}</span>
                   <button type="button" class="inline-flex min-h-9 shrink-0 items-center rounded-full border border-secondary px-4 text-label-md transition-[transform,background-color] duration-[160ms] ease-out-strong hover:bg-accent-tint-15 focus-visible:outline-2 focus-visible:outline-primary active:scale-[0.97]" @click="usernameDialog.open()">{{ profile.username ? 'Ubah' : 'Atur' }}</button>
                 </div>
-                <p class="mt-1 text-body-sm text-secondary">Bisa dipakai masuk selain email. Mengubahnya perlu kode konfirmasi lewat email atau WhatsApp.</p>
+                <p class="mt-1 text-body-sm text-secondary">Bisa dipakai masuk selain email. Mengubahnya perlu kode konfirmasi yang dikirim ke email akun.</p>
               </div>
 
               <!-- Mengganti email atau nomor HP: konfirmasi identitas dulu -->
@@ -300,7 +300,7 @@ onMounted(load);
       <NotificationPrefsCard class="mt-4" />
       <ActivityCard class="mt-4" />
       <MfaResetDialog ref="mfaDialog" @replaced="onMfaReplaced" />
-      <UsernameDialog ref="usernameDialog" :current="profile.username" :channels="profile.otp_channels" :email="profile.email" @changed="fill" />
+      <UsernameDialog ref="usernameDialog" :current="profile.username" :email="profile.email" @changed="fill" />
     </template>
   </div>
 </template>

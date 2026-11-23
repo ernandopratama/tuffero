@@ -12,7 +12,7 @@ use Illuminate\Support\Facades\Hash;
 use Illuminate\Validation\ValidationException;
 
 /**
- * Pendaftaran pelanggan dengan kode verifikasi email atau WhatsApp (D-051, D-093, D-095).
+ * Pendaftaran pelanggan: kode verifikasi email dan WhatsApp, keduanya wajib sebelum akun dibuat (D-051, D-093, D-145).
  */
 class RegisterController extends Controller
 {
@@ -29,9 +29,10 @@ class RegisterController extends Controller
 
         $pending = [
             'email' => $data['email'],
-            'phone' => $data['phone'] ?? null,
+            'phone' => $data['phone'],
             'password' => Hash::make($data['password']),
             'channel' => $data['channel'],
+            'verified' => [],
         ];
         $request->session()->put(self::SESSION_KEY, $pending);
 
@@ -45,23 +46,48 @@ class RegisterController extends Controller
         return $this->success('Registration code processed.', $this->registration->send($pending, (string) $request->ip(), true, $request->validated('captcha_token')));
     }
 
+    /** Saluran kedua setelah yang pertama terverifikasi; saluran yang sudah selesai tidak dikirimi kode lagi. */
+    public function channel(RegisterRequest $request): JsonResponse
+    {
+        $pending = $this->pending($request);
+        $channel = $request->validated('channel');
+
+        if (in_array($channel, $pending['verified'], true)) {
+            throw ValidationException::withMessages(['channel' => 'channel_done'])->status(422);
+        }
+
+        $pending['channel'] = $channel;
+        $request->session()->put(self::SESSION_KEY, $pending);
+
+        return $this->success('Registration code processed.', $this->registration->send($pending, (string) $request->ip(), false, $request->validated('captcha_token')));
+    }
+
     public function verify(RegisterRequest $request): JsonResponse
     {
         $pending = $this->pending($request);
-        $user = $this->registration->verify($pending, $request->validated('code'));
 
-        if (! $user) {
+        if (! $this->registration->verify($pending, $request->validated('code'))) {
             throw ValidationException::withMessages(['code' => 'otp_invalid']);
         }
 
+        $pending['verified'] = array_values(array_unique([...$pending['verified'], $pending['channel']]));
+
+        // Satu saluran selesai, yang lain masih menunggu: akun belum dibuat.
+        if (count($pending['verified']) < 2) {
+            $request->session()->put(self::SESSION_KEY, $pending);
+
+            return $this->success('Channel verified.', ['registered' => false, 'verified' => $pending['verified']]);
+        }
+
+        $user = $this->registration->createUser($pending);
         $request->session()->forget(self::SESSION_KEY);
         Auth::guard('web')->login($user);
         $request->session()->regenerate();
 
-        return $this->success('Registration complete.', ['registered' => true]);
+        return $this->success('Registration complete.', ['registered' => true, 'verified' => $pending['verified']]);
     }
 
-    /** @return array{email: string, phone: ?string, password: string, channel: 'email'|'phone'} */
+    /** @return array{email: string, phone: string, password: string, channel: 'email'|'phone', verified: list<string>} */
     private function pending(RegisterRequest $request): array
     {
         $pending = $request->session()->get(self::SESSION_KEY);
@@ -69,6 +95,9 @@ class RegisterController extends Controller
         if (! is_array($pending)) {
             throw ValidationException::withMessages(['otp' => 'otp_expired'])->status(422);
         }
+
+        // Sesi yang dimulai sebelum D-145 belum punya daftar saluran terverifikasi.
+        $pending['verified'] ??= [];
 
         return $pending;
     }

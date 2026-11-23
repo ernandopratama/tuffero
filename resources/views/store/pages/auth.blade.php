@@ -1,7 +1,7 @@
-@extends('store.layouts.app', ['footer' => false, 'mainbar' => false])
+@extends('store.layouts.app', ['footer' => false, 'mainbar' => false, 'legacy' => false])
 
 @section('content')
-	<script type="application/json" id="tf-auth-data">{{ $site->json(['words' => $a, 'mode' => $mode, 'dev' => app()->isLocal(), 'google' => \App\Http\Controllers\Store\GoogleAuthController::enabled(), 'googleStatus' => in_array(request('google'), ['failed', 'unavailable'], true) ? request('google') : null]) }}</script>
+	<script type="application/json" id="tf-auth-data">{{ $site->json(['words' => $a, 'mode' => $mode, 'dev' => app()->isLocal(), 'siteKey' => config('services.turnstile.site_key'), 'google' => \App\Http\Controllers\Store\GoogleAuthController::enabled(), 'googleStatus' => in_array(request('google'), ['failed', 'unavailable'], true) ? request('google') : null]) }}</script>
 	<main class="tf-wrap tf-auth" x-data="authPage">
 		<aside class="tf-auth-photo">
 			<img src="/images/Produk/gallery/Nastar Sultan 1.webp" alt="" width="800" height="800" fetchpriority="high">
@@ -84,31 +84,46 @@
 				<a href="{{ $site->route('products') }}" class="tf-auth-link">{{ $a['guest'] }}</a>
 				<p class="tf-auth-terms">{{ $a['termsA'] }} <a href="{{ $site->route('contact') }}#syarat">{{ $a['terms'] }}</a> {{ $a['termsB'] }} <a href="{{ $site->route('contact') }}#privasi">{{ $a['privacy'] }}</a>{{ $a['termsC'] && $a['termsC'] !== '.' ? ' ' : '' }}{{ $a['termsC'] }}</p>
 
-				<!-- Pilihan saluran verifikasi: satu wajib dipilih; Esc atau "Ubah data" hanya kembali ke formulir -->
-				<dialog x-ref="methodDialog" class="tf-co-dialog tf-voucher-dialog tf-auth-methods" aria-labelledby="tf-methods-title">
-					<div class="tf-co-dialog-sheet">
-						<header class="tf-co-dialog-head">
-							<div>
-								<h2 id="tf-methods-title">{{ $a['methods']['title'] }}</h2>
-								<p>{{ $a['methods']['lead'] }}</p>
-							</div>
-						</header>
-						<div class="tf-co-dialog-body">
-							<button type="button" class="tf-auth-method" :disabled="busy" @click="chooseMethod('email')">
-								{{ $site->lineIcon('mail', 22) }}
-								<span><strong>{{ $a['methods']['email'] }}</strong><small x-text="email.trim()"></small></span>
-							</button>
-							<button type="button" class="tf-auth-method" :disabled="busy || !canWhatsapp" @click="chooseMethod('phone')">
-								{{ $site->lineIcon('phone', 22) }}
-								<span><strong>{{ $a['methods']['phone'] }}</strong><small x-text="whatsappTarget"></small></span>
-							</button>
-							<button type="button" class="tf-auth-link" @click="closeMethods">{{ $a['methods']['back'] }}</button>
-						</div>
-					</div>
-				</dialog>
 			</div>
 		</template>
 
+		<!-- Pilih saluran verifikasi (D-145): email dan WhatsApp keduanya wajib; urutan bebas. "Ubah data" kembali ke formulir -->
+		<template x-if="showMethod">
+			<div class="tf-auth-panel">
+				<div class="tf-auth-top is-split">
+					<button type="button" class="tf-auth-back" :disabled="busy" @click="closeMethods">
+						<span aria-hidden="true">←</span> {{ $a['methods']['back'] }}
+					</button>
+					@include('store.partials.home-button', ['label' => $a['backHome']])
+				</div>
+				<p class="tf-eyebrow">{{ $a['otp']['eyebrow'] }} · <span x-text="stepText"></span></p>
+				<h1>{{ $a['methods']['title'] }}</h1>
+				<p class="tf-auth-lead">{{ $a['methods']['lead'] }}</p>
+
+				<div class="tf-vm-progress" role="status">
+					<span class="tf-vm-bar" aria-hidden="true"><i :class="segClass(0)"></i><i :class="segClass(1)"></i></span>
+					<span x-text="progressText"></span>
+				</div>
+				<div class="tf-sq-wrap" x-show="busy" x-cloak role="status" aria-live="polite">
+					<div class="tf-sq" aria-hidden="true">@for ($i = 0; $i < 15; $i++)<i></i>@endfor</div>
+					<p>{{ $a['methods']['sending'] }}</p>
+				</div>
+				<div class="tf-vm-list" x-show="!busy">
+					<button type="button" class="tf-vm-card" :class="emailDone ? 'is-done' : ''" :disabled="busy || emailDone" @click="chooseMethod('email')">
+						<span class="tf-vm-icon is-mail" aria-hidden="true">{{ $site->lineIcon('mail', 22) }}</span>
+						<span class="tf-vm-text"><strong>{{ $a['methods']['email'] }}</strong><small x-text="email.trim()"></small></span>
+						<span class="tf-vm-state" x-text="emailDone ? '{{ $a['methods']['done'] }}' : '{{ $a['methods']['send'] }}'"></span>
+					</button>
+					<button type="button" class="tf-vm-card" :class="phoneDone ? 'is-done' : ''" :disabled="busy || phoneDone || !canWhatsapp" @click="chooseMethod('phone')">
+						<span class="tf-vm-icon is-wa" aria-hidden="true">{{ $site->lineIcon('whatsapp', 22) }}</span>
+						<span class="tf-vm-text"><strong>{{ $a['methods']['phone'] }}</strong><small x-text="whatsappTarget"></small></span>
+						<span class="tf-vm-state" x-text="phoneDone ? '{{ $a['methods']['done'] }}' : '{{ $a['methods']['send'] }}'"></span>
+					</button>
+				</div>
+				<div id="tf-auth-turnstile"></div>
+				<template x-if="notice"><p class="tf-auth-notice" role="alert" x-text="notice"></p></template>
+			</div>
+		</template>
 		<template x-if="showOtp">
 			<div class="tf-auth-panel">
 				<div class="tf-auth-top is-split">
@@ -117,7 +132,7 @@
 					</button>
 					@include('store.partials.home-button', ['label' => $a['backHome']])
 				</div>
-				<p class="tf-eyebrow">{{ $a['otp']['eyebrow'] }}</p>
+				<p class="tf-eyebrow">{{ $a['otp']['eyebrow'] }} · <span x-text="stepText"></span></p>
 				<h1 x-text="otpTitle"></h1>
 				<p class="tf-auth-lead" x-text="otpLead"></p>
 
@@ -139,6 +154,7 @@
 				</form>
 				<template x-if="locked">@include('store.partials.slide-button', ['href' => $site->route('contact'), 'label' => $a['otp']['help'], 'class' => 'tf-auth-link'])</template>
 				<template x-if="!locked"><p class="tf-auth-terms" x-text="channelWords.noCode"></p></template>
+				<div id="tf-auth-turnstile"></div>
 			</div>
 		</template>
 	</main>

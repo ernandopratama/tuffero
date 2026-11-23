@@ -1,4 +1,5 @@
 import api from './api';
+import { loadTurnstile } from './phoneOtp';
 import { pageData } from './site';
 
 const MAX_ATTEMPTS = 5;
@@ -21,6 +22,8 @@ export const authPage = () => ({
     google: false,
     mode: 'login',
     channel: 'email',
+    // Saluran yang sudah lolos kode pada pendaftaran berjalan; akun dibuat setelah email dan WhatsApp keduanya selesai (D-145).
+    verified: [],
     identity: '',
     email: '',
     phone: '',
@@ -40,12 +43,16 @@ export const authPage = () => ({
     now: Date.now(),
     attemptsLeft: MAX_ATTEMPTS,
     ticker: null,
+    siteKey: '',
+    captchaToken: '',
+    widget: null,
 
     init() {
         const data = pageData('tf-auth-data');
         this.a = data.words;
         this.dev = data.dev;
         this.google = data.google;
+        this.siteKey = data.siteKey || '';
         this.mode = data.mode;
         if (data.googleStatus) this.notice = data.googleStatus === 'failed' ? this.a.googleFailed : this.a.googleUnavailable;
         window.addEventListener('popstate', () => {
@@ -58,7 +65,9 @@ export const authPage = () => ({
 
     get isOtp() { return this.mode === 'otp'; },
     get isRegister() { return this.mode === 'register'; },
-    get showForm() { return !this.isOtp; },
+    get isMethod() { return this.mode === 'method'; },
+    get showForm() { return !this.isOtp && !this.isMethod; },
+    get showMethod() { return this.isMethod; },
     get showOtp() { return this.isOtp; },
     get words() { return this.isRegister ? this.a.register : this.a.login; },
     get channelWords() { return this.channel === 'email' ? this.a.email : this.a.phone; },
@@ -82,9 +91,16 @@ export const authPage = () => ({
     get otpClass() { return { 'is-error': !!this.codeError, 'is-locked': this.locked }; },
     get canWhatsapp() { return phoneValid(this.phone.trim()); },
     get whatsappTarget() { return this.canWhatsapp ? `+62 ${phoneDigits(this.phone)}` : this.a.methods.phoneMissing; },
+    get emailDone() { return this.verified.includes('email'); },
+    get phoneDone() { return this.verified.includes('phone'); },
+    get doneCount() { return this.verified.length; },
+    get progressText() { return this.a.methods.progress.replace(':n', this.doneCount); },
+    get stepText() { return this.a.otp.step.replace('{n}', this.doneCount + 1); },
+    // Dua segmen bilah kemajuan di langkah pilih saluran verifikasi.
+    segClass(i) { return { 'is-on': i < this.doneCount }; },
     get codeCells() { return [0, 1, 2, 3, 4, 5]; },
     cellText(i) { return this.locked ? '' : (this.code[i] || ''); },
-    cellClass(i) { return { 'is-next': this.code.length === i || (this.code.length === 6 && i === 5) }; },
+    cellClass(i) { return { 'is-next': this.code.length === i || (this.code.length === 6 && i === 5), 'is-filled': !!this.code[i] }; },
 
     go(mode, path) {
         this.mode = mode;
@@ -104,8 +120,10 @@ export const authPage = () => ({
     tabRegister() { this.setMode('register'); },
     backToRegister() { this.go('register', '/daftar'); },
     togglePassword() { this.showPassword = !this.showPassword; },
-    clearField() { this.fieldError = ''; },
-    clearPhone() { this.phoneError = ''; this.fieldError = ''; },
+    // Mengubah email atau nomor membatalkan pendaftaran yang sedang berjalan: sesi server memegang data lama, jadi mulai dari awal.
+    resetProgress() { this.verified = []; },
+    clearField() { this.fieldError = ''; this.resetProgress(); },
+    clearPhone() { this.phoneError = ''; this.fieldError = ''; this.resetProgress(); },
     clearPassword() { this.passwordError = ''; },
     // Navigasi penuh (bukan fetch): Google mengalihkan browser, dan server menyimpan state OAuth di sesi.
     googleNotice() {
@@ -117,7 +135,7 @@ export const authPage = () => ({
         const mail = this.email.trim();
         const tel = this.phone.trim();
         this.fieldError = !mail ? this.a.identity.required : (emailValid(mail) ? '' : this.a.identity.emailInvalid);
-        this.phoneError = tel && !phoneValid(tel) ? this.a.identity.phoneInvalid : '';
+        this.phoneError = !tel ? this.a.identity.phoneRequired : (phoneValid(tel) ? '' : this.a.identity.phoneInvalid);
     },
     validateLogin() {
         const value = this.identity.trim();
@@ -130,6 +148,8 @@ export const authPage = () => ({
     async submit() {
         if (this.busy) return;
         this.notice = '';
+        // Satu saluran sudah lolos: lanjut ke saluran berikutnya tanpa mengisi ulang (kata sandi sudah di sesi server).
+        if (this.isRegister && this.doneCount > 0) { this.go('method', '/daftar'); return; }
         if (this.isRegister) this.validateRegister(); else this.validateLogin();
         this.passwordError = !this.password ? this.a.password.required : (this.isRegister && this.password.length < 8 ? this.a.password.tooShort : '');
         if (this.fieldError || this.phoneError || this.passwordError) {
@@ -137,8 +157,8 @@ export const authPage = () => ({
             document.getElementById(this.fieldError ? (this.isRegister ? 'tf-auth-email' : 'tf-auth-id') : (this.phoneError ? 'tf-auth-phone' : 'tf-auth-password'))?.focus();
             return;
         }
-        // Daftar: pilihan saluran verifikasi dulu (dialog), kode baru dikirim setelah dipilih.
-        if (this.isRegister) { this.$refs.methodDialog.showModal(); return; }
+        // Daftar: pilihan saluran verifikasi dulu (langkah sendiri), kode baru dikirim setelah dipilih.
+        if (this.isRegister) { this.go('method', '/daftar'); return; }
         this.busy = true;
         try {
             // Hanya local: masuk memakai akun uji lewat /api/v1/auth/login. Di luar local tetap "belum tersedia" (OQ-18, OQ-22).
@@ -159,14 +179,44 @@ export const authPage = () => ({
             this.busy = false;
         }
     },
-    closeMethods() { this.$refs.methodDialog.close(); },
+    // Turnstile (interaction-only) dirender ulang tiap langkah verifikasi; token sekali pakai dan wajib untuk kode WhatsApp.
+    async renderCaptcha() {
+        const el = document.getElementById('tf-auth-turnstile');
+        if (!this.siteKey || !el) return;
+        if (this.widget !== null) { try { window.turnstile?.remove(this.widget); } catch { /* widget lama sudah lepas dari DOM */ } this.widget = null; }
+        this.captchaToken = '';
+        try {
+            await loadTurnstile();
+        } catch {
+            return; // Server menolak tanpa token dan pesan galatnya tampil; pelanggan bisa mencoba lagi.
+        }
+        if (!el.isConnected || this.widget !== null) return;
+        this.widget = window.turnstile.render(el, {
+            sitekey: this.siteKey,
+            appearance: 'interaction-only',
+            callback: (token) => { this.captchaToken = token; },
+            'expired-callback': () => { this.captchaToken = ''; },
+        });
+    },
+    // Menunggu token (biasanya di bawah 2 detik); tanpa token permintaan tetap dikirim dan server yang menolak dengan pesan jelas.
+    async takeCaptcha() {
+        if (!this.siteKey) return null;
+        for (let i = 0; i < 50 && !this.captchaToken; i++) await new Promise((r) => setTimeout(r, 100));
+        const token = this.captchaToken || null;
+        this.captchaToken = '';
+        if (this.widget !== null) window.turnstile?.reset(this.widget);
+        return token;
+    },
+    closeMethods() { this.go('register', '/daftar'); },
     // Satu saluran wajib dipilih. Kata sandi dikirim sekali ke server (di-hash di sana dan disimpan di sesi), lalu dihapus dari memori.
     async chooseMethod(channel) {
-        if (this.busy || (channel === 'phone' && !this.canWhatsapp)) return;
+        if (this.busy || (channel === 'phone' && !this.canWhatsapp) || this.verified.includes(channel)) return;
         this.busy = true;
         try {
-            const { data } = await api.post('/auth/register/send', { email: this.email.trim(), phone: this.phone.trim() || null, password: this.password, channel });
-            this.$refs.methodDialog.close();
+            const captcha_token = await this.takeCaptcha();
+            const { data } = await (this.doneCount > 0
+                ? api.post('/auth/register/channel', { channel, captcha_token })
+                : api.post('/auth/register/send', { email: this.email.trim(), phone: this.phone.trim(), password: this.password, channel, captcha_token }));
             this.password = '';
             this.channel = channel;
             this.maskedId = channel === 'email' ? maskEmail(this.email.trim()) : maskPhone(this.phone);
@@ -177,8 +227,8 @@ export const authPage = () => ({
             this.attemptsLeft = MAX_ATTEMPTS;
             this.go('otp', '/masuk/verifikasi');
         } catch (e) {
-            this.$refs.methodDialog.close();
-            this.notice = this.errorText(e);
+            // Sesi pendaftaran habis di server: progres di layar tidak berlaku lagi, kembali ke formulir (kata sandi harus diisi ulang).
+            if (errorCode(e) === 'otp_expired') { this.resetProgress(); this.notice = this.errorText(e); this.go('register', '/daftar'); } else this.notice = this.errorText(e);
         } finally {
             this.busy = false;
         }
@@ -193,15 +243,24 @@ export const authPage = () => ({
         if (this.code.length < 6) { this.codeError = this.a.otp.incomplete; this.$refs.codeEl?.focus(); return; }
         this.busy = true;
         try {
-            await api.post('/auth/register/verify', { code: this.code });
-            window.location.assign('/akun');
+            const { data } = await api.post('/auth/register/verify', { code: this.code });
+            if (data.data.registered) {
+                window.location.assign('/akun');
+                return;
+            }
+            // Satu saluran selesai: lanjut ke pilihan saluran berikutnya.
+            this.verified = data.data.verified;
+            this.code = '';
+            this.codeError = '';
+            this.notice = '';
+            this.go('method', '/daftar');
             return;
         } catch (e) {
             const failure = errorCode(e);
             this.code = '';
             this.codeStatus = '';
             // Sesi pendaftaran habis (mis. cookie dihapus): kembali ke formulir.
-            if (failure === 'otp_expired') { this.notice = this.a.errors.otp_expired; this.backToRegister(); return; }
+            if (failure === 'otp_expired') { this.notice = this.a.errors.otp_expired; this.resetProgress(); this.backToRegister(); return; }
             if (failure !== 'otp_invalid') { this.codeError = this.errorText(e); return; }
             // Server menegakkan batasnya (AUTH-03, AUTH-04); hitungan di sini hanya cerminan untuk tampilan.
             this.attemptsLeft -= 1;
@@ -222,7 +281,7 @@ export const authPage = () => ({
         if (this.busy || this.resendLeft > 0 || this.locked) return;
         this.busy = true;
         try {
-            const { data } = await api.post('/auth/register/resend');
+            const { data } = await api.post('/auth/register/resend', { captcha_token: this.channel === 'phone' ? await this.takeCaptcha() : null });
             this.startCountdown(data.data.resend_in ?? 60);
             this.code = '';
             this.codeError = '';
@@ -236,7 +295,9 @@ export const authPage = () => ({
         }
     },
     enterStep() {
-        document.title = this.isOtp ? this.a.otp.meta : this.words.meta;
+        document.title = this.isOtp ? this.a.otp.meta : (this.isMethod ? this.a.register.meta : this.words.meta);
+        // Langkah pilih saluran butuh email dan nomor yang valid di memori (mis. muat ulang menghapusnya): kembali ke formulir.
+        if (this.isMethod && !(emailValid(this.email.trim()) && phoneValid(this.phone.trim()))) { window.history.replaceState({}, '', '/daftar'); this.mode = 'register'; document.title = this.words.meta; return; }
         if (this.isOtp && !this.maskedId) { window.history.replaceState({}, '', '/daftar'); this.mode = 'register'; document.title = this.words.meta; return; }
         clearInterval(this.ticker);
         // Hitung mundur dari stempel waktu agar tidak melenceng saat tab dijeda.
@@ -244,6 +305,8 @@ export const authPage = () => ({
             this.ticker = setInterval(() => { this.now = Date.now(); }, 1000);
             this.$nextTick(() => this.$refs.codeEl?.focus());
         }
+        if (this.isMethod || this.isOtp) this.$nextTick(() => this.renderCaptcha());
+        if (this.isMethod) this.$nextTick(() => document.querySelector('.tf-vm-card:not(:disabled)')?.focus());
         window.scrollTo({ top: 0 });
     },
 });

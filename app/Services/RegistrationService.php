@@ -13,7 +13,8 @@ use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
 
 /**
- * Pendaftaran pelanggan dengan verifikasi kode lewat email atau WhatsApp (D-051, D-093): pelanggan memilih satu saluran.
+ * Pendaftaran pelanggan: email dan WhatsApp keduanya wajib terverifikasi kode (D-145, kembali ke D-051). Pelanggan memilih saluran
+ * mana yang diverifikasi lebih dulu; akun baru dibuat setelah kedua kode benar.
  * Data pendaftaran ($pending) disimpan di sesi peramban yang mendaftar, bukan di cache per email, supaya orang lain
  * yang mengetahui email itu tidak bisa mengganti kata sandi di tengah proses. Kode email mengikuti aturan kode OTP WhatsApp:
  * 6 digit, 5 menit, disimpan HMAC, 5 percobaan lalu kunci 15 menit, kirim ulang 60 detik.
@@ -35,19 +36,19 @@ class RegistrationService
     public function __construct(private PhoneOtpService $phoneOtp, private VoucherService $vouchers) {}
 
     /** Email dan nomor yang sudah dipakai ditolak sebelum kode apa pun dikirim (kode berbiaya). */
-    public function assertAvailable(string $email, ?string $phone): void
+    public function assertAvailable(string $email, string $phone): void
     {
         if (User::where('email', $email)->exists()) {
             throw $this->rejected('email', 'email_taken', 422);
         }
 
-        if ($phone && User::where('phone', $phone)->exists()) {
+        if (User::where('phone', $phone)->exists()) {
             throw $this->rejected('phone', 'phone_taken', 422);
         }
     }
 
     /**
-     * @param  array{email: string, phone: ?string, password: string, channel: 'email'|'phone'}  $pending  password sudah di-hash
+     * @param  array{email: string, phone: string, password: string, channel: 'email'|'phone', verified?: list<string>}  $pending  password sudah di-hash
      * @return array{channel: string, status: string, expires_in?: int, resend_in?: int}
      */
     public function send(array $pending, string $ip, bool $resend, ?string $captchaToken): array
@@ -60,25 +61,22 @@ class RegistrationService
         return ['channel' => 'email'] + $this->sendEmail($pending['email'], $ip, $resend);
     }
 
-    /** Membuat akun bila kode benar. Null berarti kode salah, kedaluwarsa, atau terkunci. */
-    public function verify(array $pending, string $code): ?User
+    /** Kode saluran yang sedang diverifikasi benar? False bila salah, kedaluwarsa, atau terkunci. */
+    public function verify(array $pending, string $code): bool
     {
-        $ok = $pending['channel'] === 'phone'
+        return $pending['channel'] === 'phone'
             ? $this->phoneOtp->verify((string) $pending['phone'], $code)
             : $this->verifyEmail($pending['email'], $code);
-
-        return $ok ? $this->createUser($pending) : null;
     }
 
-    private function createUser(array $pending): User
+    /** Dipanggil hanya setelah email dan nomor sama-sama lolos kode; nomor yang belum terbukti tidak pernah disimpan (kolom phone unik). */
+    public function createUser(array $pending): User
     {
-        $viaPhone = $pending['channel'] === 'phone';
-        // Nomor yang belum terverifikasi tidak disimpan: kolom phone unik, jadi nomor yang belum dibuktikan bisa memblokir pemilik aslinya.
         $user = new User(['name' => Str::limit(Str::before($pending['email'], '@'), 100, ''), 'email' => $pending['email'], 'password' => $pending['password']]);
         $user->forceFill([
-            'email_verified_at' => $viaPhone ? null : now(),
-            'phone' => $viaPhone ? $pending['phone'] : null,
-            'phone_verified_at' => $viaPhone ? now() : null,
+            'email_verified_at' => now(),
+            'phone' => $pending['phone'],
+            'phone_verified_at' => now(),
             'mfa_required' => false,
             'is_active' => true,
         ]);

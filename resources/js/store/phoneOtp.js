@@ -2,7 +2,7 @@ import api from './api';
 
 // Turnstile dimuat hanya saat langkah OTP tampil, bukan di setiap halaman.
 let turnstileLoading = null;
-const loadTurnstile = () => {
+export const loadTurnstile = () => {
     if (window.turnstile) return Promise.resolve();
     turnstileLoading ??= new Promise((resolve, reject) => {
         const script = Object.assign(document.createElement('script'), {
@@ -44,6 +44,33 @@ export const phoneOtp = () => {
         get otpSent() { return this.otpStatus === 'sent'; },
         get otpCanSend() { return !this.otpBusy && this.otpResendIn === 0; },
         get otpLead() { return this.words.otp.lead.replace(':phone', this.phoneText); },
+        // Nomor tampil sebagai chip: kalimat dipecah di :phone, tanpa HTML dari data.
+        get otpLeadBefore() { return this.words.otp.lead.split(':phone')[0]; },
+        get otpLeadAfter() { return this.words.otp.lead.split(':phone')[1] ?? ''; },
+        // Enam kotak di atas satu input asli, seperti halaman masuk: isi otomatis dan tempel enam digit tetap bekerja.
+        get otpCells() { return [0, 1, 2, 3, 4, 5]; },
+        get otpCellsClass() { return this.otpInvalid ? 'is-error' : ''; },
+        otpCellText(i) { return this.otpCode[i] || ''; },
+        otpCellClass(i) { return { 'is-next': this.otpCode.length === i || (this.otpCode.length === 6 && i === 5) }; },
+        async pasteOtp() {
+            if (this.otpBusy) return;
+            let digits = '';
+            try {
+                digits = (await navigator.clipboard.readText()).replace(/\D/g, '').slice(0, 6);
+            } catch {
+                this.otpError = this.words.otp.pasteFailed;
+                document.getElementById('co-otp-code')?.focus();
+                return;
+            }
+            if (!digits) {
+                this.otpError = this.words.otp.pasteEmpty;
+                return;
+            }
+            this.otpError = '';
+            this.otpCode = digits;
+            if (digits.length === 6) this.verifyOtp();
+            else document.getElementById('co-otp-code')?.focus();
+        },
         get otpSendText() {
             if (this.otpResendIn > 0) return this.words.otp.resendIn.replace(':s', this.otpResendIn);
             return this.otpSent ? this.words.otp.resend : this.words.otp.send;

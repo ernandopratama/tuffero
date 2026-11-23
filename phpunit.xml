@@ -32,5 +32,9 @@
         <env name="PULSE_ENABLED" value="false"/>
         <env name="TELESCOPE_ENABLED" value="false"/>
         <env name="NIGHTWATCH_ENABLED" value="false"/>
+        <!-- Tes tidak boleh bergantung pada .env pengembang: saklar OTP dan kunci Turnstile dikunci ke keadaan bawaan. -->
+        <env name="WHATSAPP_OTP_REQUIRED" value="false"/>
+        <env name="TURNSTILE_SECRET_KEY" value=""/>
+        <env name="TURNSTILE_SITE_KEY" value=""/>
     </php>
 </phpunit>

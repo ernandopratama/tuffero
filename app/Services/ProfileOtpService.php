@@ -4,19 +4,18 @@ namespace App\Services;
 
 use App\Models\User;
 use App\Notifications\ProfileChangeCode;
-use App\Services\Otp\OtpSender;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Validation\ValidationException;
 
 /**
- * Kode OTP untuk staf yang mengubah data profilnya sendiri, lewat email akun atau WhatsApp (nomor yang sudah terverifikasi).
+ * Kode OTP untuk staf yang mengubah data profilnya sendiri, hanya lewat email akun (WhatsApp tidak dipakai untuk staf, supaya pesan berbiaya hanya untuk pelanggan).
  * Aturan sama dengan OTP lain di Tuffero: 6 digit, 5 menit, disimpan HMAC, 5 percobaan lalu kunci 15 menit, kirim ulang 60 detik.
  * Kode terikat ke akun dan saluran, jadi tidak bisa dipakai di akun lain. Perubahan oleh Super Admin lewat halaman Pengguna tidak memakai ini.
  */
 class ProfileOtpService
 {
-    public const CHANNELS = ['email', 'phone'];
+    public const CHANNELS = ['email'];
 
     private const TTL_SECONDS = 300;
 
@@ -26,19 +25,11 @@ class ProfileOtpService
 
     private const RESEND_SECONDS = 60;
 
-    public function __construct(private OtpSender $sender) {}
-
-    /** Saluran yang boleh dipakai akun ini: email selalu, WhatsApp hanya bila nomornya sudah terverifikasi. */
-    public function channelsFor(User $user): array
-    {
-        return $user->phone && $user->phone_verified_at ? self::CHANNELS : ['email'];
-    }
-
     /** @return array{expires_in: int, resend_in: int} */
     public function send(User $user, string $channel): array
     {
-        if (! in_array($channel, $this->channelsFor($user), true)) {
-            throw $this->rejected('channel', 'Saluran ini belum bisa dipakai. Nomor WhatsApp harus sudah terverifikasi.', 422);
+        if (! in_array($channel, self::CHANNELS, true)) {
+            throw $this->rejected('channel', 'Kode hanya dikirim lewat email.', 422);
         }
 
         $id = $this->id($user, $channel);
@@ -53,12 +44,7 @@ class ProfileOtpService
 
         try {
             $code = str_pad((string) random_int(0, 999999), 6, '0', STR_PAD_LEFT);
-
-            if ($channel === 'email') {
-                $user->notify(new ProfileChangeCode($code, intdiv(self::TTL_SECONDS, 60)));
-            } else {
-                $this->sender->send((string) $user->phone, $code);
-            }
+            $user->notify(new ProfileChangeCode($code, intdiv(self::TTL_SECONDS, 60)));
         } catch (\Throwable $e) {
             // Pengiriman yang gagal tidak boleh menahan pengguna 60 detik untuk kode yang tidak pernah sampai.
             Cache::forget("profile-otp-resend:{$id}");

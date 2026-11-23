@@ -19,6 +19,8 @@ class Setting extends Model
     public const RULES = [
         'contact.whatsapp_number' => ['required', 'string', 'regex:/^\+[1-9][0-9]{7,14}$/'],
         'contact.admin_email' => ['required', 'string', 'email', 'max:255'],
+        // Tujuan pesan "Lupa kata sandi" admin (halaman publik), jadi is_public; hanya Super Admin yang mengubahnya (grup security).
+        'security.super_admin_whatsapp' => ['required', 'string', 'regex:/^\+[1-9][0-9]{7,14}$/'],
         'refund.claim_window_hours' => ['required', 'integer', 'min:1', 'max:8760'],
         'refund.return_window_days' => ['required', 'integer', 'min:1', 'max:30'],
         'refund.review_sla_hours' => ['nullable', 'integer', 'min:1', 'max:8760'],

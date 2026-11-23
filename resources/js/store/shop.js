@@ -169,6 +169,8 @@ export const checkoutPage = () => mix(addressPicker('co'), voucherPicker(), phon
         errors: {},
         formError: '',
         submitting: false,
+        // Tombol bayar di ringkasan sudah terlihat: bilah bayar menempel (HP dan tablet) disembunyikan.
+        submitInView: false,
         rates: [],
         ratesLoading: false,
         ratesFailed: false,
@@ -196,6 +198,9 @@ export const checkoutPage = () => mix(addressPicker('co'), voucherPicker(), phon
             this.initAddressPicker();
             this.cartReady = this.loadCart();
             this.loadAccount();
+            this.watchSubmitInView();
+            // Dialog konfirmasi alamat ada di body (di luar .tf): selama terbuka, halaman di belakangnya inert supaya fokus keyboard dan pembaca layar tidak keluar dari dialog.
+            this.$watch('confirming', (open) => document.querySelector('.tf')?.toggleAttribute('inert', open));
         },
         rupiah,
         productName,
@@ -220,6 +225,26 @@ export const checkoutPage = () => mix(addressPicker('co'), voucherPicker(), phon
             if (this.submitting) return this.words.submitting;
             return this.fee === null ? this.words.submit : `${this.words.submit} (${this.totalText})`;
         },
+        // Teks bantu di atas tombol bayar: langkah berikutnya yang belum selesai. Tombol tetap aktif; submit() menjelaskan dan mengarahkan ke langkahnya.
+        get submitHint() {
+            if (!this.addressConfirmed) return this.words.hint.address;
+            if (!this.phoneOk) return this.words.otp.needed;
+            if (!this.selected) return this.words.hint.courier;
+            return '';
+        },
+        // Tamu: tombol bayar tidak bisa dipakai sebelum alamat, verifikasi WhatsApp, dan kurir selesai. Ditekan saat belum siap, tombol berubah abu-abu bergaris merah 2 detik (submitFlash). Server tetap memeriksa semuanya.
+        submitFlash: false,
+        get submitBlocked() { return !this.isCustomer && (!this.addressConfirmed || !this.phoneOk || !this.selected); },
+        get submitClass() { return this.submitFlash ? 'is-blocked' : ''; },
+        flashSubmit() {
+            this.submitFlash = true;
+            clearTimeout(this.submitFlashTimer);
+            this.submitFlashTimer = setTimeout(() => { this.submitFlash = false; }, 2000);
+        },
+        get barOn() { return this.addressConfirmed && !this.submitInView; },
+        get barClass() { return this.barOn ? 'is-on' : ''; },
+        get barLabel() { return this.fee === null ? this.words.barNoShipping : this.words.grandTotal; },
+        get barButtonText() { return this.submitting ? this.words.submitting : this.words.submitShort; },
         // Tampilan FigCraft 04: kartu alamat, kartu kurir, daftar item, ringkasan tagihan.
         get itemsCount() { return this.lines.length; },
         get itemsTitle() { return this.words.itemsTitle.replace(':count', this.itemsCount); },
@@ -236,6 +261,7 @@ export const checkoutPage = () => mix(addressPicker('co'), voucherPicker(), phon
         // Modal 04b: pilihan baru dipakai hanya setelah Terapkan, Batal mengembalikan pilihan lama.
         draft: null,
         openShipping() {
+            if (!this.phoneOk) return;
             if (this.ratesFailed && !this.ratesLoading) this.retryRates();
             this.draft = this.selected;
             this.$refs.shipDialog.showModal();
@@ -256,6 +282,23 @@ export const checkoutPage = () => mix(addressPicker('co'), voucherPicker(), phon
         },
         get canSaveAddress() { return this.isCustomer && !this.addressId && this.addresses.length < 10; },
         get hasRates() { return this.rates.length > 0; },
+        // Hanya urutan tampilan: termurah dulu. Pilihan, ongkir, dan hitungan server tidak berubah.
+        get sortedRates() { return [...this.rates].sort((a, b) => a.fee - b.fee); },
+        isCheapest(rate) { return this.rates.length > 1 && rate.fee === Math.min(...this.rates.map((r) => r.fee)); },
+        watchSubmitInView() {
+            let frame = 0;
+            const check = () => {
+                frame = 0;
+                const button = document.querySelector('.tf-co-submit');
+                const box = button?.getBoundingClientRect();
+                this.submitInView = !!box && box.top < window.innerHeight && box.bottom > 0;
+            };
+            const schedule = () => { if (!frame) frame = requestAnimationFrame(check); };
+            window.addEventListener('scroll', schedule, { passive: true });
+            window.addEventListener('resize', schedule);
+            this.$watch('addressConfirmed', () => this.$nextTick(schedule));
+            schedule();
+        },
         get courierHint() { return !this.addressConfirmed; },
         get noRates() { return this.addressConfirmed && !this.ratesLoading && !this.ratesFailed && !this.rates.length; },
         get addressSummary() {
@@ -377,6 +420,7 @@ export const checkoutPage = () => mix(addressPicker('co'), voucherPicker(), phon
         },
         async submit() {
             if (this.submitting) return;
+            if (this.submitBlocked) this.flashSubmit();
             if (!this.addressConfirmed) {
                 this.formError = this.words.confirmFirst;
                 document.getElementById('co-confirm')?.focus();
@@ -385,6 +429,11 @@ export const checkoutPage = () => mix(addressPicker('co'), voucherPicker(), phon
             if (!this.phoneOk) {
                 this.formError = this.words.otp.needed;
                 document.getElementById('co-otp')?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                return;
+            }
+            if (!this.selected) {
+                this.errors.courier = this.words.hint.courier;
+                document.getElementById('co-courier')?.scrollIntoView({ behavior: 'smooth', block: 'center' });
                 return;
             }
             this.submitting = true;
@@ -536,10 +585,16 @@ export const orderPage = () => ({
     payStarted: false,
     syncing: null,
     lastSync: 0,
+    // Tamu wajib menyimpan tautan bertoken sebelum membayar. linkSaved diingat per pesanan di perangkat ini (localStorage); linkAck hanya kotak centang di modal.
+    linkSaved: false,
+    linkAck: false,
+    linkCopied: false,
+    linkCopyFailed: false,
 
     init() {
         const data = pageData('tf-order-data');
         this.ref = data.ref;
+        try { this.linkSaved = localStorage.getItem(`tf-link-saved-${this.ref}`) === '1'; } catch { /* storage diblokir: modal tampil lagi di kunjungan berikutnya */ }
         this.words = data.words;
         this.payConfig = data.pay;
         try { this.payStarted = sessionStorage.getItem(`tf-pay-${this.ref}`) === '1'; } catch { /* sessionStorage diblokir: tombol muncul lagi setelah Bayar ditekan */ }
@@ -837,6 +892,28 @@ export const orderPage = () => ({
             // 422 = pesanan sudah tidak bisa dibayar (waktu habis atau sudah ditutup): mencoba lagi tidak membantu.
             this.payError = e.response?.status === 422 ? this.words.payExpired : this.words.payFailed;
             if (e.response?.status === 422) this.load();
+        }
+    },
+    get linkUrl() { return window.location.href; },
+    get hasToken() { return window.location.hash.startsWith('#t=') && window.location.hash.length > 3; },
+    get needsLinkSave() { return this.view === 'pay' && !!this.order?.is_guest && this.hasToken && !this.linkSaved; },
+    get linkCopyText() { return this.linkCopied ? this.words.link.copied : this.words.link.copy; },
+    openLink() { this.linkAck = false; this.$nextTick(() => { const d = this.$refs.linkDialog; if (d && !d.open) { d.showModal(); d.querySelector('.tf-lm-copy')?.focus(); } }); },
+    // Modal tidak bisa ditutup Esc atau klik latar; hanya tombol X, dan X baru aktif setelah kotak dicentang.
+    closeLink() {
+        if (!this.linkAck) return;
+        try { localStorage.setItem(`tf-link-saved-${this.ref}`, '1'); } catch { /* abaikan */ }
+        this.$refs.linkDialog?.close();
+        this.linkSaved = true;
+    },
+    async copyLinkField() {
+        this.linkCopyFailed = false;
+        try {
+            await navigator.clipboard.writeText(window.location.href);
+            this.linkCopied = true;
+        } catch {
+            this.linkCopyFailed = true;
+            this.$refs.linkField?.select();
         }
     },
     async copyLink() {

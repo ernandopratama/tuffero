@@ -31,6 +31,9 @@ class PhoneOtpTest extends TestCase
     {
         parent::setUp();
 
+        // Endpoint ini hanya hidup selama saklar OTP checkout menyala.
+        config(['services.whatsapp.otp_required' => true]);
+
         $this->app->instance(OtpSender::class, new class($this) implements OtpSender
         {
             public function __construct(private PhoneOtpTest $test) {}
@@ -59,6 +62,17 @@ class PhoneOtpTest extends TestCase
     private function wrongCode(): string
     {
         return $this->sent[array_key_last($this->sent)]['code'] === '000000' ? '000001' : '000000';
+    }
+
+    public function test_endpoints_are_closed_and_send_nothing_when_the_otp_switch_is_off(): void
+    {
+        config(['services.whatsapp.otp_required' => false]);
+
+        $this->send()->assertNotFound();
+        $this->send(['probe' => true])->assertNotFound();
+        $this->verify('123456')->assertNotFound();
+
+        $this->assertSame([], $this->sent);
     }
 
     public function test_sends_code_and_normalizes_local_number(): void
@@ -273,7 +287,7 @@ class PhoneOtpTest extends TestCase
     private function configureMeta(): void
     {
         config(['services.whatsapp' => [
-            'token' => 'test-token', 'phone_number_id' => '123', 'otp_template' => 'tuffero_otp', 'otp_language' => 'id', 'graph_version' => 'v24.0',
+            'token' => 'test-token', 'phone_number_id' => '123', 'otp_template' => 'tuffero_otp', 'otp_language' => 'id', 'graph_version' => 'v24.0', 'otp_required' => true,
         ]]);
     }
 }

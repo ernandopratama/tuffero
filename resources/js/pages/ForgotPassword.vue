@@ -1,10 +1,13 @@
 <script setup>
-import { computed, reactive, ref } from 'vue';
+import { computed, onMounted, reactive, ref } from 'vue';
 import LoginMascot from '../components/LoginMascot.vue';
+import { contact, loadContact } from '../utils/site';
 
 // Atur ulang password dilakukan Super Admin lewat menu Pengguna; halaman ini hanya menyiapkan pesan WhatsApp.
-// Nomor Super Admin 085117452317 dalam format internasional untuk wa.me.
-const SUPER_ADMIN_WHATSAPP = '6285117452317';
+// Nomor Super Admin dari Pengaturan (security.super_admin_whatsapp), dimuat lewat /settings/public; kosong = tombol kirim dimatikan.
+const waDigits = computed(() => contact.superAdmin.replace(/\D/g, ''));
+const phoneText = computed(() => (contact.superAdmin.startsWith('+62') ? `0${waDigits.value.slice(2)}`.replace(/(\d{4})(?=\d)/g, '$1-') : contact.superAdmin));
+onMounted(loadContact);
 
 const form = reactive({ name: '', account: '', position: '' });
 const focused = ref(false);
@@ -20,7 +23,8 @@ const message = computed(() => [
 ].join('\n'));
 
 function send() {
-    window.open(`https://wa.me/${SUPER_ADMIN_WHATSAPP}?text=${encodeURIComponent(message.value)}`, '_blank', 'noopener,noreferrer');
+    if (!waDigits.value) return;
+    window.open(`https://wa.me/${waDigits.value}?text=${encodeURIComponent(message.value)}`, '_blank', 'noopener,noreferrer');
 }
 </script>
 
@@ -32,7 +36,7 @@ function send() {
     <div class="w-full max-w-sm space-y-4 rounded-lg border border-border bg-surface p-6 pt-8 text-primary shadow-card sm:p-8 sm:pt-10">
       <div class="text-center">
         <h1 class="font-heading text-headline-md">Lupa Kata Sandi</h1>
-        <p class="mt-1 text-body-sm text-secondary">Password diatur ulang oleh Super Admin. Isi data berikut, lalu kirim lewat WhatsApp ke Super Admin di 0851-1745-2317.</p>
+        <p class="mt-1 text-body-sm text-secondary">Password diatur ulang oleh Super Admin. Isi data berikut, lalu kirim lewat WhatsApp ke Super Admin<template v-if="phoneText"> di {{ phoneText }}</template>.</p>
       </div>
 
       <form class="space-y-4" @submit.prevent="send">
@@ -54,7 +58,8 @@ function send() {
           <pre class="mt-1 whitespace-pre-wrap break-words rounded-md bg-accent-tint-12 px-3 py-2 font-sans text-body-sm text-secondary">{{ message }}</pre>
         </div>
 
-        <button class="w-full rounded bg-accent px-4 py-2.5 text-label-md text-primary hover:bg-accent-hover focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary">Kirim lewat WhatsApp</button>
+        <button :disabled="!waDigits" class="w-full rounded bg-accent px-4 py-2.5 text-label-md text-primary hover:bg-accent-hover focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary disabled:opacity-60">Kirim lewat WhatsApp</button>
+        <p v-if="!waDigits" class="text-center text-body-sm text-secondary" role="status">Memuat nomor Super Admin. Bila tidak muncul, hubungi Super Admin lewat jalur lain.</p>
         <p class="text-center text-body-sm text-secondary">Jangan pernah mengirim password lewat WhatsApp.</p>
         <p class="text-center">
           <router-link :to="{ name: 'Login' }" class="text-label-md text-secondary underline hover:text-primary focus-visible:outline-2 focus-visible:outline-primary">Kembali ke halaman masuk</router-link>

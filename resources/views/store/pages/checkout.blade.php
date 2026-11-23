@@ -1,4 +1,4 @@
-@extends('store.layouts.app', ['bottomNav' => false])
+@extends('store.layouts.app', ['bottomNav' => false, 'legacy' => false])
 
 @php
 	$cartWords = $pg['cart'];
@@ -6,7 +6,7 @@
 
 {{-- Tata letak FigCraft "04 Checkout" dan "04b Checkout / Modal Pengiriman". Pembayaran tetap lewat Snap (D-096): metode dipilih di jendela Midtrans setelah pesanan dibuat. --}}
 @section('content')
-	<script type="application/json" id="tf-checkout-data">{{ $site->json([...\Illuminate\Support\Arr::only($c, ['errors', 'tooMany', 'failed', 'lead', 'leadSignedIn', 'submit', 'submitting', 'shippingPending', 'saveLabelDefault', 'voucher', 'search', 'map', 'etd', 'confirmFirst', 'addressSaved', 'variant', 'qty', 'each', 'itemsTitle', 'productsTotal', 'shippingTotal']), 'customer' => $storeUser && ! $storeRole, 'otp' => config('services.whatsapp.otp_required') && ! ($storeUser && ! $storeRole) ? [...$c['otp'], 'siteKey' => config('services.turnstile.site_key')] : null]) }}</script>
+	<script type="application/json" id="tf-checkout-data">{{ $site->json([...\Illuminate\Support\Arr::only($c, ['errors', 'tooMany', 'failed', 'lead', 'leadSignedIn', 'submit', 'submitting', 'shippingPending', 'saveLabelDefault', 'voucher', 'search', 'map', 'etd', 'confirmFirst', 'hint', 'barNoShipping', 'grandTotal', 'submitShort', 'addressSaved', 'variant', 'qty', 'each', 'itemsTitle', 'productsTotal', 'shippingTotal']), 'customer' => $storeUser && ! $storeRole, 'otp' => config('services.whatsapp.otp_required') && ! ($storeUser && ! $storeRole) ? [...$c['otp'], 'siteKey' => config('services.turnstile.site_key')] : null]) }}</script>
 	<main class="tf-co" x-data="checkoutPage">
 		@include('store.partials.flow-steps', ['steps' => $c['flow'], 'label' => $c['flowLabel'], 'current' => 1, 'variant' => 'stack'])
 
@@ -134,6 +134,49 @@
 
 							<template x-if="addressConfirmed">
 								<div class="tf-co-confirmed" aria-live="polite">
+									{{-- Verifikasi WhatsApp tamu (D-051, D-093). Tampil hanya bila WHATSAPP_OTP_REQUIRED aktif dan pengunjung belum masuk sebagai member. Kartu penuh di atas alamat dan kurir; kurir terkunci sampai nomor terverifikasi. --}}
+									<template x-if="otpRequired">
+										<div class="tf-co-tile tf-co-otp" :class="otpIsVerified && 'is-verified'" id="co-otp" aria-labelledby="co-otp-title">
+											<span class="tf-co-tile-top">
+												<span class="tf-co-tile-meta" id="co-otp-title">{{ $site->lineIcon('shieldCheck', 14) }} {{ $c['otp']['title'] }}</span>
+											</span>
+											<div aria-live="polite" style="display: contents">
+												<template x-if="otpIsVerified">
+													<div class="tf-co-verified" role="status">
+														<span class="tf-co-verified-badge" aria-hidden="true">{{ $site->lineIcon('check', 22) }}</span>
+														<span class="tf-co-verified-text"><strong>{{ $c['otp']['verified'] }}</strong><span><b class="tf-co-otp-phone" x-text="phoneText"></b> {{ $c['otp']['verifiedNote'] }}</span></span>
+													</div>
+												</template>
+												<template x-if="otpNeedsLogin">
+													<span style="display: contents">
+														<p class="tf-co-tile-text">{{ $c['otp']['loginRequired'] }}</p>
+														<a href="{{ $site->route('account') }}" class="tf-btn">{{ $c['otp']['signIn'] }}</a>
+													</span>
+												</template>
+												<template x-if="otpShowForm">
+													<span style="display: contents">
+														<p class="tf-co-tile-text tf-co-otp-lead"><span x-text="otpLeadBefore"></span><strong class="tf-co-otp-phone" x-text="phoneText"></strong><span x-text="otpLeadAfter"></span></p>
+														<template x-if="otpSent">
+														<div class="tf-co-otp-field">
+															<label for="co-otp-code" class="tf-co-otp-label">{{ $c['otp']['code'] }}</label>
+															<div class="tf-otp tf-co-otp-cells" :class="otpCellsClass">
+																<input id="co-otp-code" :value="otpCode" @input="onOtpInput" type="text" inputmode="numeric" autocomplete="one-time-code" pattern="[0-9]*" maxlength="6" aria-describedby="co-otp-hint" :aria-invalid="otpInvalid" :disabled="otpBusy">
+																<template x-for="i in otpCells" :key="i"><span :class="otpCellClass(i)" aria-hidden="true" x-text="otpCellText(i)"></span></template>
+															</div>
+															<button type="button" class="tf-co-paste" :disabled="otpBusy" @click="pasteOtp">{{ $site->lineIcon('clipboard', 16) }} {{ $c['otp']['paste'] }}</button>
+															<p id="co-otp-hint" class="tf-co-otp-hint">{{ $site->lineIcon('info', 16) }}<span>{{ $c['otp']['codeHint'] }}</span></p>
+														</div>
+													</template>
+														<div id="co-turnstile"></div>
+														<button type="button" class="tf-wa-btn" :disabled="!otpCanSend" @click="sendOtp"><span class="tf-wa-fly"><span class="tf-wa-icon">{{ $site->lineIcon('whatsapp', 22) }}</span></span><span class="tf-wa-label" x-text="otpSendText"></span></button>
+													</span>
+												</template>
+												<template x-if="otpBusy"><span class="tf-confirm-wait" role="status">@include('store.partials.dot-wave') <span x-text="otpBusyText"></span></span></template>
+												<template x-if="otpError"><p class="tf-shop-issue" role="alert" x-text="otpError"></p></template>
+											</div>
+										</div>
+									</template>
+
 									<div class="tf-co-tile">
 										<div class="tf-co-tile-top">
 											<span class="tf-co-pill" x-text="addressBadge"></span>
@@ -144,21 +187,22 @@
 										<p class="tf-co-tile-text" x-text="form.customer_email"></p>
 									</div>
 
-									<button type="button" class="tf-co-tile tf-co-courier" id="co-courier" :class="courierTileClass" @click="openShipping" aria-haspopup="dialog">
+									<button type="button" class="tf-co-tile tf-co-courier" id="co-courier" :class="courierTileClass" :disabled="!phoneOk" @click="openShipping" aria-haspopup="dialog">
 										<span class="tf-co-tile-top">
 											<span class="tf-co-tile-meta">{{ $site->lineIcon('truck', 14) }} {{ $c['courierLabel'] }}</span>
 											<span class="tf-co-tile-link">{{ $c['courierChange'] }} {{ $site->lineIcon('chevronDown', 14) }}</span>
 										</span>
-										<template x-if="ratesLoading"><span class="tf-co-tile-text" role="status">{{ $c['courierLoading'] }}</span></template>
-										<template x-if="!ratesLoading && ratesFailed"><span class="tf-co-tile-text is-issue">{{ $c['courierFailed'] }} {{ $c['courierRetry'] }}</span></template>
-										<template x-if="noRates"><span class="tf-co-tile-text">{{ $c['courierNone'] }}</span></template>
-										<template x-if="!ratesLoading && !ratesFailed && hasRates && !selected">
+										<template x-if="!phoneOk"><span class="tf-co-tile-text">{{ $c['otp']['courierLocked'] }}</span></template>
+											<template x-if="phoneOk && ratesLoading"><span class="tf-co-tile-text" role="status">{{ $c['courierLoading'] }}</span></template>
+										<template x-if="phoneOk && !ratesLoading && ratesFailed"><span class="tf-co-tile-text is-issue">{{ $c['courierFailed'] }} {{ $c['courierRetry'] }}</span></template>
+										<template x-if="phoneOk && noRates"><span class="tf-co-tile-text">{{ $c['courierNone'] }}</span></template>
+										<template x-if="phoneOk && !ratesLoading && !ratesFailed && hasRates && !selected">
 											<span style="display: contents">
 												<span class="tf-co-tile-name">{{ $c['courierChoose'] }}</span>
 												<span class="tf-co-tile-text">{{ $c['courierChooseHint'] }}</span>
 											</span>
 										</template>
-										<template x-if="selected">
+										<template x-if="phoneOk && selected">
 											<span style="display: contents">
 												<span class="tf-co-tile-name" x-text="selected.label"></span>
 												<template x-if="etdText(selected)"><span class="tf-co-tile-text">{{ $site->lineIcon('clock', 14) }} <span x-text="etdText(selected)"></span></span></template>
@@ -166,40 +210,6 @@
 											</span>
 										</template>
 									</button>
-
-									{{-- Verifikasi WhatsApp tamu (D-051, D-093). Tampil hanya bila WHATSAPP_OTP_REQUIRED aktif dan pengunjung belum masuk sebagai member. --}}
-									<template x-if="otpRequired">
-										<div class="tf-co-tile tf-co-otp" id="co-otp" aria-labelledby="co-otp-title">
-											<span class="tf-co-tile-top">
-												<span class="tf-co-tile-meta" id="co-otp-title">{{ $site->lineIcon('shieldCheck', 14) }} {{ $c['otp']['title'] }}</span>
-											</span>
-											<div aria-live="polite" style="display: contents">
-												<template x-if="otpIsVerified"><p class="tf-confirm-ok">{{ $site->lineIcon('shieldCheck', 16) }} {{ $c['otp']['verified'] }}</p></template>
-												<template x-if="otpNeedsLogin">
-													<span style="display: contents">
-														<p class="tf-co-tile-text">{{ $c['otp']['loginRequired'] }}</p>
-														<a href="{{ $site->route('account') }}" class="tf-btn">{{ $c['otp']['signIn'] }}</a>
-													</span>
-												</template>
-												<template x-if="otpShowForm">
-													<span style="display: contents">
-														<p class="tf-co-tile-text" x-text="otpLead"></p>
-														<template x-if="otpSent">
-															<div class="tf-auth-field" :class="otpFieldClass">
-																<label for="co-otp-code">{{ $c['otp']['code'] }}</label>
-																<div class="tf-auth-input"><input id="co-otp-code" :value="otpCode" @input="onOtpInput" type="text" inputmode="numeric" autocomplete="one-time-code" pattern="[0-9]*" maxlength="6" aria-describedby="co-otp-hint" :aria-invalid="otpInvalid" :disabled="otpBusy"></div>
-																<p id="co-otp-hint" class="tf-field-hint">{{ $c['otp']['codeHint'] }}</p>
-															</div>
-														</template>
-														<div id="co-turnstile"></div>
-														<button type="button" class="tf-co-ghost" :disabled="!otpCanSend" @click="sendOtp" x-text="otpSendText"></button>
-													</span>
-												</template>
-												<template x-if="otpBusy"><span class="tf-confirm-wait" role="status">@include('store.partials.dot-wave') <span x-text="otpBusyText"></span></span></template>
-												<template x-if="otpError"><p class="tf-shop-issue" role="alert" x-text="otpError"></p></template>
-											</div>
-										</div>
-									</template>
 								</div>
 							</template>
 							<template x-if="invalid('courier')"><p class="tf-shop-issue" role="alert" x-text="errorFor('courier')"></p></template>
@@ -276,7 +286,8 @@
 								<strong x-text="totalText"></strong>
 							</div>
 							<template x-if="formError"><p class="tf-shop-issue" role="alert" x-text="formError"></p></template>
-							<button type="submit" class="tf-btn tf-btn-block tf-co-submit" :disabled="submitting" :aria-busy="submitting">
+								<template x-if="submitHint"><p class="tf-co-next" x-text="submitHint"></p></template>
+							<button type="submit" class="tf-btn tf-btn-block tf-co-submit" :class="submitClass" :disabled="submitting" :aria-disabled="submitBlocked" :aria-busy="submitting">
 								{{ $site->lineIcon('lock', 16) }}<span x-text="submitText"></span>{{ $site->lineIcon('arrowRight', 18) }}
 							</button>
 							<div class="tf-co-links">
@@ -291,6 +302,11 @@
 							<a href="{{ $site->route('contact') }}" class="tf-co-help-link">{{ $c['helpCta'] }}</a>
 						</div>
 					</aside>
+					{{-- HP dan tablet: ringkasan ada di bawah daftar item, jadi total dan tombol bayar ikut menempel di bawah layar sampai tombol bayar di ringkasan terlihat. --}}
+					<div class="tf-co-bar" :class="barClass" :inert="!barOn">
+						<div><span x-text="barLabel"></span><strong x-text="totalText"></strong></div>
+						<button type="submit" class="tf-btn tf-co-submit-bar" :class="submitClass" :disabled="submitting" :aria-disabled="submitBlocked" :aria-busy="submitting"><span x-text="barButtonText"></span></button>
+					</div>
 				</form>
 			</template>
 		</div>
@@ -309,7 +325,7 @@
 					<template x-if="!ratesLoading && ratesFailed"><p class="tf-shop-issue" role="alert">{{ $c['courierFailed'] }} <button type="button" class="tf-shop-link" @click="retryRates">{{ $c['courierRetry'] }}</button></p></template>
 					<template x-if="noRates"><p class="tf-shop-note">{{ $c['courierNone'] }}</p></template>
 					<div class="tf-co-options" role="radiogroup" aria-labelledby="co-ship-dialog-title">
-						<template x-for="rate in rates" :key="rateKey(rate)">
+						<template x-for="rate in sortedRates" :key="rateKey(rate)">
 							<label class="tf-co-option">
 								<input type="radio" name="co-courier-draft" class="tf-sr" :checked="isDraft(rate)" @change="pickDraft(rate)">
 								<span class="tf-co-radio" aria-hidden="true"></span>
@@ -318,7 +334,7 @@
 									<template x-if="!courierLogo(rate)"><b x-text="courierInitials(rate)"></b></template>
 								</span>
 								<span class="tf-co-option-info">
-									<span class="tf-co-option-name" x-text="rate.label"></span>
+									<span class="tf-co-option-name"><span x-text="rate.label"></span><template x-if="isCheapest(rate)"><em class="tf-co-option-tag">{{ $c['courierCheapest'] }}</em></template></span>
 									<template x-if="etdText(rate)"><small>{{ $site->lineIcon('clock', 14) }}<span x-text="etdText(rate)"></span></small></template>
 								</span>
 								<strong class="tf-co-option-fee" x-text="rupiah(rate.fee)"></strong>

@@ -14,7 +14,7 @@ use RuntimeException;
 use Tests\TestCase;
 
 /**
- * Pendaftaran pelanggan: pilih verifikasi lewat email atau WhatsApp, akun baru dibuat hanya setelah kode benar.
+ * Pendaftaran pelanggan (D-145): email dan WhatsApp keduanya wajib terverifikasi, akun baru dibuat hanya setelah kedua kode benar.
  */
 class RegisterTest extends TestCase
 {
@@ -52,7 +52,7 @@ class RegisterTest extends TestCase
 
     private function start(array $data = [])
     {
-        return $this->postJson('/api/v1/auth/register/send', ['email' => self::EMAIL, 'password' => 'rahasia-aman', 'channel' => 'email', ...$data]);
+        return $this->postJson('/api/v1/auth/register/send', ['email' => self::EMAIL, 'phone' => self::PHONE, 'password' => 'rahasia-aman', 'channel' => 'email', ...$data]);
     }
 
     private function emailCode(): string
@@ -72,16 +72,24 @@ class RegisterTest extends TestCase
         return $real === '000000' ? '111111' : '000000';
     }
 
-    public function test_email_registration_creates_a_verified_customer_and_logs_in(): void
+    public function test_account_is_created_only_after_email_and_whatsapp_are_both_verified(): void
     {
         $this->start()->assertOk()->assertJsonPath('data.channel', 'email')->assertJsonPath('data.status', 'sent');
         $this->assertDatabaseMissing('users', ['email' => self::EMAIL]);
 
-        $this->postJson('/api/v1/auth/register/verify', ['code' => $this->emailCode()])->assertOk();
+        $this->postJson('/api/v1/auth/register/verify', ['code' => $this->emailCode()])
+            ->assertOk()->assertJsonPath('data.registered', false)->assertJsonPath('data.verified', ['email']);
+        $this->assertDatabaseMissing('users', ['email' => self::EMAIL]);
+        $this->assertGuest('web');
+
+        $this->postJson('/api/v1/auth/register/channel', ['channel' => 'phone'])->assertOk()->assertJsonPath('data.channel', 'phone');
+        $this->postJson('/api/v1/auth/register/verify', ['code' => $this->whatsappCodes[0]])
+            ->assertOk()->assertJsonPath('data.registered', true);
 
         $user = User::where('email', self::EMAIL)->firstOrFail();
         $this->assertNotNull($user->email_verified_at);
-        $this->assertNull($user->phone);
+        $this->assertSame(self::PHONE, $user->phone);
+        $this->assertNotNull($user->phone_verified_at);
         $this->assertTrue($user->is_active);
         $this->assertFalse($user->mfa_required);
         $this->assertFalse($user->roles()->exists());
@@ -89,31 +97,42 @@ class RegisterTest extends TestCase
         $this->assertTrue(Auth::guard('web')->check());
     }
 
-    public function test_whatsapp_registration_stores_the_verified_phone(): void
+    public function test_whatsapp_can_be_verified_first(): void
     {
         $this->start(['channel' => 'phone', 'phone' => '0812-3456-7890'])->assertOk()->assertJsonPath('data.channel', 'phone');
         Notification::assertNothingSent();
 
-        $this->postJson('/api/v1/auth/register/verify', ['code' => $this->whatsappCodes[0]])->assertOk();
+        $this->postJson('/api/v1/auth/register/verify', ['code' => $this->whatsappCodes[0]])->assertOk()->assertJsonPath('data.registered', false);
+        $this->assertDatabaseMissing('users', ['email' => self::EMAIL]);
+
+        $this->postJson('/api/v1/auth/register/channel', ['channel' => 'email'])->assertOk()->assertJsonPath('data.channel', 'email');
+        $this->postJson('/api/v1/auth/register/verify', ['code' => $this->emailCode()])->assertOk()->assertJsonPath('data.registered', true);
 
         $user = User::where('email', self::EMAIL)->firstOrFail();
         $this->assertSame(self::PHONE, $user->phone);
         $this->assertNotNull($user->phone_verified_at);
-        $this->assertNull($user->email_verified_at);
+        $this->assertNotNull($user->email_verified_at);
     }
 
-    public function test_unverified_phone_is_not_saved_when_verifying_by_email(): void
+    public function test_a_verified_channel_cannot_be_sent_again_and_the_account_needs_the_other_one(): void
     {
-        $this->start(['phone' => self::PHONE])->assertOk();
+        $this->start()->assertOk();
         $this->postJson('/api/v1/auth/register/verify', ['code' => $this->emailCode()])->assertOk();
 
-        $this->assertNull(User::where('email', self::EMAIL)->firstOrFail()->phone);
+        $this->postJson('/api/v1/auth/register/channel', ['channel' => 'email'])->assertUnprocessable()->assertJsonPath('errors.channel.0', 'channel_done');
+        $this->assertDatabaseMissing('users', ['email' => self::EMAIL]);
     }
 
-    public function test_whatsapp_channel_needs_a_phone_number(): void
+    public function test_channel_switch_needs_a_started_registration(): void
     {
-        $this->start(['channel' => 'phone'])->assertUnprocessable()->assertJsonPath('errors.phone.0', 'phone_invalid');
+        $this->postJson('/api/v1/auth/register/channel', ['channel' => 'phone'])->assertUnprocessable()->assertJsonPath('errors.otp.0', 'otp_expired');
+    }
+
+    public function test_phone_number_is_required_and_channel_must_be_known(): void
+    {
+        $this->start(['phone' => null])->assertUnprocessable()->assertJsonPath('errors.phone.0', 'phone_invalid');
         $this->start(['channel' => 'sms'])->assertUnprocessable()->assertJsonPath('errors.channel.0', 'channel_invalid');
+        $this->postJson('/api/v1/auth/register/channel', ['channel' => 'sms'])->assertUnprocessable();
     }
 
     public function test_input_is_validated(): void
@@ -129,7 +148,7 @@ class RegisterTest extends TestCase
         $this->start()->assertUnprocessable()->assertJsonPath('errors.email.0', 'email_taken');
 
         User::factory()->create(['phone' => self::PHONE, 'phone_verified_at' => now()]);
-        $this->start(['email' => 'lain@example.com', 'channel' => 'phone', 'phone' => self::PHONE])->assertUnprocessable()->assertJsonPath('errors.phone.0', 'phone_taken');
+        $this->start(['email' => 'lain@example.com', 'phone' => self::PHONE])->assertUnprocessable()->assertJsonPath('errors.phone.0', 'phone_taken');
 
         Notification::assertNothingSent();
         $this->assertSame([], $this->whatsappCodes);

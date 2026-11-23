@@ -304,6 +304,26 @@ class AdminManagementTest extends TestCase
         $this->patchJson('/api/v1/admin/settings/refund.claim_window_hours', ['value' => 24])->assertForbidden();
     }
 
+    public function test_super_admin_whatsapp_is_public_for_the_forgot_password_page_but_only_super_admin_changes_it(): void
+    {
+        $key = 'security.super_admin_whatsapp';
+
+        // Halaman Lupa kata sandi (tanpa login) membacanya dari pengaturan publik, bukan dari kode.
+        $this->assertSame('+6285117452317', $this->getJson('/api/v1/settings/public')->assertOk()->json('data.settings')[$key]);
+
+        foreach (['store-admin', 'owner', 'marketing'] as $role) {
+            $this->actingAs($this->staff($role))->patchJson("/api/v1/admin/settings/{$key}", ['value' => '+6281200000000'])->assertForbidden();
+        }
+
+        $super = $this->staff('super-admin');
+        $this->actingAs($super)->patchJson("/api/v1/admin/settings/{$key}", ['value' => '0812345'])->assertUnprocessable();
+        $this->actingAs($super)->patchJson("/api/v1/admin/settings/{$key}", ['value' => '+6281200000000'])->assertOk();
+
+        $this->assertSame('+6281200000000', $this->getJson('/api/v1/settings/public')->json('data.settings')[$key]);
+        // Admin Toko tidak melihat grup keamanan di halaman Pengaturan.
+        $this->assertNotContains($key, collect($this->actingAs($this->staff('store-admin'))->getJson('/api/v1/admin/settings')->json('data.settings'))->pluck('key')->all());
+    }
+
     public function test_public_settings_expose_only_public_values_without_login(): void
     {
         $settings = $this->getJson('/api/v1/settings/public')->assertOk()->json('data.settings');
