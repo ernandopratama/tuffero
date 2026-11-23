@@ -6,7 +6,7 @@ use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
-#[Fillable(['voucher_id', 'order_id', 'user_id', 'customer_phone', 'amount', 'released_at'])]
+#[Fillable(['voucher_id', 'order_id', 'user_id', 'customer_phone', 'address_hash', 'amount', 'released_at'])]
 class VoucherRedemption extends Model
 {
     /**

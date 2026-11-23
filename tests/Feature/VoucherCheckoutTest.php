@@ -45,7 +45,7 @@ class VoucherCheckoutTest extends TestCase
         ]);
     }
 
-    private function checkout(?string $code, string $key = 'key-0000000000000001', string $phone = '0812-3456-7890')
+    private function checkout(?string $code, string $key = 'key-0000000000000001', string $phone = '0812-3456-7890', array $address = [])
     {
         $this->postJson('/api/v1/cart/items', ['sku' => 'NAS-01', 'quantity' => 2])->assertOk();
 
@@ -53,7 +53,7 @@ class VoucherCheckoutTest extends TestCase
             'customer_name' => 'Budi Uji',
             'customer_email' => 'budi@example.com',
             'customer_phone' => $phone,
-            'address' => ['street' => 'Jl. Uji 1', 'district' => 'Klojen', 'city' => 'Malang', 'province' => 'Jawa Timur', 'postal_code' => '65111'],
+            'address' => ['street' => 'Jl. Uji 1', 'district' => 'Klojen', 'city' => 'Malang', 'province' => 'Jawa Timur', 'postal_code' => '65111', ...$address],
             'courier' => 'jnt',
             'service' => 'ez',
             'voucher_code' => $code,
@@ -175,8 +175,10 @@ class VoucherCheckoutTest extends TestCase
         $this->voucher(['per_customer_limit' => 1]);
 
         $this->checkout('HEMAT15', 'key-0000000000000001', '0812-2222-0001')->assertCreated();
-        $this->checkout('HEMAT15', 'key-0000000000000002', '0812-2222-0001')->assertUnprocessable()->assertJsonPath('errors.voucher_code.0', 'voucher_used');
-        $this->checkout('HEMAT15', 'key-0000000000000003', '0812-2222-0002')->assertCreated();
+        // Nomor sama, alamat berbeda: tetap ditolak.
+        $this->checkout('HEMAT15', 'key-0000000000000002', '0812-2222-0001', ['street' => 'Jl. Beda 9'])->assertUnprocessable()->assertJsonPath('errors.voucher_code.0', 'voucher_used');
+        // Nomor dan alamat berbeda: boleh.
+        $this->checkout('HEMAT15', 'key-0000000000000003', '0812-2222-0002', ['street' => 'Jl. Beda 9'])->assertCreated();
     }
 
     public function test_resubmitting_the_same_request_does_not_use_the_voucher_twice(): void
@@ -390,7 +392,107 @@ class VoucherCheckoutTest extends TestCase
         $admin->assignRole('store-admin');
 
         $this->actingAs($admin)->postJson('/api/v1/admin/vouchers', [
-            'code' => 'GABUNGAN', 'type' => 'fixed', 'value' => 5000, 'min_subtotal' => 0, 'is_active' => true, 'stackable' => true,
+            'code' => 'GABUNGAN', 'type' => 'fixed', 'value' => 5000, 'min_subtotal' => 0, 'is_active' => true, 'stackable' => true, 'per_customer_limit' => 1,
         ])->assertCreated()->assertJsonPath('data.stackable', true);
+    }
+
+    // ---- D-147: Non Member maksimal sekali per nomor dan per alamat ----
+
+    private function storeAdmin(): User
+    {
+        $admin = User::factory()->create(['mfa_totp_confirmed_at' => now()]);
+        $admin->assignRole('store-admin');
+
+        return $admin;
+    }
+
+    public function test_guest_cannot_reuse_a_voucher_from_the_same_address_with_another_phone(): void
+    {
+        $this->voucher(['per_customer_limit' => 1]);
+
+        $this->checkout('HEMAT15', 'key-0000000000000001', '0812-3333-0001')->assertCreated();
+        $this->assertNotNull(VoucherRedemption::firstOrFail()->address_hash);
+
+        // Nomor lain, alamat sama (huruf besar dan tanda baca berbeda): tetap ditolak dan tidak membuat pesanan.
+        $this->checkout('HEMAT15', 'key-0000000000000002', '0812-3333-0002', ['street' => 'JL UJI, 1'])
+            ->assertUnprocessable()->assertJsonPath('errors.voucher_code.0', 'voucher_used');
+        $this->assertSame(1, Order::count());
+
+        // Nomor dan alamat lain: boleh.
+        $this->checkout('HEMAT15', 'key-0000000000000003', '0812-3333-0003', ['street' => 'Jl. Beda 9', 'postal_code' => '65112'])->assertCreated();
+    }
+
+    public function test_a_released_order_frees_the_address_again(): void
+    {
+        $this->voucher(['per_customer_limit' => 1]);
+        $this->checkout('HEMAT15', 'key-0000000000000001', '0812-3333-0001')->assertCreated();
+        Order::query()->update(['expires_at' => now()->subMinute()]);
+        app(OrderExpiryService::class)->expireDue();
+
+        $this->checkout('HEMAT15', 'key-0000000000000002', '0812-3333-0002')->assertCreated();
+    }
+
+    public function test_a_guest_voucher_without_a_limit_counts_as_one_use_but_a_member_stays_unlimited(): void
+    {
+        $this->voucher(['per_customer_limit' => null]);
+
+        $this->checkout('HEMAT15', 'key-0000000000000001', '0812-3333-0001')->assertCreated();
+        $this->checkout('HEMAT15', 'key-0000000000000002', '0812-3333-0001', ['street' => 'Jl. Lain 2'])
+            ->assertUnprocessable()->assertJsonPath('errors.voucher_code.0', 'voucher_used');
+
+        $this->actingAs($this->member());
+        $this->checkout('HEMAT15', 'key-0000000000000003', '0812-3333-0004', ['street' => 'Jl. Member 3'])->assertCreated();
+        $this->checkout('HEMAT15', 'key-0000000000000004', '0812-3333-0004', ['street' => 'Jl. Member 3'])->assertCreated();
+    }
+
+    public function test_the_check_endpoint_applies_the_phone_and_address_limit_before_checkout(): void
+    {
+        $this->voucher(['per_customer_limit' => 1]);
+        $this->checkout('HEMAT15', 'key-0000000000000001', '0812-3333-0001')->assertCreated();
+        $this->postJson('/api/v1/cart/items', ['sku' => 'NAS-01', 'quantity' => 2])->assertOk();
+
+        $this->postJson('/api/v1/vouchers/check', ['codes' => ['HEMAT15'], 'customer_phone' => '0812-3333-0009', 'street' => 'jl uji 1', 'postal_code' => '65111'])
+            ->assertUnprocessable()->assertJsonPath('errors.voucher_code.0', 'voucher_used');
+        $this->postJson('/api/v1/vouchers/check', ['codes' => ['HEMAT15'], 'customer_phone' => '0812-3333-0009', 'street' => 'Jl. Beda 9', 'postal_code' => '65111'])->assertOk();
+    }
+
+    public function test_address_is_not_counted_for_member_only_vouchers(): void
+    {
+        $this->voucher(['audience' => 'member', 'per_customer_limit' => 1]);
+
+        $this->actingAs($this->member());
+        $this->checkout('HEMAT15', 'key-0000000000000001', '0812-3333-0001')->assertCreated();
+        $this->actingAs($this->member());
+        $this->checkout('HEMAT15', 'key-0000000000000002', '0812-3333-0002')->assertCreated();
+    }
+
+    public function test_admin_must_set_a_limit_on_vouchers_that_non_members_can_use(): void
+    {
+        $admin = $this->storeAdmin();
+        $base = ['type' => 'fixed', 'value' => 5000, 'min_subtotal' => 0, 'is_active' => true];
+
+        foreach (['all', 'guest'] as $audience) {
+            $this->actingAs($admin)->postJson('/api/v1/admin/vouchers', [...$base, 'code' => 'TANPA'.strtoupper($audience), 'audience' => $audience])
+                ->assertUnprocessable()->assertJsonValidationErrors('per_customer_limit');
+        }
+        // Audience tidak diisi berarti Semua, jadi juga wajib.
+        $this->actingAs($admin)->postJson('/api/v1/admin/vouchers', [...$base, 'code' => 'TANPAAUD'])->assertUnprocessable()->assertJsonValidationErrors('per_customer_limit');
+
+        // Khusus member, voucher klaim, dan gratis ongkir boleh tanpa batas; dengan batas selalu boleh.
+        $this->actingAs($admin)->postJson('/api/v1/admin/vouchers', [...$base, 'code' => 'MEMBERAJA', 'audience' => 'member'])->assertCreated();
+        $this->actingAs($admin)->postJson('/api/v1/admin/vouchers', [...$base, 'code' => 'KLAIMAJA', 'audience' => 'all', 'requires_claim' => true])->assertCreated();
+        $this->actingAs($admin)->postJson('/api/v1/admin/vouchers', [...$base, 'code' => 'ONGKIR1', 'kind' => 'shipping', 'value' => 10000])->assertCreated();
+        $this->actingAs($admin)->postJson('/api/v1/admin/vouchers', [...$base, 'code' => 'DENGAN', 'audience' => 'guest', 'per_customer_limit' => 1])->assertCreated();
+    }
+
+    public function test_a_legacy_voucher_without_a_limit_can_be_deactivated_but_not_kept_active(): void
+    {
+        $legacy = $this->voucher(['code' => 'LAMA', 'audience' => 'all', 'per_customer_limit' => null]);
+        $admin = $this->storeAdmin();
+        $body = ['code' => 'LAMA', 'type' => 'fixed', 'value' => 15000, 'min_subtotal' => 0, 'is_active' => false];
+
+        $this->actingAs($admin)->patchJson('/api/v1/admin/vouchers/'.$legacy->public_id, $body)->assertOk();
+        $this->actingAs($admin)->patchJson('/api/v1/admin/vouchers/'.$legacy->public_id, [...$body, 'is_active' => true])
+            ->assertUnprocessable()->assertJsonValidationErrors('per_customer_limit');
     }
 }

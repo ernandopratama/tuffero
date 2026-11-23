@@ -53,6 +53,10 @@ export const voucherPicker = () => ({
     appliedText(item) { return '-' + rp(item.discount); },
     // Konteks tambahan untuk pratinjau gratis ongkir (ongkir dan provinsi). Checkout menimpanya; keranjang belum tahu ongkir.
     voucherContext() { return {}; },
+    // Nomor, jalan, dan kode pos pelanggan hanya lewat badan POST (bukan URL), untuk batas pakai per nomor dan per alamat (D-147).
+    voucherIdentity() {
+        return { customer_phone: this.form?.customer_phone || undefined, street: this.form?.street || undefined, postal_code: this.form?.postal_code || undefined };
+    },
 
     // Status kartu di pilihan: on = terpilih, off = belum memenuhi minimum, full = sudah 2, nostack = tidak bisa digabung, ok = bisa dipilih.
     // D-126: maksimal 1 gratis ongkir; dua voucher biasa harus sama-sama bisa digabung; gratis ongkir + 1 voucher biasa selalu boleh.
@@ -138,7 +142,7 @@ export const voucherPicker = () => ({
             if (!codes.length) {
                 this.clearVouchers();
             } else {
-                const { data } = await api.post('/vouchers/check', { codes, customer_phone: this.form?.customer_phone || undefined, ...this.voucherContext() });
+                const { data } = await api.post('/vouchers/check', { codes, ...this.voucherIdentity(), ...this.voucherContext() });
                 this.setApplied(data.data.vouchers, data.data.discount, data.data.shipping_discount);
                 if (typed) this.voucherCode = '';
             }
@@ -157,7 +161,7 @@ export const voucherPicker = () => ({
         const codes = this.applied.length ? this.appliedCodes : readStored();
         if (!codes.length) return;
         try {
-            const { data } = await api.post('/vouchers/check', { codes, customer_phone: this.form?.customer_phone || undefined, ...this.voucherContext() });
+            const { data } = await api.post('/vouchers/check', { codes, ...this.voucherIdentity(), ...this.voucherContext() });
             this.setApplied(data.data.vouchers, data.data.discount, data.data.shipping_discount);
         } catch (e) {
             if (e.response?.status === 422) {

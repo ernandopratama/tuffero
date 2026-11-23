@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Api\V1\Store;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Store\CheckoutRequest;
 use App\Models\Campaign;
+use App\Models\CustomerBlock;
 use App\Services\CartService;
 use App\Services\VoucherService;
 use App\Traits\ApiResponse;
@@ -60,19 +61,24 @@ class CheckoutVoucherController extends Controller
 
     /**
      * Ongkir dan provinsi pilihan pelanggan, hanya untuk pratinjau potongan gratis ongkir. Checkout menghitung ulang dari Biteship.
+     * Jalan dan kode pos (hanya dikirim lewat badan POST, bukan URL) dipakai mencocokkan batas pakai per alamat (D-147);
+     * pemakaian yang sebenarnya dihitung ulang dari alamat pesanan saat checkout.
      *
-     * @return array{shippingFee: int|null, province: string|null}
+     * @return array{shippingFee: int|null, province: string|null, addressHash: string|null}
      */
     private function shipping(Request $request): array
     {
         $request->validate([
             'shipping_fee' => ['nullable', 'integer', 'min:0', 'max:100000000'],
             'province' => ['nullable', 'string', 'max:100'],
+            'street' => ['nullable', 'string', 'max:255'],
+            'postal_code' => ['nullable', 'string', 'max:10'],
         ]);
 
         return [
             'shippingFee' => $request->filled('shipping_fee') ? (int) $request->input('shipping_fee') : null,
             'province' => $request->filled('province') ? (string) $request->input('province') : null,
+            'addressHash' => CustomerBlock::addressHash(['street' => (string) $request->input('street', ''), 'postal_code' => (string) $request->input('postal_code', '')]),
         ];
     }
 

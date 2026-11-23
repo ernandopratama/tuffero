@@ -3,6 +3,7 @@
 namespace App\Http\Requests\Admin;
 
 use App\Models\Voucher;
+use Illuminate\Contracts\Validation\Validator;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
 
@@ -68,6 +69,28 @@ class VoucherRequest extends FormRequest
             'ends_at' => ['nullable', 'date', 'after:starts_at'],
             'is_active' => ['required', 'boolean'],
         ];
+    }
+
+    /**
+     * D-147: voucher yang bisa dipakai Non Member (Semua atau Non Member, tanpa klaim) wajib punya batas pakai per pelanggan.
+     * Kosong berarti tanpa batas, dan itu hanya boleh untuk voucher khusus member. Voucher yang dimatikan tidak diperiksa,
+     * supaya voucher lama tanpa batas tetap bisa dinonaktifkan.
+     *
+     * @return list<callable(Validator): void>
+     */
+    public function after(): array
+    {
+        return [function (Validator $validator) {
+            $voucher = $this->route('voucher');
+            $audience = $this->input('audience', $voucher->audience ?? 'all');
+            $kind = $this->input('kind', $voucher->kind ?? Voucher::KIND_ORDER);
+            $claim = $this->exists('requires_claim') ? $this->boolean('requires_claim') : (bool) ($voucher->requires_claim ?? false);
+            $limit = $this->exists('per_customer_limit') ? $this->input('per_customer_limit') : $voucher?->per_customer_limit;
+
+            if ($this->boolean('is_active') && in_array($audience, ['all', 'guest'], true) && $kind !== Voucher::KIND_SHIPPING && ! $claim && blank($limit)) {
+                $validator->errors()->add('per_customer_limit', 'Voucher yang bisa dipakai Non Member wajib punya batas pakai per pelanggan (minimal 1).');
+            }
+        }];
     }
 
     /** @return array<string, string> */

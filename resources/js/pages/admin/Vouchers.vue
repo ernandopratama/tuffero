@@ -311,7 +311,7 @@ async function save() {
           <label class="block text-label-md">
             Batas pakai per pelanggan
             <input v-model.number="form.per_customer_limit" type="number" min="1" :class="field">
-            <span class="mt-1 block text-body-sm font-normal text-secondary">Kosong = tanpa batas.{{ isShipping ? ' Dihitung per nomor WhatsApp terverifikasi.' : '' }}</span>
+            <span class="mt-1 block text-body-sm font-normal text-secondary">{{ isShipping ? 'Dihitung per nomor WhatsApp terverifikasi.' : 'Wajib untuk voucher Semua atau Non Member (dihitung per nomor WhatsApp dan per alamat pengiriman). Kosong = tanpa batas, hanya untuk voucher khusus Member.' }}</span>
             <span v-if="fieldErrors.per_customer_limit" class="block text-body-sm font-normal text-error">{{ fieldErrors.per_customer_limit[0] }}</span>
           </label>
           <label class="block text-label-md">

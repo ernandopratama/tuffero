@@ -2,6 +2,7 @@
 
 namespace App\Services;
 
+use App\Models\CustomerBlock;
 use App\Models\InventoryStock;
 use App\Models\Order;
 use App\Models\Warehouse;
@@ -119,7 +120,7 @@ class CheckoutService
         // Voucher dikunci dan dihitung di dalam transaksi ini; kode salah menggagalkan seluruh checkout.
         $codes = array_values(array_filter([...($data['voucher_codes'] ?? []), $data['voucher_code'] ?? null], 'filled'));
         $applied = $codes
-            ? $this->vouchers->redeem($codes, $summary['subtotal'], $data['user_id'] ?? null, $data['customer_phone'], $rate['fee'], $data['address']['province'])
+            ? $this->vouchers->redeem($codes, $summary['subtotal'], $data['user_id'] ?? null, $data['customer_phone'], $rate['fee'], $data['address']['province'], CustomerBlock::addressHash($data['address']))
             : [];
         // Voucher gratis ongkir memotong ongkir, bukan subtotal; shipping_fee tetap tarif penuh dari kurir (D-126).
         $shippingRow = collect($applied)->first(fn (array $row) => $row['voucher']->isShipping());

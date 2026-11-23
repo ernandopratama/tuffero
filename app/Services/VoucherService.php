@@ -3,6 +3,7 @@
 namespace App\Services;
 
 use App\Models\Campaign;
+use App\Models\CustomerBlock;
 use App\Models\Order;
 use App\Models\User;
 use App\Models\Voucher;
@@ -46,7 +47,7 @@ class VoucherService
      * Pemeriksaan pasti saat checkout terjadi di redeem(), dengan baris voucher dikunci.
      * $province null = area belum diketahui (keranjang); area diperiksa pasti saat checkout.
      */
-    public function problem(Voucher $voucher, int $subtotal, ?int $userId, ?string $phone, ?string $province = null): ?string
+    public function problem(Voucher $voucher, int $subtotal, ?int $userId, ?string $phone, ?string $province = null, ?string $addressHash = null): ?string
     {
         $now = now();
 
@@ -77,7 +78,9 @@ class VoucherService
                 return 'voucher_phone_unverified';
             }
         }
-        if ($this->usedByCustomer($voucher, $userId, $phone) >= ($voucher->per_customer_limit ?? PHP_INT_MAX)) {
+        // D-147: Non Member tanpa batas tertulis dihitung 1 kali; member tanpa batas tetap tanpa batas.
+        $limit = $voucher->per_customer_limit ?? ($userId ? PHP_INT_MAX : 1);
+        if ($this->usedByCustomer($voucher, $userId, $phone, $addressHash) >= $limit) {
             return 'voucher_used';
         }
         if ($province !== null && $voucher->provinces && ! in_array(self::provinceKey($province), array_map(self::provinceKey(...), $voucher->provinces), true)) {
@@ -96,13 +99,13 @@ class VoucherService
      *
      * @return list<array<string, mixed>>
      */
-    public function listFor(int $subtotal, ?int $userId, ?string $phone, ?int $shippingFee = null, ?string $province = null): array
+    public function listFor(int $subtotal, ?int $userId, ?string $phone, ?int $shippingFee = null, ?string $province = null, ?string $addressHash = null): array
     {
         return Voucher::where('is_active', true)->where('is_listed', true)
             ->orderBy('min_subtotal')->orderBy('id')
             ->get()
-            ->map(function (Voucher $voucher) use ($subtotal, $userId, $phone, $shippingFee, $province) {
-                $problem = $this->problem($voucher, $subtotal, $userId, $phone, $province);
+            ->map(function (Voucher $voucher) use ($subtotal, $userId, $phone, $shippingFee, $province, $addressHash) {
+                $problem = $this->problem($voucher, $subtotal, $userId, $phone, $province, $addressHash);
                 $discount = $this->discountFor($voucher, $subtotal, $shippingFee);
                 if (! $problem && $this->overBudget($voucher, $discount)) {
                     $problem = 'voucher_exhausted';
@@ -260,7 +263,7 @@ class VoucherService
      *
      * @throws ValidationException
      */
-    public function apply(array $codes, int $subtotal, ?int $userId, ?string $phone, bool $lock = false, ?int $shippingFee = null, ?string $province = null): array
+    public function apply(array $codes, int $subtotal, ?int $userId, ?string $phone, bool $lock = false, ?int $shippingFee = null, ?string $province = null, ?string $addressHash = null): array
     {
         $codes = array_values(array_unique(array_filter(array_map(fn ($code) => is_string($code) ? strtoupper(trim($code)) : '', $codes))));
 
@@ -276,7 +279,7 @@ class VoucherService
 
         foreach ($found as $voucher) {
             $this->autoClaim($voucher, $userId);
-            $problem = $voucher ? $this->problem($voucher, $subtotal, $userId, $phone, $province) : 'voucher_invalid';
+            $problem = $voucher ? $this->problem($voucher, $subtotal, $userId, $phone, $province, $addressHash) : 'voucher_invalid';
             if ($problem) {
                 throw ValidationException::withMessages(['voucher_code' => $problem]);
             }
@@ -314,11 +317,11 @@ class VoucherService
      * @param  list<string>  $codes
      * @return array{code: string|null, discount: int, shipping_discount: int, vouchers: list<array{code: string, kind: string, discount: int}>}
      */
-    public function check(array $codes, int $subtotal, ?int $userId, ?string $phone, ?int $shippingFee = null, ?string $province = null): array
+    public function check(array $codes, int $subtotal, ?int $userId, ?string $phone, ?int $shippingFee = null, ?string $province = null, ?string $addressHash = null): array
     {
         $rows = array_map(
             fn (array $row) => ['code' => $row['voucher']->code, 'kind' => $row['voucher']->kind, 'discount' => $row['discount']],
-            $this->apply($codes, $subtotal, $userId, $phone, shippingFee: $shippingFee, province: $province),
+            $this->apply($codes, $subtotal, $userId, $phone, shippingFee: $shippingFee, province: $province, addressHash: $addressHash),
         );
         $sum = fn (string $kind) => array_sum(array_column(array_filter($rows, fn (array $row) => $row['kind'] === $kind), 'discount'));
 
@@ -332,9 +335,9 @@ class VoucherService
      * @param  list<string>  $codes
      * @return list<array{voucher: Voucher, discount: int}>
      */
-    public function redeem(array $codes, int $subtotal, ?int $userId, string $phone, int $shippingFee, string $province): array
+    public function redeem(array $codes, int $subtotal, ?int $userId, string $phone, int $shippingFee, string $province, ?string $addressHash = null): array
     {
-        $rows = $this->apply($codes, $subtotal, $userId, $phone, lock: true, shippingFee: $shippingFee, province: $province);
+        $rows = $this->apply($codes, $subtotal, $userId, $phone, lock: true, shippingFee: $shippingFee, province: $province, addressHash: $addressHash);
 
         foreach ($rows as $row) {
             $row['voucher']->increment('used_count');
@@ -351,6 +354,8 @@ class VoucherService
             'user_id' => $userId,
             // Gratis ongkir dihitung per nomor terverifikasi akun (D-126), voucher lain per nomor pemesan.
             'customer_phone' => $voucher->isShipping() ? ($this->verifiedPhone($userId) ?? $order->customer_phone) : $order->customer_phone,
+            // D-147: alamat pengiriman (jalan dan kode pos, dinormalkan) ikut dicatat; dihitung hanya untuk voucher yang bisa dipakai Non Member.
+            'address_hash' => CustomerBlock::addressHash((array) $order->shipping_address),
             'amount' => $amount,
         ]);
     }
@@ -391,15 +396,20 @@ class VoucherService
         return mb_strtolower(preg_replace('/\s+/', ' ', trim($province)));
     }
 
-    private function usedByCustomer(Voucher $voucher, ?int $userId, ?string $phone): int
+    private function usedByCustomer(Voucher $voucher, ?int $userId, ?string $phone, ?string $addressHash = null): int
     {
+        // D-147: voucher yang bisa dipakai Non Member (semua atau khusus Non Member) juga dihitung per alamat pengiriman,
+        // supaya mengganti nomor saja tidak cukup. Gratis ongkir dan voucher khusus member tidak dihitung per alamat.
+        $byAddress = $addressHash && ! $voucher->isShipping() && $voucher->audience !== 'member';
+
         return VoucherRedemption::where('voucher_id', $voucher->id)->whereNull('released_at')
             // D-126: batas "per bulan" = bulan kalender, mulai tanggal 1.
             ->when($voucher->limit_period === 'month', fn ($query) => $query->where('created_at', '>=', now()->startOfMonth()))
             ->where(fn ($query) => $query
                 ->when($userId, fn ($inner) => $inner->orWhere('user_id', $userId))
-                ->when($phone, fn ($inner) => $inner->orWhere('customer_phone', $phone)))
-            ->when(! $userId && ! $phone, fn ($query) => $query->whereRaw('1 = 0'))
+                ->when($phone, fn ($inner) => $inner->orWhere('customer_phone', $phone))
+                ->when($byAddress, fn ($inner) => $inner->orWhere('address_hash', $addressHash)))
+            ->when(! $userId && ! $phone && ! $byAddress, fn ($query) => $query->whereRaw('1 = 0'))
             ->count();
     }
 }

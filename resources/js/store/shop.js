@@ -338,6 +338,9 @@ export const checkoutPage = () => mix(addressPicker('co'), voucherPicker(), phon
             this.confirming = false;
             this.accepting = false;
             this.addressConfirmed = true;
+            // Voucher yang dipilih sebelum nomor dan alamat diisi (mis. dari keranjang) diperiksa ulang sekarang, supaya batas per nomor
+            // dan per alamat (D-147) ketahuan sebelum membayar, bukan saat tombol bayar ditekan.
+            if (this.applied.length) this.restoreVouchers();
             this.$nextTick(() => document.getElementById('co-courier')?.scrollIntoView({ behavior: 'smooth', block: 'start' }));
             this.probeOtp();
         },
