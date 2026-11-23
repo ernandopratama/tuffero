@@ -3,6 +3,7 @@
 use App\Http\Middleware\EnsureMfaEnrolled;
 use App\Http\Middleware\EnsureUserIsActive;
 use App\Http\Middleware\HermesToken;
+use App\Http\Middleware\HideAdminFromCustomers;
 use App\Http\Middleware\RedirectForStoreAccount;
 use App\Http\Middleware\SecurityHeadersMiddleware;
 use App\Http\Middleware\SetStoreContext;
@@ -38,6 +39,7 @@ return Application::configure(basePath: dirname(__DIR__))
             'active' => EnsureUserIsActive::class,
             'mfa.enrolled' => EnsureMfaEnrolled::class,
             'store.account' => RedirectForStoreAccount::class,
+            'admin.area' => HideAdminFromCustomers::class,
         ]);
         // Pilihan bahasa ditulis JavaScript toko; nilainya tetap diperiksa SetStoreContext.
         $middleware->encryptCookies(except: [SetStoreContext::COOKIE]);

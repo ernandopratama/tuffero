@@ -11,9 +11,12 @@ Route::get('/manifest.webmanifest', PwaManifestController::class)->defaults('app
 Route::get('/admin/manifest.webmanifest', PwaManifestController::class)->defaults('app', 'admin');
 
 // Area admin: Vue 3 SPA dengan Blade sendiri (D-053). CSS Bootstrap template toko menimpa token design system.
-Route::view('/login', 'admin');
-Route::view('/lupa-kata-sandi', 'admin');
-Route::view('/admin/{any?}', 'admin')->where('any', '.*');
+// Pelanggan yang sudah masuk melihat 404 toko di sini (HideAdminFromCustomers), bukan kerangka admin.
+Route::middleware('admin.area')->group(function () {
+    Route::view('/login', 'admin');
+    Route::view('/lupa-kata-sandi', 'admin');
+    Route::view('/admin/{any?}', 'admin')->where('any', '.*');
+});
 
 Route::get('/sitemap.xml', [StorefrontController::class, 'sitemap']);
 
