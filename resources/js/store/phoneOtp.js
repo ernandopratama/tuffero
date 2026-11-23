@@ -93,12 +93,22 @@ export const phoneOtp = () => {
             this.otpPhone = this.form.customer_phone;
             return this.callOtp({ probe: true });
         },
-        async sendOtp() {
-            if (!this.otpCanSend) return;
-            await this.callOtp({ resend: this.otpSent, captcha_token: this.otpToken || null });
-            // Token Turnstile hanya berlaku sekali.
+        // Token Turnstile (interaction-only) baru siap beberapa detik setelah kartu tampil. Menunggu sampai 5 detik, seperti halaman Daftar,
+        // supaya menekan tombol terlalu cepat tidak berujung "pemeriksaan keamanan belum selesai". Token hanya berlaku sekali, jadi widget direset.
+        async takeCaptcha() {
+            if (!this.words.otp.siteKey) return null;
+            for (let i = 0; i < 50 && !this.otpToken; i++) await new Promise((r) => setTimeout(r, 100));
+            const token = this.otpToken || null;
             this.otpToken = '';
             if (widget !== null) window.turnstile?.reset(widget);
+            return token;
+        },
+        async sendOtp() {
+            if (!this.otpCanSend) return;
+            // Tombol terkunci selagi menunggu token; callOtp mengunci ulang segera setelahnya.
+            this.otpBusy = true;
+            const captcha_token = await this.takeCaptcha();
+            await this.callOtp({ resend: this.otpSent, captcha_token });
         },
         async callOtp(body) {
             const phone = this.form.customer_phone;
