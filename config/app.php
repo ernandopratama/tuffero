@@ -99,6 +99,13 @@ return [
 
     'key' => env('APP_KEY'),
 
+    /*
+    | Alamat atau rentang IP proxy tepercaya (dipisah koma) yang boleh menentukan IP pengunjung lewat X-Forwarded-For.
+    | Kosong = tidak ada. Di belakang Cloudflare isi dengan rentang IP Cloudflare; jangan memakai "*" bila server asal
+    | bisa diakses langsung, karena pengunjung bisa memalsukan header itu untuk lolos dari batas per IP.
+    */
+    'trusted_proxies' => array_values(array_filter(array_map('trim', explode(',', (string) env('TRUSTED_PROXIES', ''))))),
+
     'previous_keys' => [
         ...array_filter(
             explode(',', (string) env('APP_PREVIOUS_KEYS', ''))

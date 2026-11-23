@@ -23,6 +23,7 @@ use App\Services\Shipping\UnavailableShippingProvider;
 use App\Services\Translation\ClaudeTranslator;
 use App\Services\Translation\Translator;
 use Illuminate\Cache\RateLimiting\Limit;
+use Illuminate\Http\Middleware\TrustProxies;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\RateLimiter;
 use Illuminate\Support\Facades\Route;
@@ -61,6 +62,12 @@ class AppServiceProvider extends ServiceProvider
      */
     public function boot(): void
     {
+        // Proxy (mis. Cloudflare) yang boleh menentukan IP pengunjung lewat X-Forwarded-For. Kosong berarti tidak ada yang dipercaya,
+        // jadi header itu diabaikan. Dibaca dari config (bukan env di bootstrap) supaya tetap bekerja setelah config:cache.
+        if ($proxies = config('app.trusted_proxies')) {
+            TrustProxies::at($proxies);
+        }
+
         // CommentController dipakai dua jenis target, jadi parameternya tidak diberi tipe.
         Route::model('voucher', Voucher::class);
         Route::model('content', PromoContent::class);
