@@ -13,6 +13,7 @@ use Illuminate\Validation\ValidationException;
 
 /**
  * Pendaftaran pelanggan: kode verifikasi email dan WhatsApp, keduanya wajib sebelum akun dibuat (D-051, D-093, D-145).
+ * Saklar registration.whatsapp_required (D-146): mati (bawaan) berarti cukup email dan nomor tidak diminta.
  */
 class RegisterController extends Controller
 {
@@ -29,7 +30,7 @@ class RegisterController extends Controller
 
         $pending = [
             'email' => $data['email'],
-            'phone' => $data['phone'],
+            'phone' => $data['phone'] ?? null,
             'password' => Hash::make($data['password']),
             'channel' => $data['channel'],
             'verified' => [],
@@ -72,8 +73,8 @@ class RegisterController extends Controller
 
         $pending['verified'] = array_values(array_unique([...$pending['verified'], $pending['channel']]));
 
-        // Satu saluran selesai, yang lain masih menunggu: akun belum dibuat.
-        if (count($pending['verified']) < 2) {
+        // Saluran yang diwajibkan belum semua selesai: akun belum dibuat (dua saluran bila saklar WhatsApp menyala, D-146).
+        if (count($pending['verified']) < (RegistrationService::whatsappRequired() ? 2 : 1)) {
             $request->session()->put(self::SESSION_KEY, $pending);
 
             return $this->success('Channel verified.', ['registered' => false, 'verified' => $pending['verified']]);
@@ -87,7 +88,7 @@ class RegisterController extends Controller
         return $this->success('Registration complete.', ['registered' => true, 'verified' => $pending['verified']]);
     }
 
-    /** @return array{email: string, phone: string, password: string, channel: 'email'|'phone', verified: list<string>} */
+    /** @return array{email: string, phone: ?string, password: string, channel: 'email'|'phone', verified: list<string>} */
     private function pending(RegisterRequest $request): array
     {
         $pending = $request->session()->get(self::SESSION_KEY);

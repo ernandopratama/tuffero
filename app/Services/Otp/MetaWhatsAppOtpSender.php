@@ -9,6 +9,12 @@ use Illuminate\Support\Facades\Http;
  */
 class MetaWhatsAppOtpSender implements OtpSender
 {
+    /** Kunci yang dibutuhkan untuk mengirim lewat Meta terisi? Dipakai memilih pengirim dan menjaga saklar pendaftaran (D-146). */
+    public static function configured(): bool
+    {
+        return filled(config('services.whatsapp.token')) && filled(config('services.whatsapp.phone_number_id')) && filled(config('services.whatsapp.otp_template'));
+    }
+
     public function send(string $phone, string $code): void
     {
         $config = config('services.whatsapp');

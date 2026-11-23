@@ -20,6 +20,8 @@ export const authPage = () => ({
     a: {},
     dev: false,
     google: false,
+    // Saklar registration.whatsapp_required (D-146): mati berarti daftar cukup email, tanpa nomor dan tanpa langkah pilih saluran.
+    whatsappRequired: true,
     mode: 'login',
     channel: 'email',
     // Saluran yang sudah lolos kode pada pendaftaran berjalan; akun dibuat setelah email dan WhatsApp keduanya selesai (D-145).
@@ -52,6 +54,7 @@ export const authPage = () => ({
         this.a = data.words;
         this.dev = data.dev;
         this.google = data.google;
+        this.whatsappRequired = data.whatsappRequired !== false;
         this.siteKey = data.siteKey || '';
         this.mode = data.mode;
         if (data.googleStatus) this.notice = data.googleStatus === 'failed' ? this.a.googleFailed : this.a.googleUnavailable;
@@ -70,6 +73,7 @@ export const authPage = () => ({
     get showMethod() { return this.isMethod; },
     get showOtp() { return this.isOtp; },
     get words() { return this.isRegister ? this.a.register : this.a.login; },
+    get leadText() { return this.isRegister && !this.whatsappRequired ? this.a.register.leadEmail : this.words.lead; },
     get channelWords() { return this.channel === 'email' ? this.a.email : this.a.phone; },
     get resendLeft() { return Math.max(0, Math.ceil((this.resendAt - this.now) / 1000)); },
     get lockLeft() { return Math.max(0, Math.ceil((this.lockUntil - this.now) / 1000)); },
@@ -135,7 +139,7 @@ export const authPage = () => ({
         const mail = this.email.trim();
         const tel = this.phone.trim();
         this.fieldError = !mail ? this.a.identity.required : (emailValid(mail) ? '' : this.a.identity.emailInvalid);
-        this.phoneError = !tel ? this.a.identity.phoneRequired : (phoneValid(tel) ? '' : this.a.identity.phoneInvalid);
+        this.phoneError = !this.whatsappRequired ? '' : (!tel ? this.a.identity.phoneRequired : (phoneValid(tel) ? '' : this.a.identity.phoneInvalid));
     },
     validateLogin() {
         const value = this.identity.trim();
@@ -158,7 +162,8 @@ export const authPage = () => ({
             return;
         }
         // Daftar: pilihan saluran verifikasi dulu (langkah sendiri), kode baru dikirim setelah dipilih.
-        if (this.isRegister) { this.go('method', '/daftar'); return; }
+        // Saklar WhatsApp mati: tanpa langkah itu, kode langsung dikirim ke email.
+        if (this.isRegister) { if (this.whatsappRequired) this.go('method', '/daftar'); else await this.chooseMethod('email'); return; }
         this.busy = true;
         try {
             // Hanya local: masuk memakai akun uji lewat /api/v1/auth/login. Di luar local tetap "belum tersedia" (OQ-18, OQ-22).
@@ -216,7 +221,7 @@ export const authPage = () => ({
             const captcha_token = await this.takeCaptcha();
             const { data } = await (this.doneCount > 0
                 ? api.post('/auth/register/channel', { channel, captcha_token })
-                : api.post('/auth/register/send', { email: this.email.trim(), phone: this.phone.trim(), password: this.password, channel, captcha_token }));
+                : api.post('/auth/register/send', { email: this.email.trim(), phone: this.whatsappRequired ? this.phone.trim() : null, password: this.password, channel, captcha_token }));
             this.password = '';
             this.channel = channel;
             this.maskedId = channel === 'email' ? maskEmail(this.email.trim()) : maskPhone(this.phone);
@@ -297,7 +302,7 @@ export const authPage = () => ({
     enterStep() {
         document.title = this.isOtp ? this.a.otp.meta : (this.isMethod ? this.a.register.meta : this.words.meta);
         // Langkah pilih saluran butuh email dan nomor yang valid di memori (mis. muat ulang menghapusnya): kembali ke formulir.
-        if (this.isMethod && !(emailValid(this.email.trim()) && phoneValid(this.phone.trim()))) { window.history.replaceState({}, '', '/daftar'); this.mode = 'register'; document.title = this.words.meta; return; }
+        if (this.isMethod && !(emailValid(this.email.trim()) && (!this.whatsappRequired || phoneValid(this.phone.trim())))) { window.history.replaceState({}, '', '/daftar'); this.mode = 'register'; document.title = this.words.meta; return; }
         if (this.isOtp && !this.maskedId) { window.history.replaceState({}, '', '/daftar'); this.mode = 'register'; document.title = this.words.meta; return; }
         clearInterval(this.ticker);
         // Hitung mundur dari stempel waktu agar tidak melenceng saat tab dijeda.

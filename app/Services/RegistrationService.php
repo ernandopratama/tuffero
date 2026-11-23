@@ -2,8 +2,10 @@
 
 namespace App\Services;
 
+use App\Models\Setting;
 use App\Models\User;
 use App\Notifications\RegisterEmailCode;
+use App\Services\Otp\MetaWhatsAppOtpSender;
 use Illuminate\Database\UniqueConstraintViolationException;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Log;
@@ -21,6 +23,9 @@ use Illuminate\Validation\ValidationException;
  */
 class RegistrationService
 {
+    /** Saklar D-146 di tabel settings. */
+    public const SETTING_KEY = 'registration.whatsapp_required';
+
     private const TTL_SECONDS = 300;
 
     private const MAX_ATTEMPTS = 5;
@@ -35,25 +40,49 @@ class RegistrationService
 
     public function __construct(private PhoneOtpService $phoneOtp, private VoucherService $vouchers) {}
 
+    /** Saklar D-146: nyala = email dan WhatsApp keduanya wajib (D-145); mati (bawaan) = cukup verifikasi email, nomor tidak diminta. */
+    public static function whatsappRequired(): bool
+    {
+        return Setting::where('key', self::SETTING_KEY)->value('value') === '1';
+    }
+
+    /**
+     * Kode WhatsApp bisa dikirim dan lolos Turnstile di lingkungan ini? Aturannya sama dengan pemilihan pengirim di AppServiceProvider
+     * dan TurnstileService (local dan testing memakai pengirim log), supaya saklar tidak dinyalakan saat pengiriman pasti gagal.
+     */
+    public static function whatsappReady(): bool
+    {
+        if (app()->environment('local', 'testing')) {
+            return true;
+        }
+
+        return MetaWhatsAppOtpSender::configured() && filled(config('services.turnstile.secret'));
+    }
+
     /** Email dan nomor yang sudah dipakai ditolak sebelum kode apa pun dikirim (kode berbiaya). */
-    public function assertAvailable(string $email, string $phone): void
+    public function assertAvailable(string $email, ?string $phone): void
     {
         if (User::where('email', $email)->exists()) {
             throw $this->rejected('email', 'email_taken', 422);
         }
 
-        if (User::where('phone', $phone)->exists()) {
+        if ($phone && User::where('phone', $phone)->exists()) {
             throw $this->rejected('phone', 'phone_taken', 422);
         }
     }
 
     /**
-     * @param  array{email: string, phone: string, password: string, channel: 'email'|'phone', verified?: list<string>}  $pending  password sudah di-hash
+     * @param  array{email: string, phone: ?string, password: string, channel: 'email'|'phone', verified?: list<string>}  $pending  password sudah di-hash
      * @return array{channel: string, status: string, expires_in?: int, resend_in?: int}
      */
     public function send(array $pending, string $ip, bool $resend, ?string $captchaToken): array
     {
         if ($pending['channel'] === 'phone') {
+            // Satu-satunya pintu kode WhatsApp pendaftaran: saklar mati atau tanpa nomor berarti tidak ada pesan berbiaya yang dikirim (D-146).
+            if (! self::whatsappRequired() || blank($pending['phone'])) {
+                throw $this->rejected('channel', 'channel_invalid', 422);
+            }
+
             // Cookie perangkat sengaja null: pendaftaran selalu butuh kode baru, bukan status verifikasi checkout.
             return ['channel' => 'phone'] + $this->phoneOtp->request((string) $pending['phone'], $ip, $resend, $captchaToken, null);
         }
@@ -69,14 +98,21 @@ class RegistrationService
             : $this->verifyEmail($pending['email'], $code);
     }
 
-    /** Dipanggil hanya setelah email dan nomor sama-sama lolos kode; nomor yang belum terbukti tidak pernah disimpan (kolom phone unik). */
+    /**
+     * Dipanggil setelah semua saluran yang diwajibkan lolos kode. Nomor yang belum terbukti tidak pernah disimpan (kolom phone unik):
+     * dengan saklar WhatsApp mati (D-146) akun dibuat tanpa nomor.
+     *
+     * @param  array{email: string, phone: ?string, password: string, verified: list<string>}  $pending
+     */
     public function createUser(array $pending): User
     {
+        $viaPhone = in_array('phone', $pending['verified'], true);
+
         $user = new User(['name' => Str::limit(Str::before($pending['email'], '@'), 100, ''), 'email' => $pending['email'], 'password' => $pending['password']]);
         $user->forceFill([
             'email_verified_at' => now(),
-            'phone' => $pending['phone'],
-            'phone_verified_at' => now(),
+            'phone' => $viaPhone ? $pending['phone'] : null,
+            'phone_verified_at' => $viaPhone ? now() : null,
             'mfa_required' => false,
             'is_active' => true,
         ]);

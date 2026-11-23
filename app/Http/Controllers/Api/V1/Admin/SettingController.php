@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Http\Requests\Admin\UpdateSettingRequest;
 use App\Models\AuditLog;
 use App\Models\Setting;
+use App\Services\RegistrationService;
 use App\Services\ReturnBlockRuleService;
 use App\Traits\ApiResponse;
 use Illuminate\Http\JsonResponse;
@@ -48,6 +49,11 @@ class SettingController extends Controller
         // D-133: blokir otomatis retur hanya menyala lewat pengajuan yang disetujui Pemilik, bukan lewat Pengaturan.
         if ($setting->key === ReturnBlockRuleService::KEY && $new === '1' && $old !== '1') {
             throw ValidationException::withMessages(['value' => 'Blokir otomatis dinyalakan lewat halaman Pelanggan Diblokir dan butuh persetujuan Pemilik.']);
+        }
+
+        // D-146: daftar wajib WhatsApp hanya boleh menyala bila kode WhatsApp dan Turnstile sudah dikonfigurasi di server; kalau tidak, pendaftaran pasti gagal.
+        if ($setting->key === RegistrationService::SETTING_KEY && $new === '1' && $old !== '1' && ! RegistrationService::whatsappReady()) {
+            throw ValidationException::withMessages(['value' => 'Kunci WhatsApp (WHATSAPP_TOKEN, WHATSAPP_PHONE_NUMBER_ID, WHATSAPP_OTP_TEMPLATE) dan Turnstile (TURNSTILE_SECRET_KEY) belum diisi di server, jadi pendaftaran akan gagal. Isi dulu di .env, lalu coba lagi.']);
         }
 
         if ($old !== $new) {

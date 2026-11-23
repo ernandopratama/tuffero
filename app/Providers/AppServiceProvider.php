@@ -48,7 +48,7 @@ class AppServiceProvider extends ServiceProvider
         });
         $this->app->bind(OtpSender::class, fn () => match (true) {
             $this->app->environment('testing') => new LogOtpSender,
-            filled(config('services.whatsapp.token')) && filled(config('services.whatsapp.phone_number_id')) && filled(config('services.whatsapp.otp_template')) => new MetaWhatsAppOtpSender,
+            MetaWhatsAppOtpSender::configured() => new MetaWhatsAppOtpSender,
             $this->app->environment('local') => new LogOtpSender,
             default => new UnavailableOtpSender,
         });

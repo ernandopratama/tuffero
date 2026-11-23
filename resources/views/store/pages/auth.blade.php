@@ -1,7 +1,7 @@
 @extends('store.layouts.app', ['footer' => false, 'mainbar' => false, 'legacy' => false])
 
 @section('content')
-	<script type="application/json" id="tf-auth-data">{{ $site->json(['words' => $a, 'mode' => $mode, 'dev' => app()->isLocal(), 'siteKey' => config('services.turnstile.site_key'), 'google' => \App\Http\Controllers\Store\GoogleAuthController::enabled(), 'googleStatus' => in_array(request('google'), ['failed', 'unavailable'], true) ? request('google') : null]) }}</script>
+	<script type="application/json" id="tf-auth-data">{{ $site->json(['words' => $a, 'mode' => $mode, 'dev' => app()->isLocal(), 'whatsappRequired' => \App\Services\RegistrationService::whatsappRequired(), 'siteKey' => config('services.turnstile.site_key'), 'google' => \App\Http\Controllers\Store\GoogleAuthController::enabled(), 'googleStatus' => in_array(request('google'), ['failed', 'unavailable'], true) ? request('google') : null]) }}</script>
 	<main class="tf-wrap tf-auth" x-data="authPage">
 		<aside class="tf-auth-photo">
 			<img src="/images/Produk/gallery/Nastar Sultan 1.webp" alt="" width="800" height="800" fetchpriority="high">
@@ -22,7 +22,7 @@
 				<div class="tf-auth-top">@include('store.partials.home-button', ['label' => $a['backHome']])</div>
 				<p class="tf-eyebrow">{{ $a['eyebrow'] }}</p>
 				<h1 x-text="words.title"></h1>
-				<p class="tf-auth-lead" x-text="words.lead"></p>
+				<p class="tf-auth-lead" x-text="leadText"></p>
 
 				<div class="tf-auth-tabs" role="group" aria-label="{{ $a['modeLabel'] }}">
 					<button type="button" :aria-pressed="!isRegister" @click="tabLogin">{{ $a['login']['tab'] }}</button>
@@ -40,14 +40,14 @@
 								</div>
 								<p id="tf-auth-email-hint" :role="fieldError ? 'alert' : null" x-text="fieldError"></p>
 							</div>
-							<div class="tf-auth-field" :class="phoneError ? 'is-error' : ''">
+							<template x-if="whatsappRequired"><div class="tf-auth-field" :class="phoneError ? 'is-error' : ''">
 								<label for="tf-auth-phone">{{ $a['identity']['phoneLabel'] }}</label>
 								<div class="tf-auth-input">
 									<span aria-hidden="true">+62</span>
 									<input id="tf-auth-phone" x-model="phone" type="tel" name="tel" autocomplete="tel-national" inputmode="tel" placeholder="{{ $a['identity']['phonePlaceholder'] }}" :aria-invalid="!!phoneError" aria-describedby="tf-auth-phone-hint" @input="clearPhone">
 								</div>
 								<p id="tf-auth-phone-hint" :role="phoneError ? 'alert' : null" x-text="phoneHint"></p>
-							</div>
+							</div></template>
 						</div>
 					</template>
 					<template x-if="!isRegister">
@@ -96,7 +96,7 @@
 					</button>
 					@include('store.partials.home-button', ['label' => $a['backHome']])
 				</div>
-				<p class="tf-eyebrow">{{ $a['otp']['eyebrow'] }} · <span x-text="stepText"></span></p>
+				<p class="tf-eyebrow">{{ $a['otp']['eyebrow'] }}<span x-show="whatsappRequired"> · <span x-text="stepText"></span></span></p>
 				<h1>{{ $a['methods']['title'] }}</h1>
 				<p class="tf-auth-lead">{{ $a['methods']['lead'] }}</p>
 
@@ -132,7 +132,7 @@
 					</button>
 					@include('store.partials.home-button', ['label' => $a['backHome']])
 				</div>
-				<p class="tf-eyebrow">{{ $a['otp']['eyebrow'] }} · <span x-text="stepText"></span></p>
+				<p class="tf-eyebrow">{{ $a['otp']['eyebrow'] }}<span x-show="whatsappRequired"> · <span x-text="stepText"></span></span></p>
 				<h1 x-text="otpTitle"></h1>
 				<p class="tf-auth-lead" x-text="otpLead"></p>
 

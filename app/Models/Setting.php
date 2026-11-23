@@ -45,6 +45,7 @@ class Setting extends Model
         'marketing.videos_per_week' => ['required', 'integer', 'min:0', 'max:14'],
         'pwa.store_enabled' => ['required', 'integer', 'in:0,1'],
         'pwa.admin_enabled' => ['required', 'integer', 'in:0,1'],
+        'registration.whatsapp_required' => ['required', 'integer', 'in:0,1'],
     ];
 
     /**

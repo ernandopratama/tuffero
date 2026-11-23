@@ -157,6 +157,7 @@ const GROUPS = {
     refund: { label: 'Refund', icon: 'undo', text: 'Batas waktu klaim dan proses refund.' },
     cancellation: { label: 'Pembatalan', icon: 'x', text: 'Batas proses pengajuan dan pembatalan langsung pesanan belum dibayar.' },
     marketing: { label: 'Konten marketing', icon: 'megaphone', text: 'Target frekuensi konten per minggu (D-062). Hanya Super Admin yang bisa mengubahnya.' },
+    registration: { label: 'Pendaftaran pelanggan', icon: 'shield', text: 'Aturan verifikasi akun baru (D-146). Hanya Super Admin yang bisa mengubahnya.' },
     pwa: { label: 'Aplikasi terpasang (PWA)', icon: 'sparkles', text: 'Pasang Tuffero di layar utama HP seperti aplikasi (D-144). Hanya Super Admin yang bisa mengubahnya.' },
 };
 const FIELDS = {
@@ -186,6 +187,7 @@ const FIELDS = {
     'cancellation.process_days_max': { label: 'Batas proses pembatalan (hari)', hint: 'Sejak pengajuan sampai dana diterima pelanggan.', input: 'number' },
     'marketing.videos_per_week': { label: 'Target video per minggu', hint: 'Rencana video. Bawaan 2 (D-062: 1 sampai 2 video). Hanya target tampilan.', input: 'number' },
     'pwa.store_enabled': { label: 'Aplikasi toko untuk pelanggan', hint: 'Bawaan 0. Bila aktif, pelanggan yang sudah masuk bisa memasang aplikasi Tuffero dari halaman Akun; tamu tidak. Mematikannya menghentikan pemasangan baru, tetapi aplikasi yang sudah terpasang di HP tidak ikut terhapus dan hanya membuka website biasa.', input: 'switch' },
+    'registration.whatsapp_required': { label: 'Daftar wajib verifikasi WhatsApp', hint: 'Bawaan 0 (D-146). Mati: pelanggan baru cukup verifikasi email dan nomor tidak diminta. Nyala: email dan WhatsApp keduanya wajib (D-145). Hanya bisa dinyalakan setelah kunci WhatsApp dan Turnstile terisi di server. Akun yang sudah ada tidak terpengaruh.', input: 'switch' },
     'pwa.admin_enabled': { label: 'Aplikasi admin untuk staf', hint: 'Bawaan 0. Bila aktif, semua role staf yang sudah masuk bisa memasang Tuffero Admin dari halaman Profil. Mematikannya menghentikan pemasangan baru; aplikasi yang sudah terpasang tidak ikut terhapus.', input: 'switch' },
 };
 

@@ -2,6 +2,7 @@
 
 namespace App\Http\Requests\Store;
 
+use App\Services\RegistrationService;
 use Illuminate\Foundation\Http\FormRequest;
 
 /**
@@ -21,7 +22,8 @@ class RegisterRequest extends FormRequest
         $phone = $this->input('phone');
         $this->merge([
             'email' => is_string($email) ? mb_strtolower(trim($email)) : null,
-            'phone' => is_string($phone) && preg_replace('/\D/', '', $phone) !== '' ? CheckoutRequest::normalizePhone($phone) : null,
+            // Saklar WhatsApp mati (D-146): nomor tidak diminta dan diabaikan.
+            'phone' => RegistrationService::whatsappRequired() && is_string($phone) && preg_replace('/\D/', '', $phone) !== '' ? CheckoutRequest::normalizePhone($phone) : null,
         ]);
     }
 
@@ -36,16 +38,20 @@ class RegisterRequest extends FormRequest
             return ['captcha_token' => ['nullable', 'string', 'max:2048']];
         }
 
+        // Saklar WhatsApp mati (D-146): hanya saluran email, jadi tidak ada pesan WhatsApp berbiaya yang bisa diminta.
+        $whatsapp = RegistrationService::whatsappRequired();
+        $channel = ['required', $whatsapp ? 'in:email,phone' : 'in:email'];
+
         // Saluran berikutnya setelah satu saluran terverifikasi: data lain diambil dari sesi.
         if ($this->is('*/channel')) {
-            return ['channel' => ['required', 'in:email,phone'], 'captcha_token' => ['nullable', 'string', 'max:2048']];
+            return ['channel' => $channel, 'captcha_token' => ['nullable', 'string', 'max:2048']];
         }
 
         return [
             'email' => ['required', 'email', 'max:255'],
-            'phone' => ['required', 'string', 'regex:/^\+628\d{8,11}$/'],
+            'phone' => $whatsapp ? ['required', 'string', 'regex:/^\+628\d{8,11}$/'] : ['nullable'],
             'password' => ['required', 'string', 'min:8', 'max:255'],
-            'channel' => ['required', 'in:email,phone'],
+            'channel' => $channel,
             'captcha_token' => ['nullable', 'string', 'max:2048'],
         ];
     }

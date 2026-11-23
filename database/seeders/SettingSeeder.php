@@ -41,6 +41,7 @@ class SettingSeeder extends Seeder
         // D-144: aplikasi terpasang toko dan admin, bawaan mati; dinyalakan Super Admin.
         ['key' => 'pwa.store_enabled', 'value' => '0', 'type' => 'int', 'group' => 'pwa', 'is_public' => false],
         ['key' => 'pwa.admin_enabled', 'value' => '0', 'type' => 'int', 'group' => 'pwa', 'is_public' => false],
+        ['key' => 'registration.whatsapp_required', 'value' => '0', 'type' => 'int', 'group' => 'registration', 'is_public' => false],
     ];
 
     public function run(): void

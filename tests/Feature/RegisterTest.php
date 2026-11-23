@@ -2,9 +2,11 @@
 
 namespace Tests\Feature;
 
+use App\Models\Setting;
 use App\Models\User;
 use App\Notifications\RegisterEmailCode;
 use App\Services\Otp\OtpSender;
+use App\Services\RegistrationService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Cache;
@@ -34,6 +36,9 @@ class RegisterTest extends TestCase
         parent::setUp();
 
         Notification::fake();
+
+        // Kelas ini menguji D-145 (email dan WhatsApp wajib), jadi saklar D-146 dinyalakan; bawaannya mati.
+        Setting::where('key', RegistrationService::SETTING_KEY)->update(['value' => '1']);
 
         $this->app->instance(OtpSender::class, new class($this) implements OtpSender
         {
