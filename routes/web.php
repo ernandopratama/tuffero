@@ -35,6 +35,7 @@ Route::middleware(SetStoreContext::class)->controller(StorefrontController::clas
     Route::get('/kontak', 'contact');
     Route::get('/produk', 'catalog');
     Route::get('/produk/{sku}', 'product');
+    Route::get('/kategori/{slug}', 'category');
     Route::get('/voucher', 'vouchers');
     Route::get('/promo', 'promos');
     Route::get('/promo/{slug}', 'promo');

@@ -14,12 +14,14 @@ use App\Http\Controllers\Api\V1\Admin\CustomerBlockController;
 use App\Http\Controllers\Api\V1\Admin\CustomerController;
 use App\Http\Controllers\Api\V1\Admin\CustomerEmailController;
 use App\Http\Controllers\Api\V1\Admin\CustomerHistoryController;
+use App\Http\Controllers\Api\V1\Admin\CustomerNotificationController;
 use App\Http\Controllers\Api\V1\Admin\DashboardController;
 use App\Http\Controllers\Api\V1\Admin\DiscountController;
 use App\Http\Controllers\Api\V1\Admin\FollowUpController;
 use App\Http\Controllers\Api\V1\Admin\GalleryPhotoController;
 use App\Http\Controllers\Api\V1\Admin\IntegrationController;
 use App\Http\Controllers\Api\V1\Admin\MarketingDraftController;
+use App\Http\Controllers\Api\V1\Admin\MarketingDraftMetricController;
 use App\Http\Controllers\Api\V1\Admin\NewsItemController;
 use App\Http\Controllers\Api\V1\Admin\NotificationController as AdminNotificationController;
 use App\Http\Controllers\Api\V1\Admin\OrderController as AdminOrderController;
@@ -36,7 +38,9 @@ use App\Http\Controllers\Api\V1\Admin\ReturnBlockRuleController;
 use App\Http\Controllers\Api\V1\Admin\ReviewController;
 use App\Http\Controllers\Api\V1\Admin\RoleController;
 use App\Http\Controllers\Api\V1\Admin\SalesExportController;
+use App\Http\Controllers\Api\V1\Admin\SeoController;
 use App\Http\Controllers\Api\V1\Admin\SettingController;
+use App\Http\Controllers\Api\V1\Admin\SocialMetricController;
 use App\Http\Controllers\Api\V1\Admin\StockController;
 use App\Http\Controllers\Api\V1\Admin\SystemHealthController;
 use App\Http\Controllers\Api\V1\Admin\TermsController;
@@ -48,6 +52,7 @@ use App\Http\Controllers\Api\V1\BiteshipWebhookController;
 use App\Http\Controllers\Api\V1\CatalogController;
 use App\Http\Controllers\Api\V1\HealthController;
 use App\Http\Controllers\Api\V1\HermesDraftController;
+use App\Http\Controllers\Api\V1\HermesMetricController;
 use App\Http\Controllers\Api\V1\HermesReminderController;
 use App\Http\Controllers\Api\V1\MfaController;
 use App\Http\Controllers\Api\V1\MidtransWebhookController;
@@ -78,6 +83,8 @@ Route::prefix('v1')->group(function () {
     Route::post('/webhooks/whatsapp', [WhatsAppWebhookController::class, 'receive'])->middleware('throttle:120,1');
     // Laporan riset dari Hermes Agent (D-079): token bersama, bukan sesi. Batas ketat karena hanya jadwal mingguan yang memakainya.
     Route::post('/integrations/hermes/drafts', HermesDraftController::class)->middleware([HermesToken::class, 'throttle:hermes-ingest']);
+    // Metrik konten untuk Hermes (D-150): hanya baca, token baca khusus (HERMES_READ_TOKEN), tanpa data pelanggan.
+    Route::get('/integrations/hermes/metrics', HermesMetricController::class)->middleware([HermesToken::class.':read', 'throttle:hermes-read']);
     // Ringkasan pengingat untuk Hermes (hanya baca, tanpa data pelanggan): dasar pesan Telegram yang tahu isi dashboard.
     Route::get('/integrations/hermes/reminders', HermesReminderController::class)->middleware([HermesToken::class, 'throttle:hermes-ingest']);
 
@@ -184,6 +191,15 @@ Route::prefix('v1')->group(function () {
         Route::post('/system-health/log-ack', [SystemHealthController::class, 'acknowledgeLog'])->middleware(['permission:settings.manage', 'mfa.enrolled', 'throttle:6,1']);
         Route::get('/integrations', [IntegrationController::class, 'index'])->middleware('permission:settings.manage');
         Route::post('/integrations/check', [IntegrationController::class, 'check'])->middleware(['permission:settings.manage', 'mfa.enrolled', 'throttle:6,1']);
+        // Halaman SEO dashboard: Super Admin dan Pemilik (izin reports.view yang sudah ada, tanpa izin baru).
+        Route::get('/seo/overview', [SeoController::class, 'overview'])->middleware('permission:reports.view');
+        Route::get('/seo/content', [SeoController::class, 'content'])->middleware('permission:reports.view');
+        Route::get('/seo/preview', [SeoController::class, 'preview'])->middleware(['permission:reports.view', 'throttle:30,1']);
+        Route::post('/seo/technical/check', [SeoController::class, 'check'])->middleware(['permission:reports.view', 'mfa.enrolled', 'throttle:6,1']);
+        Route::put('/seo/checklist/{key}', [SeoController::class, 'checklist'])->middleware(['permission:reports.view', 'mfa.enrolled', 'throttle:30,1']);
+        // Fase 2 (D-152): data Search Console dan PageSpeed dari tabel lokal; sinkron manual hanya mengantre pekerjaan.
+        Route::get('/seo/search', [SeoController::class, 'search'])->middleware('permission:reports.view');
+        Route::post('/seo/search/sync', [SeoController::class, 'sync'])->middleware(['permission:reports.view', 'mfa.enrolled', 'throttle:6,1']);
 
         Route::get('/notifications', [AdminNotificationController::class, 'index'])->middleware('throttle:120,1');
         Route::post('/notifications/read', [AdminNotificationController::class, 'readAll']);
@@ -305,6 +321,9 @@ Route::prefix('v1')->group(function () {
                 Route::post('/orders/{order}/customer-emails', [CustomerEmailController::class, 'store'])->middleware('permission:orders.view');
                 Route::post('/refunds/{refund}/customer-emails', [CustomerEmailController::class, 'store'])->middleware('permission:refunds.view');
                 Route::post('/cancellations/{cancellation}/customer-emails', [CustomerEmailController::class, 'store'])->middleware('permission:orders.cancel_request|orders.cancel');
+                Route::post('/orders/{order}/customer-notifications/{notification}/resend', [CustomerNotificationController::class, 'resend'])->middleware('permission:orders.view');
+                Route::post('/refunds/{refund}/customer-notifications/{notification}/resend', [CustomerNotificationController::class, 'resend'])->middleware('permission:refunds.view');
+                Route::post('/cancellations/{cancellation}/customer-notifications/{notification}/resend', [CustomerNotificationController::class, 'resend'])->middleware('permission:orders.cancel_request|orders.cancel');
             });
         });
 
@@ -480,6 +499,25 @@ Route::prefix('v1')->group(function () {
         Route::middleware(['permission:marketing_drafts.manage', 'mfa.enrolled'])->group(function () {
             Route::post('/caption-generations', [CaptionGeneratorController::class, 'store'])->middleware('throttle:marketing-ai');
             Route::delete('/caption-generations/{generation}', [CaptionGeneratorController::class, 'destroy'])->whereUlid('generation');
+        });
+        // Analisis konten pribadi (rapat 14 Nov 2026 poin 28): metrik harian konten tayang, diisi manual. Lihat seperti draf, kelola seperti draf.
+        Route::get('/marketing-metrics/overview', [MarketingDraftMetricController::class, 'overview'])->middleware('permission:marketing_drafts.view');
+        Route::get('/marketing-metrics/top', [MarketingDraftMetricController::class, 'top'])->middleware('permission:marketing_drafts.view');
+        Route::get('/marketing-drafts/{draft}/metrics', [MarketingDraftMetricController::class, 'index'])->whereUlid('draft')->middleware('permission:marketing_drafts.view');
+        Route::middleware(['permission:content_metrics.manage', 'mfa.enrolled'])->group(function () {
+            Route::post('/marketing-drafts/{draft}/metrics', [MarketingDraftMetricController::class, 'store'])->whereUlid('draft');
+            Route::patch('/marketing-drafts/{draft}/metrics/{metric}', [MarketingDraftMetricController::class, 'update'])->whereUlid(['draft', 'metric'])->scopeBindings();
+            Route::delete('/marketing-drafts/{draft}/metrics/{metric}', [MarketingDraftMetricController::class, 'destroy'])->whereUlid(['draft', 'metric'])->scopeBindings();
+        });
+        // Performa akun media sosial (D-151 tahap 1): angka akun diisi manual. Lihat seperti draf, catat dengan izin sendiri.
+        Route::get('/social-metrics/overview', [SocialMetricController::class, 'overview'])->middleware('permission:marketing_drafts.view');
+        Route::middleware(['permission:social_metrics.manage', 'mfa.enrolled'])->group(function () {
+            Route::post('/social-metrics', [SocialMetricController::class, 'store']);
+            Route::patch('/social-metrics/{metric}', [SocialMetricController::class, 'update'])->whereUlid('metric');
+            Route::delete('/social-metrics/{metric}', [SocialMetricController::class, 'destroy'])->whereUlid('metric');
+            Route::delete('/social-metrics', [SocialMetricController::class, 'destroyTestData']);
+            Route::put('/social-audience', [SocialMetricController::class, 'saveAudience']);
+            Route::delete('/social-audience/{snapshot}', [SocialMetricController::class, 'destroyAudience'])->whereUlid('snapshot');
         });
         Route::post('/marketing-drafts/{draft}/decide', [MarketingDraftController::class, 'decide'])->whereUlid('draft')->middleware(['permission:marketing_drafts.approve', 'mfa.enrolled']);
 

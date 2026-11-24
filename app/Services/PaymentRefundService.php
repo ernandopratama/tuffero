@@ -22,7 +22,7 @@ class PaymentRefundService
     /** Metode bayar yang punya Refund API Midtrans dan aktif di Tuffero. */
     private const AUTO_TYPES = ['credit_card', 'qris', 'gopay', 'shopeepay'];
 
-    public function __construct(private MidtransService $midtrans, private StaffNotifier $notifier) {}
+    public function __construct(private MidtransService $midtrans, private StaffNotifier $notifier, private CustomerNotifier $customers) {}
 
     public static function enabled(): bool
     {
@@ -85,6 +85,7 @@ class PaymentRefundService
             $order->histories()->create(['status_type' => 'payment', 'from_status' => 'refund_pending', 'to_status' => 'refunded', 'source' => 'midtrans_refund', 'actor_user_id' => $actor?->id, 'reason' => "Refund otomatis {$result['via']}"]);
             $order->histories()->create(['status_type' => 'order', 'from_status' => Order::CANCELLED, 'to_status' => Order::REFUNDED, 'source' => 'midtrans_refund', 'actor_user_id' => $actor?->id]);
             AuditLog::record('refund.auto_done', $order, $context, $actor?->id);
+            $this->customers->cancellation($locked, 'refunded');
 
             return 'done';
         });

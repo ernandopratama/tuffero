@@ -42,6 +42,9 @@ class SettingSeeder extends Seeder
         ['key' => 'pwa.store_enabled', 'value' => '0', 'type' => 'int', 'group' => 'pwa', 'is_public' => false],
         ['key' => 'pwa.admin_enabled', 'value' => '0', 'type' => 'int', 'group' => 'pwa', 'is_public' => false],
         ['key' => 'registration.whatsapp_required', 'value' => '0', 'type' => 'int', 'group' => 'registration', 'is_public' => false],
+        // Pesan otomatis pembatalan dan refund lewat WhatsApp: mati sampai akun Meta aktif; nama template diisi Super Admin.
+        ['key' => 'notifications.customer_whatsapp_enabled', 'value' => '0', 'type' => 'int', 'group' => 'notifications', 'is_public' => false],
+        ['key' => 'notifications.customer_whatsapp_template', 'value' => null, 'type' => 'string', 'group' => 'notifications', 'is_public' => false],
     ];
 
     public function run(): void

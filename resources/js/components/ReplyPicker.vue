@@ -8,7 +8,8 @@ import AdminIcon from './AdminIcon.vue';
 
 // Template balasan CS (hanya pemegang izin templates.manage). Server mengisi variabel dari data pesanan; teks bisa disunting
 // sebelum dipakai. CS membuka WhatsApp dengan teks terisi, menyalin teksnya, atau (pemegang izin emails.send) mengirim email
-// ke pelanggan dengan menekan Kirim. Tidak ada pesan yang terkirim tanpa tindakan CS.
+// ke pelanggan dengan menekan Kirim. Email buatan CS tidak terkirim tanpa tindakan CS; daftar "Pesan otomatis" di bawah adalah
+// email sistem (pembatalan dan refund, D-149) dengan status kirim sebenarnya, dan CS boleh mengirim ulang.
 // url = endpoint template untuk satu data, mis. /admin/refunds/1/reply-templates.
 const props = defineProps({ url: { type: String, required: true } });
 
@@ -25,6 +26,10 @@ const copied = ref(false);
 const emailUrl = computed(() => props.url.replace(/reply-templates$/, 'customer-emails'));
 const emailTo = ref(null);
 const sentEmails = ref([]);
+const autoMessages = ref([]);
+const resendingId = ref('');
+const autoError = ref('');
+const AUTO_STATUS = { pending: 'Menunggu', queued: 'Dalam antrean', sent: 'Terkirim', failed: 'Gagal', skipped: 'Dilewati (tanpa email sah)' };
 const emailOpen = ref(false);
 const subject = ref('');
 const sending = ref(false);
@@ -60,8 +65,22 @@ async function loadEmails() {
         const { data } = await api.get(emailUrl.value);
         emailTo.value = data.data.to;
         sentEmails.value = data.data.items;
+        autoMessages.value = data.data.notifications ?? [];
     } catch {
         emailTo.value = null; // tanpa riwayat, tombol email disembunyikan; WhatsApp tetap bisa dipakai
+    }
+}
+
+async function resendAuto(message) {
+    resendingId.value = message.id;
+    autoError.value = '';
+    try {
+        await api.post(`${emailUrl.value.replace(/customer-emails$/, 'customer-notifications')}/${message.id}/resend`);
+        await loadEmails();
+    } catch (e) {
+        autoError.value = apiError(e).message;
+    } finally {
+        resendingId.value = '';
     }
 }
 
@@ -155,6 +174,16 @@ onMounted(load);
         · {{ mail.subject }} · {{ mail.sent_by }} · {{ formatDate(mail.created_at) }}
       </li>
     </ul>
+
+    <ul v-if="autoMessages.length" class="mt-space-sm space-y-1 border-t border-border pt-2 text-body-sm text-secondary" aria-label="Pesan otomatis ke pelanggan">
+      <li class="text-label-md text-primary">Pesan otomatis</li>
+      <li v-for="message in autoMessages" :key="message.id" class="flex flex-wrap items-center gap-x-2 break-words">
+        <span :class="message.status === 'sent' ? 'text-success' : message.status === 'failed' ? 'text-error' : ''">{{ AUTO_STATUS[message.status] || message.status }}</span>
+        <span>· {{ message.subject }} · {{ message.channel === 'mail' ? 'Email' : 'WhatsApp' }} · {{ formatDate(message.created_at) }}</span>
+        <button v-if="message.can_resend" type="button" :disabled="resendingId === message.id" :class="`inline-flex min-h-8 items-center rounded-full border border-secondary px-3 text-label-md hover:bg-accent-tint-15 ${press}`" @click="resendAuto(message)">{{ resendingId === message.id ? 'Mengirim...' : 'Kirim ulang' }}</button>
+      </li>
+    </ul>
+    <p v-if="autoError" role="alert" class="mt-2 text-body-sm text-error">{{ autoError }}</p>
 
     <p v-if="error" role="alert" class="mt-2 text-body-sm text-error">{{ error }}</p>
   </section>

@@ -22,7 +22,7 @@ use Illuminate\Support\Facades\DB;
  */
 #[Fillable([
     'user_id', 'public_ref', 'order_number', 'access_token_hash', 'idempotency_key', 'warehouse_id',
-    'customer_name', 'customer_email', 'customer_phone', 'shipping_address', 'ip_address', 'shipping_courier', 'shipping_service',
+    'customer_name', 'customer_email', 'customer_phone', 'locale', 'shipping_address', 'ip_address', 'shipping_courier', 'shipping_service',
     'status', 'payment_status', 'shipping_status', 'subtotal', 'discount_total', 'voucher_code', 'voucher_code_2', 'shipping_voucher_code', 'shipping_fee', 'shipping_discount', 'total', 'expires_at',
     'review_due_at', 'reviewed_at', 'reviewed_by', 'review_note',
 ])]

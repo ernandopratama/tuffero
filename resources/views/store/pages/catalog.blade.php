@@ -14,6 +14,16 @@
 			<p class="tf-cat-pill wow fadeInUp">{{ $c['eyebrow'] }}</p>
 			<h1 class="tf-h2 tf-cat-title text-anime-style-2" data-cursor="-opaque">{{ $site->rich($c['title']) }}</h1>
 			<p class="tf-lead tf-cat-lead wow fadeInUp" data-wow-delay="0.1s">{{ $c['lead'] }}</p>
+			{{-- R-08: tautan ke halaman kategori (tanpa ini halaman kategori yatim di mesin pencari). --}}
+			@if ($categoryPages->isNotEmpty())
+				<nav class="tf-catlinks-nav" aria-label="{{ trans('store.pages.category.browse') }}">
+					<ul class="tf-catlinks">
+						@foreach ($categoryPages as $categoryPage)
+							<li><a href="/kategori/{{ $categoryPage['slug'] }}">{{ $categoryPage['name'][$locale] }}</a></li>
+						@endforeach
+					</ul>
+				</nav>
+			@endif
 		</section>
 
 		{{-- Pencarian dan keranjang menempel di bawah navbar saat digulir. --}}

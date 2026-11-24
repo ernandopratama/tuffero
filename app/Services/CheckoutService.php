@@ -147,6 +147,7 @@ class CheckoutService
             'customer_name' => $data['customer_name'],
             'customer_email' => $data['customer_email'],
             'customer_phone' => $data['customer_phone'],
+            'locale' => $data['locale'] ?? 'id',
             'shipping_address' => $data['address'],
             'ip_address' => $data['ip_address'] ?? null,
             'shipping_courier' => $rate['courier'],

@@ -2,6 +2,7 @@
 
 namespace App\Providers;
 
+use App\Models\CustomerNotification;
 use App\Models\Order;
 use App\Models\OrderCancellationRequest;
 use App\Models\PromoContent;
@@ -25,6 +26,8 @@ use App\Services\Translation\Translator;
 use Illuminate\Cache\RateLimiting\Limit;
 use Illuminate\Http\Middleware\TrustProxies;
 use Illuminate\Http\Request;
+use Illuminate\Mail\Events\MessageSent;
+use Illuminate\Support\Facades\Event;
 use Illuminate\Support\Facades\RateLimiter;
 use Illuminate\Support\Facades\Route;
 use Illuminate\Support\Facades\Schema;
@@ -62,6 +65,13 @@ class AppServiceProvider extends ServiceProvider
      */
     public function boot(): void
     {
+        // Email pelanggan baru berstatus `sent` saat server email menerimanya (di worker), bukan saat masuk antrean.
+        Event::listen(MessageSent::class, function (MessageSent $event) {
+            if ($id = $event->data['notificationId'] ?? null) {
+                CustomerNotification::whereKey($id)->update(['status' => CustomerNotification::SENT, 'error' => null]);
+            }
+        });
+
         // Proxy (mis. Cloudflare) yang boleh menentukan IP pengunjung lewat X-Forwarded-For. Kosong berarti tidak ada yang dipercaya,
         // jadi header itu diabaikan. Dibaca dari config (bukan env di bootstrap) supaya tetap bekerja setelah config:cache.
         if ($proxies = config('app.trusted_proxies')) {
@@ -148,6 +158,12 @@ class AppServiceProvider extends ServiceProvider
         RateLimiter::for('hermes-ingest', fn (Request $request) => [
             Limit::perMinute(10)->by('hermes-ingest-minute|'.$request->ip()),
             Limit::perDay(100)->by('hermes-ingest-day'),
+        ]);
+
+        // Hermes membaca metrik konten (D-150): rekap mingguan saja, jadi batasnya kecil.
+        RateLimiter::for('hermes-read', fn (Request $request) => [
+            Limit::perMinute(6)->by('hermes-read-minute|'.$request->ip()),
+            Limit::perDay(50)->by('hermes-read-day'),
         ]);
 
         // Batas kasar per permintaan. Batas pengiriman yang berbiaya (per nomor dan IP, D-093) ada di PhoneOtpService.

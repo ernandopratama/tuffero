@@ -80,6 +80,8 @@ class PermissionCatalog
         'marketing_drafts.view' => ['Konten dan marketing', 'Lihat draf konten'],
         'marketing_drafts.manage' => ['Konten dan marketing', 'Susun draf konten'],
         'marketing_drafts.approve' => ['Konten dan marketing', 'Putuskan draf konten'],
+        'content_metrics.manage' => ['Konten dan marketing', 'Catat performa konten'],
+        'social_metrics.manage' => ['Konten dan marketing', 'Catat performa media sosial'],
         'terms.manage' => ['Konten dan marketing', 'Kelola Syarat dan Ketentuan dan Kebijakan Privasi'],
 
         'faqs.manage' => ['Customer Service', 'Kelola FAQ chat'],

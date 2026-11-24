@@ -7,6 +7,15 @@
 		</header>
 		<div class="tf-vpick-body">
 			<p class="tf-vpick-hint"><strong x-text="pickCountText"></strong> {{ $v['stackNote'] }}</p>
+			<template x-if="!words.customer">
+				<div class="tf-vpick-guest">
+					{{ $site->lineIcon('gift', 20) }}
+					<div>
+						<strong>{{ $v['guestTitle'] }}</strong>
+						<p>{{ $v['guestRule'] }} <a href="/masuk">{{ $v['guestLogin'] }}</a> {{ $v['guestMore'] }}</p>
+					</div>
+				</div>
+			</template>
 			<form class="tf-vpick-code" @submit.prevent="applyCode">
 				<label class="tf-sr" for="vp-code">{{ $v['codeLabel'] }}</label>
 				<input id="vp-code" x-model="voucherCode" maxlength="40" autocomplete="off" autocapitalize="characters" placeholder="{{ $v['codePlaceholder'] }}">

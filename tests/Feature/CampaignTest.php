@@ -200,7 +200,7 @@ class CampaignTest extends TestCase
         $this->item($this->campaign());
 
         $this->get('/promo/promo-imlek?lang=en')->assertOk()->assertSee('Running now')->assertSee('Promo products');
-        $this->get('/promo?lang=en')->assertOk()->assertSee('Promotions | Tuffero Bakery', false);
+        $this->get('/promo?lang=en')->assertOk()->assertSee('Promotions and Flash Sales | Tuffero Bakery', false);
     }
 
     public function test_admin_creates_a_campaign_adds_items_and_everything_is_audited(): void

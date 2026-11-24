@@ -4,6 +4,7 @@ namespace App\Support;
 
 use App\Models\Setting;
 use Carbon\CarbonImmutable;
+use Illuminate\Support\Collection;
 use Illuminate\Support\HtmlString;
 
 /**
@@ -35,6 +36,15 @@ class StoreSite
         'about' => '/tentang-kami', 'services' => '/layanan', 'products' => '/produk', 'offers' => '/#offers', 'gallery' => '/galeri', 'contact' => '/kontak',
         'account' => '/masuk', 'profile' => '/akun', 'orders' => '/akun/pesanan', 'addresses' => '/akun/alamat', 'vouchers' => '/voucher', 'promos' => '/promo', 'myVouchers' => '/akun/voucher', 'cart' => '/keranjang', 'checkout' => '/checkout', 'track' => '/cek-pesanan', 'refund' => '/ajukan-refund',
     ];
+
+    /** Halaman statis yang masuk sitemap dan daftar pratinjau SEO di dashboard. */
+    public const STATIC_PAGES = ['/', '/tentang-kami', '/layanan', '/produk', '/galeri', '/kontak'];
+
+    /**
+     * Kategori yang punya halaman sendiri, `/kategori/{slug}` (R-08). Pia (1 produk) dan Hampers (kosong) belum, dan
+     * Produk Lainnya (selai, terasi, sambal) bukan pastry. Tambah slug di sini setelah ada keputusan.
+     */
+    public const CATEGORY_PAGES = ['nastar', 'macaron', 'brownies-cake', 'cookies'];
 
     public const NAV_LINKS = ['/', '/tentang-kami', '/layanan', '/produk', '/promo', '/#offers', '/galeri', '/kontak'];
 
@@ -121,8 +131,11 @@ class StoreSite
         return array_filter([
             '@context' => 'https://schema.org',
             '@type' => 'Bakery',
+            '@id' => url('/#bakery'),
             'name' => 'Tuffero Bakery',
             'url' => url('/'),
+            // Wordmark hitam berlatar transparan (terbaca di latar putih); Pth putih tidak cocok untuk logo mesin pencari.
+            'logo' => url('/images/Logo/Logo%20Tuffero%20Bakery-Htm.webp'),
             'image' => url(str_replace(' ', '%20', $this->productPhoto('Nastar Classic 2'))),
             'telephone' => $this->whatsappNumber(),
             'foundingDate' => '2021-06-08',
@@ -148,6 +161,147 @@ class StoreSite
             'priceRange' => implode('–', $range),
             'servesCuisine' => ['Kue Kering', 'Pastry', 'Macaron'],
         ]);
+    }
+
+    /**
+     * JSON-LD beranda (R-11): Bakery (subtipe Organization, kini dengan logo) dan WebSite yang merujuknya sebagai penerbit.
+     * Nama mengikuti nama situs saat ini; tinjau ulang bila nama merek kanonis diputuskan (R-03).
+     *
+     * @param  array<int, int>  $prices
+     * @return array<string, mixed>
+     */
+    public function homeJsonLd(array $prices = []): array
+    {
+        $bakery = $this->businessJsonLd($prices);
+        unset($bakery['@context']);
+
+        return [
+            '@context' => 'https://schema.org',
+            '@graph' => [
+                $bakery,
+                [
+                    '@type' => 'WebSite',
+                    '@id' => url('/#website'),
+                    'url' => url('/'),
+                    'name' => 'Tuffero Bakery',
+                    'inLanguage' => ['id', 'en'],
+                    'publisher' => ['@id' => url('/#bakery')],
+                ],
+            ],
+        ];
+    }
+
+    /**
+     * JSON-LD katalog (R-11): CollectionPage dengan ItemList seluruh produk yang tampil di HTML, plus BreadcrumbList.
+     * shortcut: semua produk didaftar karena katalog dirender utuh di server; batasi bila katalog diberi halaman.
+     *
+     * @param  Collection<int, array<string, mixed>>  $items
+     * @param  array{name: string, path: string}|null  $category  halaman kategori: ubah alamat dan tambah satu tingkat breadcrumb
+     * @return array<string, mixed>
+     */
+    public function catalogJsonLd(Collection $items, string $title, string $locale, ?array $category = null): array
+    {
+        $crumbs = trans('store.pages.product');
+        $trail = [['@type' => 'ListItem', 'position' => 1, 'name' => $crumbs['home'], 'item' => url('/')]];
+        $trail[] = $category
+            ? ['@type' => 'ListItem', 'position' => 2, 'name' => $crumbs['products'], 'item' => url('/produk')]
+            : ['@type' => 'ListItem', 'position' => 2, 'name' => $crumbs['products']];
+        if ($category) {
+            $trail[] = ['@type' => 'ListItem', 'position' => 3, 'name' => $category['name']];
+        }
+
+        return [
+            '@context' => 'https://schema.org',
+            '@graph' => [
+                [
+                    '@type' => 'CollectionPage',
+                    'name' => $title,
+                    'url' => url($category['path'] ?? '/produk'),
+                    'mainEntity' => [
+                        '@type' => 'ItemList',
+                        'numberOfItems' => $items->count(),
+                        'itemListElement' => $items->values()->map(fn (array $item, int $i) => [
+                            '@type' => 'ListItem',
+                            'position' => $i + 1,
+                            'url' => url($item['path']),
+                            'name' => $item['name'][$locale],
+                        ])->all(),
+                    ],
+                ],
+                ['@type' => 'BreadcrumbList', 'itemListElement' => $trail],
+            ],
+        ];
+    }
+
+    /**
+     * Teks pembuka halaman kategori (R-08), hanya dari fakta produk di database: jumlah, nama, berat kemasan, masa simpan.
+     * Tanpa klaim rasa, bahan, atau halal; itu menunggu konfirmasi tim. Mengembalikan paragraf dan ringkasan berat untuk meta.
+     *
+     * @param  Collection<int, array<string, mixed>>  $items
+     * @return array{intro: string, pack: string}
+     */
+    public function categoryFacts(Collection $items, string $name, string $locale): array
+    {
+        $g = trans('store.pages.category');
+        $names = $items->map(fn (array $x) => $x['name'][$locale])->values();
+        $shown = $names->take(5)->all();
+        $more = $names->count() - count($shown);
+
+        if ($more > 0) {
+            $list = implode(', ', $shown).' '.$this->fill($g['andMore'], ['more' => $more]);
+        } elseif (count($shown) > 1) {
+            $list = implode(', ', array_slice($shown, 0, -1)).' '.$g['and'].' '.end($shown);
+        } else {
+            $list = (string) ($shown[0] ?? '');
+        }
+
+        $packs = $items->pluck('pack')->filter();
+        $pack = $packs->isEmpty() ? '' : ($packs->min() === $packs->max()
+            ? $this->fill($g['packOne'], ['a' => $packs->min()])
+            : $this->fill($g['packRange'], ['a' => $packs->min(), 'b' => $packs->max()]));
+        $shelf = $this->shelfRange($items);
+
+        $parts = [$this->fill($g['intro'], ['count' => $items->count(), 'name' => $name, 'list' => $list])];
+        if ($pack !== '') {
+            $parts[] = $this->fill($g['introPack'], ['pack' => $pack]);
+        }
+        if ($shelf !== null) {
+            $parts[] = $this->fill($g['introShelf'], ['shelf' => $shelf]);
+        }
+        $parts[] = $g['introShip'];
+
+        return ['intro' => implode(' ', $parts), 'pack' => $pack];
+    }
+
+    /**
+     * Rentang masa simpan dari data produk, mis. "14 sampai 21 hari" atau "1 bulan sampai 2 bulan".
+     *
+     * @param  Collection<int, array<string, mixed>>  $items
+     */
+    private function shelfRange(Collection $items): ?string
+    {
+        $perUnit = ['day' => 1, 'month' => 30, 'year' => 365];
+        $rows = $items->filter(fn (array $x) => $x['shelf'])
+            ->map(fn (array $x) => ['days' => $x['shelf'][0] * $perUnit[$x['shelf'][1]], 'item' => $x])
+            ->sortBy('days')->values();
+        if ($rows->isEmpty()) {
+            return null;
+        }
+
+        $lo = $rows->first();
+        $hi = $rows->last();
+        if ($lo['days'] === $hi['days']) {
+            return $this->shelfPlain($lo['item']);
+        }
+
+        $to = trans('store.pages.category.to');
+        [$a, $unitA] = $lo['item']['shelf'];
+        [$b, $unitB] = $hi['item']['shelf'];
+        if ($unitA === $unitB) {
+            return $a.' '.$to.' '.$b.' '.trans('store.pages.catalog.units')[$unitA][$b > 1 ? 1 : 0];
+        }
+
+        return $this->shelfPlain($lo['item']).' '.$to.' '.$this->shelfPlain($hi['item']);
     }
 
     /**

@@ -18,6 +18,7 @@ use App\Services\TermsService;
 use App\Support\StoreSite;
 use Carbon\Carbon;
 use Illuminate\Contracts\View\View;
+use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Http\Response;
 
@@ -42,7 +43,7 @@ class StorefrontController extends Controller
         $google = $this->catalog->reviews();
 
         return view('store.pages.home', [
-            'seo' => ['title' => $t['meta']['title'], 'description' => $t['meta']['description'], 'jsonld' => $this->site->businessJsonLd($items->pluck('price')->all())],
+            'seo' => ['title' => $t['meta']['title'], 'description' => $t['meta']['description'], 'jsonld' => $this->site->homeJsonLd($items->pluck('price')->all())],
             'google' => ['rating' => number_format($google['rating'], 1, ',', ''), 'count' => $google['count']],
             // Popup berita (D-085): data saja; JS membangun popup setelah halaman siap.
             'newsPopup' => $this->news->popup(app()->getLocale()),
@@ -168,11 +169,72 @@ class StorefrontController extends Controller
     {
         $c = trans('store.pages.catalog');
 
-        return view('store.pages.catalog', ['c' => $c, 'items' => $this->catalog->items(), 'categories' => $this->catalog->categories(), 'seo' => ['title' => $c['meta'], 'description' => $c['lead'], 'image' => $this->site->productPhoto('Nastar Classic 3')]]);
+        $items = $this->catalog->items();
+        $categories = $this->catalog->categories();
+
+        return view('store.pages.catalog', ['c' => $c, 'items' => $items, 'categories' => $categories, 'categoryPages' => $categories->whereIn('slug', StoreSite::CATEGORY_PAGES)->values(), 'seo' => [
+            'title' => $c['meta'],
+            'description' => $c['lead'],
+            'image' => $this->site->productPhoto('Nastar Classic 3'),
+            'jsonld' => $this->site->catalogJsonLd($items, $c['meta'], app()->getLocale()),
+        ]]);
     }
 
-    public function product(string $sku): Response
+    /**
+     * Halaman kategori (R-08): daftar produk satu kategori dengan teks pembuka dari fakta produk. Hanya kategori di
+     * `StoreSite::CATEGORY_PAGES` yang punya produk tayang; selebihnya 404. Slug huruf besar dialihkan permanen.
+     */
+    public function category(Request $request, string $slug): View|Response|RedirectResponse
     {
+        if ($slug !== strtolower($slug)) {
+            $query = $request->getQueryString();
+
+            return redirect()->to('/kategori/'.strtolower($slug).($query ? '?'.$query : ''), 301);
+        }
+
+        $category = in_array($slug, StoreSite::CATEGORY_PAGES, true) ? $this->catalog->categories()->firstWhere('slug', $slug) : null;
+        $items = $this->catalog->items()->where('cat', $slug)->values();
+        if (! $category || $items->isEmpty()) {
+            return $this->missing($request);
+        }
+
+        $locale = app()->getLocale();
+        $g = trans('store.pages.category');
+        $name = $category['name'][$locale];
+        $facts = $this->site->categoryFacts($items, $name, $locale);
+        $title = $this->site->fill($g['title'], ['name' => $name]);
+
+        return view('store.pages.category', [
+            'g' => $g,
+            'catalog' => trans('store.pages.catalog'),
+            'p' => trans('store.pages.product'),
+            'slug' => $slug,
+            'name' => $name,
+            'intro' => $facts['intro'],
+            'items' => $items,
+            'others' => $this->catalog->categories()->whereIn('slug', StoreSite::CATEGORY_PAGES)->where('slug', '!=', $slug)->values(),
+            'seo' => [
+                'title' => $title,
+                'description' => $this->site->fill($g['metaDescription'], [
+                    'name' => $name,
+                    'count' => $items->count(),
+                    'pack' => $facts['pack'] === '' ? '' : $this->site->fill($g['metaPack'], ['pack' => $facts['pack']]),
+                ]),
+                'image' => $items->first()['photos'][0]['src'] ?? null,
+                'jsonld' => $this->site->catalogJsonLd($items, $title, $locale, ['name' => $name, 'path' => '/kategori/'.$slug]),
+            ],
+        ]);
+    }
+
+    public function product(Request $request, string $sku): Response|RedirectResponse
+    {
+        // Satu alamat per produk (R-07): SKU huruf besar dialihkan permanen ke huruf kecil, query ikut.
+        if ($sku !== strtolower($sku)) {
+            $query = $request->getQueryString();
+
+            return redirect()->to('/produk/'.strtolower($sku).($query ? '?'.$query : ''), 301);
+        }
+
         $c = trans('store.pages.catalog');
         $p = trans('store.pages.product');
         $locale = app()->getLocale();
@@ -187,6 +249,17 @@ class StorefrontController extends Controller
 
         $description = $this->productDescription($item, $p, $locale);
         $items = $this->catalog->items();
+
+        // R-08: bila kategori produk punya halaman sendiri, breadcrumb (tampilan dan JSON-LD) memuatnya.
+        $categoryPage = $item['cat'] && in_array($item['cat'], StoreSite::CATEGORY_PAGES, true);
+        $crumbs = [
+            ['@type' => 'ListItem', 'position' => 1, 'name' => $p['home'], 'item' => url('/')],
+            ['@type' => 'ListItem', 'position' => 2, 'name' => $p['products'], 'item' => url('/produk')],
+        ];
+        if ($categoryPage) {
+            $crumbs[] = ['@type' => 'ListItem', 'position' => 3, 'name' => $item['cat_name'][$locale], 'item' => url('/kategori/'.$item['cat'])];
+        }
+        $crumbs[] = ['@type' => 'ListItem', 'position' => count($crumbs) + 1, 'name' => $item['name'][$locale]];
 
         // Dua daftar tanpa produk yang sama: pilihan toko (samping) dan produk lain (kategori yang sama lebih dulu).
         $picks = collect(['NAS-TOP-01', 'MAC-MIN-31', 'CHO-DUB-01', 'NAS-APEL-01', 'PIA-OLH-02', 'MAC-REG-06'])
@@ -210,7 +283,7 @@ class StorefrontController extends Controller
         ];
 
         return response()->view('store.pages.product', [
-            'c' => $c, 'p' => $p, 'x' => $item, 'description' => $description, 'picks' => $picks, 'also' => $also, 'reviews' => $this->catalog->reviews(), 'buyer' => $buyer,
+            'c' => $c, 'p' => $p, 'x' => $item, 'categoryPage' => $categoryPage, 'description' => $description, 'picks' => $picks, 'also' => $also, 'reviews' => $this->catalog->reviews(), 'buyer' => $buyer,
             'seo' => [
                 'title' => $item['name'][$locale].$p['metaSuffix'],
                 'description' => $description,
@@ -234,11 +307,7 @@ class StorefrontController extends Controller
                         ]),
                         [
                             '@type' => 'BreadcrumbList',
-                            'itemListElement' => [
-                                ['@type' => 'ListItem', 'position' => 1, 'name' => $p['home'], 'item' => url('/')],
-                                ['@type' => 'ListItem', 'position' => 2, 'name' => $p['products'], 'item' => url('/produk')],
-                                ['@type' => 'ListItem', 'position' => 3, 'name' => $item['name'][$locale]],
-                            ],
+                            'itemListElement' => $crumbs,
                         ],
                     ],
                 ],
@@ -334,7 +403,8 @@ class StorefrontController extends Controller
         return view('store.pages.promos', [
             'c' => $c,
             'campaigns' => $campaigns,
-            'seo' => ['title' => $c['meta'], 'description' => $c['description']],
+            // R-12: halaman daftar tipis, tidak diindeks dan tidak ada di sitemap. Halaman tiap promo tetap diindeks.
+            'seo' => ['title' => $c['meta'], 'description' => $c['description'], 'noindex' => true],
         ]);
     }
 
@@ -360,7 +430,8 @@ class StorefrontController extends Controller
     {
         $c = [...trans('store.pages.voucherCard'), ...trans('store.pages.vouchers')];
 
-        return view('store.pages.vouchers', ['c' => $c, 'seo' => ['title' => $c['meta'], 'description' => $c['description']]]);
+        // R-12: halaman tipis, tidak diindeks dan tidak ada di sitemap.
+        return view('store.pages.vouchers', ['c' => $c, 'seo' => ['title' => $c['meta'], 'description' => $c['description'], 'noindex' => true]]);
     }
 
     public function accountVouchers(): View
@@ -380,8 +451,9 @@ class StorefrontController extends Controller
     public function sitemap(): Response
     {
         // lastmod hanya untuk halaman yang punya tanggal ubah di database; halaman statis tanpa lastmod.
-        $urls = collect(['/', '/tentang-kami', '/layanan', '/produk', '/promo', '/voucher', '/galeri', '/kontak'])
+        $urls = collect(StoreSite::STATIC_PAGES)
             ->map(fn (string $path) => ['path' => $path, 'lastmod' => null])
+            ->merge($this->catalog->categories()->whereIn('slug', StoreSite::CATEGORY_PAGES)->map(fn (array $category) => ['path' => '/kategori/'.$category['slug'], 'lastmod' => null]))
             ->merge(Campaign::visible()->get(['slug', 'updated_at'])->map(fn (Campaign $campaign) => ['path' => '/promo/'.$campaign->slug, 'lastmod' => $campaign->updated_at]))
             ->merge($this->catalog->publishedProducts()->flatMap(fn ($product) => $product->variants->map(fn ($variant) => [
                 'path' => '/produk/'.strtolower($variant->sku),

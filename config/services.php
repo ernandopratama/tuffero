@@ -78,6 +78,8 @@ return [
     // Buat dengan `php -r "echo bin2hex(random_bytes(32));"`. Token ini hanya untuk Hermes dan tidak dipakai di tempat lain.
     'hermes' => [
         'token' => env('HERMES_INGEST_TOKEN'),
+        // Token baca metrik konten (D-150), terpisah dari token kiriman draf. Minimal 32 karakter; kosong = endpoint mati (404).
+        'read_token' => env('HERMES_READ_TOKEN'),
     ],
 
     'biteship' => [
@@ -112,6 +114,14 @@ return [
         'secret' => env('TURNSTILE_SECRET_KEY'),
         // Site key memang publik (dipakai widget di browser).
         'site_key' => env('TURNSTILE_SITE_KEY'),
+    ],
+
+    // Data SEO untuk dashboard (D-152 Fase 2). Kosong berarti halaman Search Console tampil "belum terhubung" dan tidak ada
+    // panggilan ke Google. Berkas JSON service account disimpan di server di luar folder publik, tidak pernah di Git.
+    'google_seo' => [
+        'property' => env('GOOGLE_SC_PROPERTY'),
+        'credentials_path' => env('GOOGLE_SC_CREDENTIALS_PATH'),
+        'pagespeed_key' => env('GOOGLE_PAGESPEED_API_KEY'),
     ],
 
     // Masuk pelanggan dengan Google (D-051). Kosong berarti tombol Google menampilkan "belum tersedia".

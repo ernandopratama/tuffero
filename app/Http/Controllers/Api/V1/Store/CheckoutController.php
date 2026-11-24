@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Api\V1\Store;
 
 use App\Http\Controllers\Controller;
+use App\Http\Middleware\SetStoreContext;
 use App\Http\Requests\Store\CheckoutRequest;
 use App\Services\CartService;
 use App\Services\CheckoutService;
@@ -46,6 +47,8 @@ class CheckoutController extends Controller
         $data['user_id'] = $user?->getRoleNames()->isEmpty() ? $user->id : null;
         // Bukti untuk D-122 (tidak dipakai menolak): IP dari koneksi, bukan dari isian pembeli.
         $data['ip_address'] = $request->ip();
+        // Bahasa pesan otomatis ke pelanggan: pilihan bahasa toko (cookie tidak terenkripsi, jadi divalidasi), bawaan id.
+        $data['locale'] = in_array($request->cookie(SetStoreContext::COOKIE), ['id', 'en'], true) ? $request->cookie(SetStoreContext::COOKIE) : 'id';
 
         if ($data['user_id'] === null && config('services.whatsapp.otp_required')) {
             $otp->assertGuestMayCheckout($request->cookie(PhoneOtpService::DEVICE_COOKIE), $data['customer_phone']);

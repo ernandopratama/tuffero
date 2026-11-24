@@ -2,6 +2,7 @@
 import { computed, nextTick, onBeforeUnmount, onMounted, reactive, ref, watch } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import AdminIcon from '../../components/AdminIcon.vue';
+import MetricsPanel from '../../components/marketing/MetricsPanel.vue';
 import StoryboardPanel from '../../components/marketing/StoryboardPanel.vue';
 import AddButton from '../../components/ui/AddButton.vue';
 import AppModal from '../../components/ui/AppModal.vue';
@@ -19,6 +20,8 @@ const auth = useAuthStore();
 const route = useRoute();
 const router = useRouter();
 const canManage = computed(() => auth.can('marketing_drafts.manage'));
+// Catatan metrik konten punya izin sendiri (D-150): Marketing, Admin Toko, dan Super Admin mengisi; Pemilik hanya melihat.
+const canRecordMetrics = computed(() => auth.can('content_metrics.manage'));
 const canApprove = computed(() => auth.can('marketing_drafts.approve'));
 
 // Jadwal hanya tanggal (tanpa jam), jadi tidak memakai formatDate yang menampilkan jam.
@@ -54,6 +57,10 @@ const btnPrimary = `inline-flex min-h-10 items-center gap-1.5 rounded-full bg-ac
 const items = ref([]);
 const frequency = ref({ videos_per_week: 0 });
 const week = ref({ posts: 0, videos: 0 });
+// Konten teratas per platform menurut views catatan metrik terakhir (input manual). Gagal dimuat tidak menghalangi daftar draf.
+const top = ref({});
+const topPlatforms = computed(() => Object.entries(top.value).filter(([, rows]) => rows.length));
+const number = new Intl.NumberFormat('id-ID');
 const loading = ref(true);
 const loadError = ref('');
 const filter = ref('');
@@ -234,7 +241,8 @@ async function load(quiet = false) {
     if (!quiet) loading.value = true;
     loadError.value = '';
     try {
-        const { data } = await api.get('/admin/marketing-drafts');
+        const [{ data }, topResult] = await Promise.all([api.get('/admin/marketing-drafts'), api.get('/admin/marketing-metrics/top').catch(() => null)]);
+        if (topResult) top.value = topResult.data.data.platforms;
         items.value = data.data.items;
         frequency.value = data.data.frequency;
         aiEnabled.value = data.data.ai_enabled;
@@ -253,6 +261,14 @@ async function load(quiet = false) {
     } finally {
         loading.value = false;
     }
+}
+
+// Daftar draf dibatasi 200 terbaru; draf teratas yang lebih lama tidak ada di daftar, jadi diberi tahu, bukan diam.
+const topMissing = ref(false);
+function openById(id) {
+    const row = items.value.find((item) => item.id === id);
+    topMissing.value = !row;
+    if (row) open(row);
 }
 
 function open(row = null) {
@@ -392,6 +408,24 @@ onBeforeUnmount(() => {
         <span class="block text-body-sm text-secondary">Target minggu diatur Super Admin di Pengaturan</span>
       </li>
     </ul>
+
+    <section v-if="topPlatforms.length" aria-labelledby="top-content" class="mt-space-md rounded-3xl border border-border bg-surface p-3 shadow-card sm:p-space-md">
+      <h2 id="top-content" class="flex items-center gap-2 text-body-sm text-secondary"><AdminIcon name="chart" :size="16" />Konten teratas (views catatan terakhir)</h2>
+      <div class="mt-2 grid gap-space-md md:grid-cols-2">
+        <div v-for="[platform, rows] in topPlatforms" :key="platform">
+          <span class="rounded-full px-2.5 py-1 text-label-sm text-surface" :class="PLATFORM_SOLID[platform]">{{ PLATFORMS[platform] }}</span>
+          <ol class="mt-2 space-y-1">
+            <li v-for="(row, index) in rows" :key="row.draft_id" class="flex items-baseline gap-2 text-body-sm">
+              <span class="w-5 shrink-0 tabular-nums text-secondary">{{ index + 1 }}.</span>
+              <button type="button" class="min-w-0 flex-1 truncate text-left underline-offset-2 hover:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary" :title="row.title" @click="openById(row.draft_id)">#{{ row.number }} {{ row.title }}</button>
+              <span class="shrink-0 tabular-nums">{{ number.format(row.views) }} views</span>
+              <span v-if="row.engagement_rate !== null" class="shrink-0 tabular-nums text-secondary">{{ row.engagement_rate.toLocaleString('id-ID') }}%</span>
+            </li>
+          </ol>
+        </div>
+      </div>
+      <p v-if="topMissing" role="status" class="mt-2 rounded-2xl bg-warning-surface px-3 py-2 text-body-sm text-warning">Draf itu lebih lama dari 200 draf terbaru, jadi tidak ada di daftar ini.</p>
+    </section>
 
     <div class="mt-space-md flex flex-wrap items-center justify-between gap-x-space-md gap-y-2">
     <!-- Ponsel: chip filter satu baris yang bisa digeser (tinggi sentuh 40px), bukan beberapa baris kecil -->
@@ -653,6 +687,7 @@ onBeforeUnmount(() => {
       </fieldset>
     </form>
     <StoryboardPanel v-if="editing && editing.type === 'video_script'" :draft="editing" :can-edit="canManage && editable(editing)" @changed="load(true)" />
+    <MetricsPanel v-if="editing && editing.status === 'posted'" :draft="editing" :can-edit="canRecordMetrics" @changed="load(true)" />
     <template #footer>
       <button type="button" :class="btn" @click="dialog.close()">Tutup</button>
       <button v-if="!readOnly" form="draft-form" :disabled="saving" :class="btnPrimary"><AdminIcon name="check" :size="16" />{{ saving ? 'Menyimpan...' : (editing ? 'Simpan' : 'Buat draf') }}</button>

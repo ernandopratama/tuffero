@@ -470,6 +470,7 @@ export const checkoutPage = () => mix(addressPicker('co'), voucherPicker(), phon
                     // Alamat atau data pemesan ditolak server: buka lagi isiannya supaya pesan galat terlihat.
                     if ([...ADDRESS_FIELDS, ...CONTACT_FIELDS].some((key) => this.errors[key])) this.addressConfirmed = false;
                     // Voucher ditolak server: lepas supaya pelanggan bisa memilih ulang tanpa terjebak.
+                    if (fields.voucher_code?.[0] === 'voucher_used') this.voucherNotice = this.usedNoticeText(this.appliedCodes);
                     if (this.errors.voucher_code) this.clearVouchers();
                     this.$nextTick(() => document.querySelector('.tf-checkout [aria-invalid="true"]')?.focus());
                 } else {

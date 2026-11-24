@@ -166,20 +166,13 @@ export const authPage = () => ({
         if (this.isRegister) { if (this.whatsappRequired) this.go('method', '/daftar'); else await this.chooseMethod('email'); return; }
         this.busy = true;
         try {
-            // Hanya local: masuk memakai akun uji lewat /api/v1/auth/login. Di luar local tetap "belum tersedia" (OQ-18, OQ-22).
-            if (this.dev) {
-                try {
-                    await fetch('/sanctum/csrf-cookie', { credentials: 'same-origin' });
-                    const { data } = await api.post('/auth/login', { email: this.identity.trim(), password: this.password });
-                    this.password = '';
-                    if (data.data.mfa) { this.notice = 'Akun staf dengan MFA masuk lewat /login.'; return; }
-                    window.location.assign('/');
-                } catch {
-                    this.notice = 'Email atau kata sandi salah (mode pengembangan, hanya akun email).';
-                }
-                return;
-            }
-            this.notice = this.words.unavailable;
+            await fetch('/sanctum/csrf-cookie', { credentials: 'same-origin' });
+            const { data } = await api.post('/auth/login', { login: this.identity.trim(), password: this.password });
+            this.password = '';
+            if (data.data.mfa) { this.notice = this.words.staff; return; }
+            window.location.assign('/akun');
+        } catch (e) {
+            this.notice = e.response?.status === 429 ? this.a.errors.tooMany : (e.response?.status === 401 ? this.words.invalid : this.words.unavailable);
         } finally {
             this.busy = false;
         }

@@ -228,6 +228,18 @@ const routes = [
                 meta: { permission: 'marketing_drafts.view' },
             },
             {
+                path: 'performa-konten',
+                name: 'AdminContentMetrics',
+                component: () => import('./pages/admin/ContentMetrics.vue'),
+                meta: { anyPermission: ['marketing_drafts.manage', 'marketing_drafts.approve', 'content_metrics.manage'] },
+            },
+            {
+                path: 'performa-akun',
+                name: 'AdminSocialMetrics',
+                component: () => import('./pages/admin/SocialMetrics.vue'),
+                meta: { anyPermission: ['marketing_drafts.manage', 'marketing_drafts.approve', 'content_metrics.manage', 'social_metrics.manage'] },
+            },
+            {
                 path: 'generator-caption',
                 name: 'AdminCaptionGenerator',
                 component: () => import('./pages/admin/CaptionGenerator.vue'),
@@ -238,6 +250,24 @@ const routes = [
                 name: 'AdminReports',
                 component: () => import('./pages/admin/Reports.vue'),
                 meta: { anyPermission: ['reports.view', 'reports.view_summary'] },
+            },
+            {
+                path: 'seo',
+                name: 'AdminSeo',
+                component: () => import('./pages/admin/Seo.vue'),
+                meta: { permission: 'reports.view' },
+            },
+            {
+                path: 'seo/konten',
+                name: 'AdminSeoContent',
+                component: () => import('./pages/admin/SeoContent.vue'),
+                meta: { permission: 'reports.view' },
+            },
+            {
+                path: 'seo/search-console',
+                name: 'AdminSeoGoogle',
+                component: () => import('./pages/admin/SeoGoogle.vue'),
+                meta: { permission: 'reports.view' },
             },
             {
                 path: 'audit-log',

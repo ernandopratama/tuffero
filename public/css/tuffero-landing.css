@@ -2570,6 +2570,12 @@ button.tf-cartp-voucher{ width: 100%; border: 0; border-bottom: 1px solid var(--
 .tf-vpick-body{ display: grid; flex: 1; align-content: start; gap: 10px; padding: 0 20px 12px; overflow-y: auto; overscroll-behavior: contain; }
 .tf .tf-vpick-hint{ margin: 0; font-size: 12px; line-height: 18px; color: var(--tf-brown); }
 .tf-vpick-hint strong{ color: var(--tf-ink); }
+.tf-vpick-guest{ display: flex; align-items: flex-start; gap: 12px; padding: 12px 14px; border: 1px solid var(--tf-gold); border-left-width: 4px; border-radius: 8px; background: #C6A15B1F; }
+.tf-vpick-guest > svg{ flex: none; margin-top: 1px; color: var(--tf-gold); }
+.tf-vpick-guest strong{ display: block; font: 600 15px/20px var(--tf-sans); color: var(--tf-ink); }
+.tf .tf-vpick-guest p{ margin: 2px 0 0; font-size: 13px; line-height: 19px; color: var(--tf-brown); }
+.tf-vpick-guest a{ font-weight: 600; color: var(--tf-ink); text-decoration: underline; text-underline-offset: 2px; }
+.tf-vpick-guest a:focus-visible{ outline: 2px solid var(--tf-ink); outline-offset: 2px; border-radius: 2px; }
 .tf-vpick-code{ display: flex; gap: 8px; }
 .tf-vpick-code input{ flex: 1; min-width: 0; height: 40px; padding: 0 12px; border: 1px solid var(--tf-brown); border-radius: 6px; background: #fff; color: var(--tf-ink); font: 500 14px/20px var(--tf-sans); text-transform: uppercase; }
 .tf-vpick-code input:focus{ outline: 2px solid var(--tf-ink); outline-offset: 1px; }
@@ -3311,3 +3317,22 @@ body{ padding-left: env(safe-area-inset-left); padding-right: env(safe-area-inse
 @keyframes tfOtpPop{ from{ transform: scale(0.94); } to{ transform: scale(1); } }
 @media (max-width: 767px){ .tf-otp{ grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 8px; } .tf-otp span{ height: 60px; border-radius: 14px; } }
 @media (prefers-reduced-motion: reduce){ .tf-otp span.is-filled{ animation: none; } }
+
+/* Halaman kategori (R-08) dan tautan kategori */
+.tf-catpage-crumbs{ margin-bottom: 24px; text-align: left; }
+.tf-catpage{ margin-top: 32px; padding-bottom: 72px; }
+.tf-catpage-more{ padding-bottom: 72px; text-align: center; }
+.tf-catpage-more h2{ margin: 0 0 12px; font: 600 14px/20px var(--tf-sans); letter-spacing: 1.2px; text-transform: uppercase; color: var(--tf-brown); }
+.tf-catlinks-nav{ margin-top: 24px; }
+.tf-catlinks{ display: flex; flex-wrap: wrap; justify-content: center; gap: 8px; padding: 0; list-style: none; }
+.tf-catlinks a{ display: inline-block; padding: 7px 16px; border: 1px solid var(--tf-brown); border-radius: 999px; font: 600 13px/18px var(--tf-sans); color: var(--tf-ink); text-decoration: none; transition: background-color 150ms ease, color 150ms ease; }
+.tf-catlinks a:focus-visible{ outline: 2px solid var(--tf-ink); outline-offset: 2px; }
+@media (hover: hover) and (pointer: fine){
+	.tf-catlinks a:hover{ background: var(--tf-ink); color: var(--tf-ivory); }
+}
+/* Judul kartu di halaman kategori memakai h2 (di bawah h1 halaman); gayanya sama dengan h3 katalog. */
+.tf-cat-card h2{ margin: 0; font: 500 20px/26px var(--tf-serif); color: var(--tf-ink); }
+.tf-cat-card h2 a{ color: inherit; }
+@media (max-width: 767px){
+	.tf-cat-card h2{ font-size: 20px; line-height: 24px; }
+}

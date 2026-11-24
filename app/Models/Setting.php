@@ -46,6 +46,9 @@ class Setting extends Model
         'pwa.store_enabled' => ['required', 'integer', 'in:0,1'],
         'pwa.admin_enabled' => ['required', 'integer', 'in:0,1'],
         'registration.whatsapp_required' => ['required', 'integer', 'in:0,1'],
+        'notifications.customer_whatsapp_enabled' => ['required', 'integer', 'in:0,1'],
+        // Nama template Meta: huruf kecil, angka, garis bawah (aturan penamaan Meta).
+        'notifications.customer_whatsapp_template' => ['nullable', 'string', 'max:100', 'regex:/^[a-z0-9_]+$/'],
     ];
 
     /**

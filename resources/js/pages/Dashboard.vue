@@ -4,6 +4,8 @@ import AdminIcon from '../components/AdminIcon.vue';
 import AttentionModal from '../components/dashboard/AttentionModal.vue';
 import BarChart from '../components/dashboard/BarChart.vue';
 import ContentCalendar from '../components/dashboard/ContentCalendar.vue';
+import ContentMetricsCard from '../components/dashboard/ContentMetricsCard.vue';
+import SocialMetricsCard from '../components/dashboard/SocialMetricsCard.vue';
 import GaugeCard from '../components/dashboard/GaugeCard.vue';
 import KpiCard from '../components/dashboard/KpiCard.vue';
 import ListCard from '../components/dashboard/ListCard.vue';
@@ -37,6 +39,8 @@ const today = new Intl.DateTimeFormat('id-ID', { weekday: 'long', day: 'numeric'
 const roleLabel = computed(() => labelOf(auth.activeRole, auth.user?.role_label));
 // Kalender konten: Super Admin, Pemilik, dan Marketing (pemegang izin menyusun atau memutuskan draf konten).
 const showCalendar = computed(() => auth.can('marketing_drafts.manage') || auth.can('marketing_drafts.approve'));
+// Kartu performa konten: juga untuk pemegang izin mencatat metrik (Admin Toko).
+const showMetrics = computed(() => showCalendar.value || auth.can('content_metrics.manage'));
 const shortcuts = computed(() => (SHORTCUTS[auth.activeRole] || []).filter(([, , , permission]) => auth.can(permission)));
 
 async function load(quiet = false) {
@@ -155,6 +159,10 @@ onMounted(() => load());
           <GaugeCard :gauge="data.gauge" />
         </section>
       </div>
+
+      <ContentMetricsCard v-if="showMetrics" />
+
+      <SocialMetricsCard v-if="showMetrics" />
 
       <ContentCalendar v-if="showCalendar" />
 

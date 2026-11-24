@@ -96,6 +96,12 @@ class MarketingDraft extends Model
         return $this->hasMany(MarketingDraftNote::class)->orderBy('id');
     }
 
+    /** @return HasMany<MarketingDraftMetric, $this> */
+    public function metrics(): HasMany
+    {
+        return $this->hasMany(MarketingDraftMetric::class);
+    }
+
     /** Draf ditempel manual ke Instagram/TikTok yang tidak membaca Markdown, jadi tandanya dibuang saat disimpan. */
     public static function plain(?string $text): ?string
     {

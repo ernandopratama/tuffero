@@ -19,7 +19,7 @@ use Throwable;
  */
 class CancellationService
 {
-    public function __construct(private InventoryService $inventory, private VoucherService $vouchers, private StaffNotifier $notifier, private BiteshipShipmentService $biteship, private MidtransService $midtrans, private PaymentRefundService $refunds) {}
+    public function __construct(private InventoryService $inventory, private VoucherService $vouchers, private StaffNotifier $notifier, private BiteshipShipmentService $biteship, private MidtransService $midtrans, private PaymentRefundService $refunds, private CustomerNotifier $customers) {}
 
     /** @param array{reason: string, channel: string} $data */
     public function submit(Order $order, array $data): CancellationRequest
@@ -46,6 +46,7 @@ class CancellationService
             ]);
 
             $this->notify(['customer-service'], 'cancellation_submitted', $request, $locked, "Pengajuan pembatalan {$request->request_number} menunggu validasi", $data['reason']);
+            $this->customers->cancellation($request, 'submitted');
 
             return $request;
         });
@@ -81,7 +82,14 @@ class CancellationService
             Log::warning('Auto refund attempt crashed', ['request' => $approved->request_number, 'error' => $e->getMessage()]);
         }
 
-        return $approved->fresh();
+        $fresh = $approved->fresh();
+
+        // Satu pesan untuk satu klik ACC: bila refund otomatis langsung berhasil, pelanggan hanya menerima kabar "dana dikembalikan".
+        if ($fresh->status === CancellationRequest::APPROVED) {
+            $this->customers->cancellation($fresh, 'approved');
+        }
+
+        return $fresh;
     }
 
     /** Tombol "Coba refund otomatis": percobaan eksplisit oleh Admin Toko atau Super Admin; hasilnya tersimpan di pengajuan. */
@@ -118,6 +126,9 @@ class CancellationService
                 'rejection_reason' => $reason,
             ])->save();
 
+            // Alasan yang ditulis staf tidak ikut dikirim (bisa berisi catatan internal).
+            $this->customers->cancellation($locked, 'rejected');
+
             return $locked;
         });
     }
@@ -137,6 +148,7 @@ class CancellationService
             $order->forceFill(['status' => Order::REFUNDED, 'payment_status' => 'refunded'])->save();
             $order->histories()->create(['status_type' => 'payment', 'from_status' => 'refund_pending', 'to_status' => 'refunded', 'source' => 'admin', 'actor_user_id' => $actor->id]);
             $order->histories()->create(['status_type' => 'order', 'from_status' => Order::CANCELLED, 'to_status' => Order::REFUNDED, 'source' => 'admin', 'actor_user_id' => $actor->id]);
+            $this->customers->cancellation($locked, 'refunded');
         });
     }
 
@@ -160,6 +172,7 @@ class CancellationService
             $locked->forceFill(['payment_status' => 'refunded'])->save();
             $locked->histories()->create(['status_type' => 'payment', 'from_status' => $from, 'to_status' => 'refunded', 'source' => 'admin', 'actor_user_id' => $actor->id, 'reason' => $note]);
             AuditLog::record('order.late_payment_refunded', $locked, ['note' => $note, 'total' => (int) $locked->total], $actor->id);
+            $this->customers->latePaymentRefunded($locked);
 
             return $locked;
         }, 3);
@@ -286,6 +299,7 @@ class CancellationService
             }
 
             AuditLog::record('order.customer_cancelled', $locked, ['total' => (int) $locked->total, 'from_status' => $fromStatus]);
+            $this->customers->orderCancelled($locked);
 
             return $locked;
         }, 3);

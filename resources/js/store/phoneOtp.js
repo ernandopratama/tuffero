@@ -119,6 +119,8 @@ export const phoneOtp = () => {
                 if (phone !== this.otpPhone) return;
                 const { status, resend_in: resendIn } = data.data;
                 this.otpStatus = status === 'code_active' ? 'sent' : status;
+                // Perangkat ini sudah terverifikasi untuk nomor ini: voucher yang dipilih diperiksa ulang terhadap nomor itu (D-147).
+                if (this.otpStatus === 'verified' && this.applied?.length) this.restoreVouchers();
                 if (this.otpSent) {
                     this.countdown(resendIn ?? 0);
                     this.$nextTick(() => document.getElementById('co-otp-code')?.focus());
@@ -157,6 +159,8 @@ export const phoneOtp = () => {
                 this.otpStatus = 'verified';
                 this.otpResendIn = 0;
                 if (this.formError === this.words.otp.needed) this.formError = '';
+                // Nomor sudah terbukti milik pelanggan: voucher yang dipilih diperiksa ulang terhadap nomor ini (D-147).
+                if (this.applied?.length) this.restoreVouchers();
             } catch (e) {
                 this.otpError = this.otpMessage(e);
                 this.otpCode = '';

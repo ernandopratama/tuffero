@@ -32,6 +32,8 @@ export const voucherPicker = () => ({
     shippingDiscount: 0,
     voucherBusy: false,
     voucherError: '',
+    // Pemberitahuan tetap tampil (bukan toast) saat voucher dilepas karena sudah pernah dipakai nomor atau alamat ini (D-147).
+    voucherNotice: '',
     voucherCode: '',
 
     get vw() { return this.words.voucher; },
@@ -105,6 +107,7 @@ export const voucherPicker = () => ({
     },
     async openVouchers() {
         this.voucherError = '';
+        this.voucherNotice = '';
         this.voucherCode = '';
         this.picked = [...this.appliedCodes];
         this.$refs.voucherDialog.showModal();
@@ -164,10 +167,33 @@ export const voucherPicker = () => ({
             const { data } = await api.post('/vouchers/check', { codes, ...this.voucherIdentity(), ...this.voucherContext() });
             this.setApplied(data.data.vouchers, data.data.discount, data.data.shipping_discount);
         } catch (e) {
-            if (e.response?.status === 422) {
-                this.clearVouchers();
-                this.$store.toast.show(this.vw.dropped, 'info');
+            if (e.response?.status !== 422) return;
+            // Sudah pernah dipakai nomor atau alamat ini: lepas hanya yang terpakai dan jelaskan (D-147). Alasan lain: lepas semua seperti biasa.
+            if (e.response.data?.errors?.voucher_code?.[0] === 'voucher_used') {
+                await this.dropUsedVouchers(codes);
+                return;
+            }
+            this.clearVouchers();
+            this.$store.toast.show(this.vw.dropped, 'info');
+        }
+    },
+    usedNoticeText(codes) { return this.vw.usedNotice.replace('{codes}', codes.join(', ')); },
+    // Server hanya menyebut alasan, bukan kode mana yang gagal, jadi tiap kode diperiksa sendiri (maksimal 2). Yang terpakai dilepas dan
+    // dijelaskan; yang lolos dipertahankan; gagal sementara (bukan 422) dibiarkan; alasan 422 lain dilepas tanpa penjelasan khusus.
+    async dropUsedVouchers(codes) {
+        const keep = [];
+        const used = [];
+        for (const code of codes) {
+            try {
+                await api.post('/vouchers/check', { codes: [code], ...this.voucherIdentity(), ...this.voucherContext() });
+                keep.push(code);
+            } catch (e) {
+                if (e.response?.status !== 422) keep.push(code);
+                else if (e.response.data?.errors?.voucher_code?.[0] === 'voucher_used') used.push(code);
             }
         }
+        if (keep.length) await this.applyCodes(keep, false, true);
+        else this.clearVouchers();
+        if (used.length) this.voucherNotice = this.usedNoticeText(used);
     },
 });

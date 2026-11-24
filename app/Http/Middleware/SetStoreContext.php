@@ -26,6 +26,14 @@ class SetStoreContext
 
     public function handle(Request $request, Closure $next): Response
     {
+        // R-07: /index.php dan /index.php/... memuat halaman yang sama dengan alamat tanpanya. Dibaca dari URI mentah,
+        // bukan dari base URL, supaya server yang menulis ulang ke index.php tidak ikut terhitung (tanpa risiko putaran).
+        if ($request->isMethodSafe() && preg_match('#^/index\.php(?=[/?]|$)#', $request->getRequestUri())) {
+            $rest = substr($request->getRequestUri(), strlen('/index.php'));
+
+            return redirect()->to($request->getSchemeAndHttpHost().($rest === '' || $rest[0] === '?' ? '/'.$rest : $rest), 301);
+        }
+
         $locale = collect([$request->query('lang'), $request->cookie(self::COOKIE)])
             ->first(fn ($value) => in_array($value, self::LOCALES, true)) ?? 'id';
 

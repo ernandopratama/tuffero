@@ -1,6 +1,7 @@
 <?php
 
 use App\Jobs\QueueHeartbeat;
+use App\Jobs\SyncSeoData;
 use App\Models\AuditLog;
 use App\Models\LoginFailure;
 use App\Models\User;
@@ -114,6 +115,10 @@ Artisan::command('marketing:remind', function (MarketingReminderService $reminde
 // 08.00 WIB; hari dihitung menurut jam toko. Pengingat Telegram untuk grup tim dikirim Hermes (D-079), bukan Laravel.
 Schedule::command('marketing:remind')->dailyAt('08:00')->timezone('Asia/Jakarta')->withoutOverlapping();
 
+// Data Google untuk dashboard SEO (D-152 Fase 2), 03.00 WIB lewat antrean. Tanpa kunci Google di server, pekerjaan ini langsung selesai
+// tanpa memanggil siapa pun. Data Search Console tertinggal 2 sampai 3 hari, jadi sekali sehari cukup.
+Schedule::job(new SyncSeoData)->dailyAt('03:00')->timezone('Asia/Jakarta')->name('seo:sync')->withoutOverlapping();
+
 Artisan::command('notifications:prune', function () {
     // Sudah dibaca disimpan 30 hari; belum dibaca 90 hari supaya tidak terlewat.
     $read = DatabaseNotification::whereNotNull('read_at')->where('created_at', '<', now()->subDays(30))->delete();
@@ -122,6 +127,8 @@ Artisan::command('notifications:prune', function () {
 })->purpose('Delete old notifications (read after 30 days, unread after 90 days)');
 
 Schedule::command('notifications:prune')->daily();
+// Job gagal menyimpan payload (alamat email penerima); 7 hari cukup untuk diselidiki.
+Schedule::command('queue:prune-failed --hours=168')->daily();
 Schedule::call(fn () => LoginFailure::where('created_at', '<', now()->subDays(LoginFailure::KEEP_DAYS))->delete())->name('login-failures:prune')->daily();
 Schedule::call(fn () => WebhookRejection::where('created_at', '<', now()->subDays(WebhookRejection::KEEP_DAYS))->delete())->name('webhook-rejections:prune')->daily();
 

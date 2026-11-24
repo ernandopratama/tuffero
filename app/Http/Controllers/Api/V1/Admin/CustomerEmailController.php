@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Mail\CustomerServiceMessage;
 use App\Models\AuditLog;
 use App\Models\CustomerEmail;
+use App\Models\CustomerNotification;
 use App\Models\Order;
 use App\Models\OrderCancellationRequest;
 use App\Models\Refund;
@@ -41,6 +42,15 @@ class CustomerEmailController extends Controller
                 'status' => $email->status,
                 'sent_by' => $email->sender->name,
                 'created_at' => $email->created_at,
+            ]),
+            // Pesan otomatis sistem (pembatalan dan refund) beserta status kirim sebenarnya; CS boleh mengirim ulang yang email.
+            'notifications' => CustomerNotification::query()->forTarget($target)->with('order:id,order_number')->latest('id')->limit(10)->get()->map(fn (CustomerNotification $n) => [
+                'id' => $n->public_id,
+                'subject' => $n->subject(),
+                'channel' => $n->channel,
+                'status' => $n->status,
+                'can_resend' => $n->canResend(),
+                'created_at' => $n->created_at,
             ]),
         ]);
     }

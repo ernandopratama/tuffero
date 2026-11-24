@@ -7,7 +7,7 @@ use Illuminate\Database\Seeder;
 
 /**
  * Semua data contoh untuk lokal dan dev dalam satu perintah: pelanggan, pelanggan diblokir, voucher dan diskon (PromoSampleSeeder),
- * kampanye, konten promo, ulasan produk, berita popup, dan draf Kebijakan Privasi. Tidak dipanggil DatabaseSeeder dan ditolak di
+ * kampanye, konten promo, ulasan produk, berita popup, draf Kebijakan Privasi, dan metrik konten serta akun bertanda [SEEDER] (MetricsSampleSeeder). Tidak dipanggil DatabaseSeeder dan ditolak di
  * production. Semua seeder di dalamnya aman diulang. Jalankan dengan php artisan db:seed --class=DevSampleDataSeeder.
  * Ulasan dan diskon butuh produk tayang: jalankan CatalogDraftSeeder lebih dulu bila katalog masih kosong.
  */
@@ -30,6 +30,7 @@ class DevSampleDataSeeder extends Seeder
             ProductReviewSampleSeeder::class,
             NewsPopupSampleSeeder::class,
             PrivacyDraftSeeder::class,
+            MetricsSampleSeeder::class,
         ]);
     }
 }

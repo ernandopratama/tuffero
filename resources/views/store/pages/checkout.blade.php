@@ -281,6 +281,12 @@
 								</template>
 							</dl>
 							<button type="button" class="tf-co-voucher" aria-haspopup="dialog" @click="openVouchers">{{ $site->lineIcon('gift', 16) }} <span x-text="voucherButtonText"></span></button>
+							<template x-if="voucherNotice">
+								<div class="tf-shop-issue" role="alert">
+									<p x-text="voucherNotice"></p>
+									<p class="tf-co-note"><button type="button" class="tf-co-inline" @click="openVouchers">{{ $c['voucher']['usedOthers'] }}</button> · <a class="tf-co-inline" href="/masuk">{{ $c['voucher']['usedLogin'] }}</a></p>
+								</div>
+							</template>
 							<div class="tf-co-total">
 								<span>{{ $c['grandTotal'] }}</span>
 								<strong x-text="totalText"></strong>

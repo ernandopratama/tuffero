@@ -1,10 +1,9 @@
-// Popup berita di beranda (D-085): kampanye berjalan dan berita manual, paling banyak 5, tampil sekali per sesi browser.
+// Popup berita di beranda (D-085): kampanye berjalan dan berita manual, paling banyak 5, tampil setiap beranda dibuka (keputusan pemilik 23 Nov 2026; sebelumnya sekali per sesi browser).
 // Dibuat ringan: tanpa Alpine dan tanpa pustaka carousel. Data sudah ada di halaman (satu tag JSON), DOM dan CSS popup baru
 // dibuat setelah halaman selesai dimuat dan browser menganggur, dan gambar baru diunduh saat popup dibuka.
 // Teks dipasang lewat textContent, tidak pernah innerHTML, jadi isi dari admin tidak bisa menyisipkan HTML.
 import { pageData, reducedMotion } from './site';
 
-const SEEN_KEY = 'tf-news-seen';
 const OPEN_DELAY = 1200;
 const CLOSE_MS = 160;
 const AUTO_MS = 5000; // jeda tiap slide sebelum pindah sendiri; setelah slide terakhir popup menutup sendiri
@@ -53,15 +52,6 @@ const ring = () => {
 
 // Tautan dari admin hanya halaman toko ("/promo/...") atau https; server sudah memeriksa, ini lapis kedua.
 const safeHref = (url) => (typeof url === 'string' && ((url.startsWith('/') && !url.startsWith('//')) || url.startsWith('https://')) ? url : null);
-
-const seen = (version) => {
-    // shortcut: sementara, popup muncul tiap reload saat `npm run dev` (build production tetap sekali per sesi); hapus baris ini setelah selesai mencoba.
-    if (import.meta.env.DEV) return false;
-    try { return sessionStorage.getItem(SEEN_KEY) === version; } catch { return false; }
-};
-const markSeen = (version) => {
-    try { sessionStorage.setItem(SEEN_KEY, version); } catch { /* penyimpanan diblokir: popup tampil lagi saat dimuat ulang */ }
-};
 
 const loadStyles = (href) => new Promise((resolve) => {
     if (!href || document.querySelector(`link[href="${href}"]`)) return resolve();
@@ -224,7 +214,6 @@ const open = async (data) => {
     // Kembali dengan tombol Back (bfcache): tombol kembali ke keadaan awal.
     addEventListener('pageshow', (e) => { if (e.persisted) ui.dialog.querySelectorAll('.tf-news-cta.is-going').forEach((c) => c.classList.remove('is-going')); });
 
-    markSeen(data.version);
     ui.dialog.showModal();
     sync();
 };
@@ -236,7 +225,7 @@ const whenIdle = () => new Promise((resolve) => {
 
 export const initNewsPopup = async () => {
     const data = pageData('tf-news-data');
-    if (!data || !data.items?.length || seen(data.version)) return;
+    if (!data || !data.items?.length) return;
     // Pengunjung yang datang ke bagian tertentu (#offers) sedang menuju tujuan; jangan ditimpa popup.
     if (location.hash) return;
 
@@ -247,6 +236,5 @@ export const initNewsPopup = async () => {
     await new Promise((resolve) => setTimeout(resolve, OPEN_DELAY));
     // Tab yang sedang di latar belakang menunggu sampai dilihat.
     if (document.hidden) await new Promise((resolve) => document.addEventListener('visibilitychange', () => !document.hidden && resolve()));
-    if (seen(data.version)) return;
     open(data);
 };

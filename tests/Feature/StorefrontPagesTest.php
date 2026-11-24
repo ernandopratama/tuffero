@@ -4,6 +4,7 @@ namespace Tests\Feature;
 
 use App\Models\Campaign;
 use App\Models\Product;
+use App\Models\ProductCategory;
 use App\Models\User;
 use App\Support\StoreSite;
 use Database\Seeders\RolePermissionSeeder;
@@ -33,16 +34,24 @@ class StorefrontPagesTest extends TestCase
         return $model;
     }
 
+    /** Produk uji di kategori `$slug` (dibuat bila belum ada). SKU, slug, dan nama harus berbeda per produk. */
+    private function categorized(string $slug, array $product = [], array $variant = []): Product
+    {
+        $category = ProductCategory::firstOrCreate(['slug' => $slug], ['name_id' => ucfirst($slug), 'name_en' => ucfirst($slug), 'is_active' => true]);
+
+        return $this->product(['product_category_id' => $category->id, ...$product], $variant);
+    }
+
     /** @return array<string, array{string, string}> */
     public static function publicPages(): array
     {
         return [
             'beranda' => ['/', 'Tuffero Bakery Malang – Nastar, Macaron &amp; Kue Kering Premium'],
-            'tentang' => ['/tentang-kami', 'Tentang Kami | Tuffero Bakery'],
-            'layanan' => ['/layanan', 'Layanan | Tuffero Bakery'],
-            'katalog' => ['/produk', 'Produk | Tuffero Bakery'],
-            'galeri' => ['/galeri', 'Galeri | Tuffero Bakery'],
-            'kontak' => ['/kontak', 'Kontak | Tuffero Bakery'],
+            'tentang' => ['/tentang-kami', 'Tentang Tuffero Bakery | Kue Kering dan Pastry dari Malang'],
+            'layanan' => ['/layanan', 'Layanan Pesan Online, Hampers &amp; Oleh-oleh | Tuffero Bakery'],
+            'katalog' => ['/produk', 'Katalog Nastar, Macaron, Pia &amp; Kue Kering | Tuffero Bakery'],
+            'galeri' => ['/galeri', 'Galeri Foto Produk dan Dapur | Tuffero Bakery'],
+            'kontak' => ['/kontak', 'Kontak dan Alamat Tuffero Bakery di Malang'],
         ];
     }
 
@@ -106,7 +115,8 @@ class StorefrontPagesTest extends TestCase
         $this->get('/kontak')->assertSee('Retur dan klaim: batas waktu')->assertSee('3 hari kalender');
         $this->get('/kontak?lang=en')->assertSee('within 3 calendar days');
 
-        $this->get('/produk/NAS-UJI-01')->assertOk()->assertSee('Nastar Uji');
+        // R-07: satu alamat per produk.
+        $this->get('/produk/NAS-UJI-01')->assertStatus(301)->assertRedirect('/produk/nas-uji-01');
     }
 
     public function test_unpublished_or_unknown_product_answers_404_with_same_message(): void
@@ -240,11 +250,151 @@ class StorefrontPagesTest extends TestCase
             ->assertSee('/produk/nas-uji-01', false)
             ->assertSee('/promo/promo-lebaran', false)
             ->assertDontSee('/promo/promo-lama', false)
-            ->assertSee('/voucher', false)
+            // R-12: daftar promo dan voucher tipis, tidak masuk sitemap (halaman tiap promo tetap).
+            ->assertDontSee('/voucher</loc>', false)
+            ->assertDontSee('/promo</loc>', false)
             ->assertSee('<lastmod>', false)
             ->assertSee('/tentang-kami', false)
             ->assertDontSee('/produk/draf-01', false)
             ->assertDontSee('/keranjang', false);
+    }
+
+    public function test_uppercase_product_address_redirects_permanently_and_keeps_the_query(): void
+    {
+        $this->product();
+
+        $this->get('/produk/NAS-UJI-01?lang=en&utm_source=x')
+            ->assertStatus(301)
+            ->assertRedirect('/produk/nas-uji-01?lang=en&utm_source=x');
+        $this->get('/produk/nas-uji-01')->assertOk();
+        $this->get('/produk/TIDAK-ADA')->assertStatus(301)->assertRedirect('/produk/tidak-ada');
+        $this->get('/produk/tidak-ada')->assertNotFound();
+    }
+
+    public function test_index_php_address_redirects_permanently_to_the_clean_address(): void
+    {
+        $base = url('/');
+
+        $this->get('/index.php')->assertStatus(301)->assertHeader('Location', $base.'/');
+        $this->get('/index.php?lang=en')->assertStatus(301)->assertHeader('Location', $base.'/?lang=en');
+        $this->get('/index.php/produk?lang=en')->assertStatus(301)->assertHeader('Location', $base.'/produk?lang=en');
+        // Alamat sekali ini bukan index.php: tidak ada pengalihan.
+        $this->get('/')->assertOk();
+    }
+
+    public function test_promo_and_voucher_lists_are_noindex(): void
+    {
+        $this->get('/promo')->assertOk()->assertSee('content="noindex, nofollow"', false)->assertDontSee('rel="canonical"', false);
+        $this->get('/voucher')->assertOk()->assertSee('content="noindex, nofollow"', false);
+    }
+
+    public function test_static_page_titles_stay_within_search_result_length(): void
+    {
+        foreach (['id', 'en'] as $locale) {
+            foreach (['about', 'services', 'gallery', 'contact', 'catalog', 'promo', 'vouchers'] as $page) {
+                $title = trans("store.pages.{$page}.meta", [], $locale);
+                $this->assertLessThanOrEqual(60, mb_strlen($title), "{$locale} {$page}: {$title}");
+            }
+        }
+
+        $this->get('/produk?lang=en')->assertSee('<title>Nastar, Macaron, Pia &amp; Cookies Catalog | Tuffero Bakery</title>', false);
+    }
+
+    public function test_home_json_ld_links_the_website_to_the_bakery_with_a_logo(): void
+    {
+        $this->product();
+
+        $base = url('/');
+
+        $this->get('/')
+            ->assertOk()
+            ->assertSee('"@id":"'.$base.'/#bakery"', false)
+            ->assertSee('"logo":"'.$base.'/images/Logo/Logo%20Tuffero%20Bakery-Htm.webp"', false)
+            ->assertSee('"@type":"WebSite"', false)
+            ->assertSee('"publisher":{"@id":"'.$base.'/#bakery"}', false);
+        $this->assertFileExists(public_path('images/Logo/Logo Tuffero Bakery-Htm.webp'));
+    }
+
+    public function test_catalog_lists_every_product_in_item_list_json_ld_with_a_breadcrumb(): void
+    {
+        $this->product();
+
+        $this->get('/produk')
+            ->assertOk()
+            ->assertSee('"@type":"CollectionPage"', false)
+            ->assertSee('"@type":"ItemList"', false)
+            ->assertSee('"numberOfItems":1', false)
+            ->assertSee('"url":"'.url('/produk/nas-uji-01').'"', false)
+            ->assertSee('"@type":"BreadcrumbList"', false);
+    }
+
+    public function test_category_page_lists_its_products_with_a_facts_only_intro_and_seo_tags(): void
+    {
+        $this->categorized('nastar', [], ['shelf_life_days' => 21]);
+        $this->categorized('macaron', ['name' => 'Macaron Uji', 'slug' => 'macaron-uji'], ['sku' => 'MAC-UJI-01']);
+
+        $this->get('/kategori/nastar')
+            ->assertOk()
+            ->assertSee('<title>Nastar dari Malang | Tuffero Bakery</title>', false)
+            ->assertSee('<h1', false)
+            ->assertSee('Tuffero menyediakan 1 pilihan Nastar: Nastar Uji.')
+            ->assertSee('Berat kemasan 500 gram.')
+            ->assertSee('Masa simpan 21 hari.')
+            ->assertSee('/produk/nas-uji-01', false)
+            ->assertDontSee('/produk/mac-uji-01', false)
+            ->assertSee('rel="canonical" href="'.url('/kategori/nastar').'"', false)
+            ->assertSee('hreflang="en"', false)
+            ->assertSee('"@type":"ItemList"', false)
+            ->assertSee('"numberOfItems":1', false)
+            ->assertDontSee('content="noindex', false);
+
+        $this->get('/kategori/nastar?lang=en')
+            ->assertOk()
+            ->assertSee('<title>Nastar from Malang | Tuffero Bakery</title>', false)
+            ->assertSee('In Nastar, Tuffero offers 1 options: ');
+    }
+
+    public function test_only_listed_categories_that_have_products_get_a_page(): void
+    {
+        $this->categorized('pia', ['name' => 'Pia Uji', 'slug' => 'pia-uji'], ['sku' => 'PIA-UJI-01']);
+
+        $this->get('/kategori/pia')->assertNotFound();          // ada produk, tetapi tidak ada di daftar halaman kategori
+        $this->get('/kategori/hampers')->assertNotFound();      // tidak ada produk
+        $this->get('/kategori/nastar')->assertNotFound();       // di daftar, tetapi belum ada produk tayang
+        $this->get('/kategori/tidak-ada')->assertNotFound();
+    }
+
+    public function test_uppercase_category_address_redirects_permanently_and_keeps_the_query(): void
+    {
+        $this->categorized('nastar');
+
+        $this->get('/kategori/NASTAR?lang=en')->assertStatus(301)->assertRedirect('/kategori/nastar?lang=en');
+    }
+
+    public function test_category_pages_are_in_the_sitemap_and_linked_from_catalog_and_product(): void
+    {
+        $this->categorized('nastar');
+        $this->categorized('pia', ['name' => 'Pia Uji', 'slug' => 'pia-uji'], ['sku' => 'PIA-UJI-01']);
+
+        $this->get('/sitemap.xml')
+            ->assertSee('/kategori/nastar</loc>', false)
+            ->assertDontSee('/kategori/pia</loc>', false);
+
+        $this->get('/produk')->assertSee('href="/kategori/nastar"', false)->assertDontSee('href="/kategori/pia"', false);
+
+        // Breadcrumb produk (tampilan dan JSON-LD) memuat kategori hanya bila halamannya ada.
+        $this->get('/produk/nas-uji-01')
+            ->assertSee('href="/kategori/nastar"', false)
+            ->assertSee('"item":"'.url('/kategori/nastar').'"', false);
+        $this->get('/produk/pia-uji-01')->assertOk()->assertDontSee('/kategori/pia', false);
+    }
+
+    public function test_category_titles_stay_within_search_result_length(): void
+    {
+        foreach (['id' => 'Brownies & Cake', 'en' => 'Brownies & Cakes'] as $locale => $longestName) {
+            $title = str_replace('{name}', $longestName, trans('store.pages.category.title', [], $locale));
+            $this->assertLessThanOrEqual(60, mb_strlen($title), $title);
+        }
     }
 
     public function test_home_has_local_business_json_ld(): void

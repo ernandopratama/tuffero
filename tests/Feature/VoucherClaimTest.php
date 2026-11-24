@@ -175,8 +175,8 @@ class VoucherClaimTest extends TestCase
     {
         $this->withoutVite();
 
-        $this->get('/voucher')->assertOk()->assertSee('Voucher | Tuffero Bakery', false);
-        $this->get('/voucher?lang=en')->assertOk()->assertSee('Vouchers | Tuffero Bakery', false);
+        $this->get('/voucher')->assertOk()->assertSee('Voucher Belanja | Tuffero Bakery', false);
+        $this->get('/voucher?lang=en')->assertOk()->assertSee('Shopping Vouchers | Tuffero Bakery', false);
         $this->get('/akun/voucher')->assertRedirect();
 
         $this->actingAs($this->member())->get('/akun/voucher')->assertOk()->assertSee('Voucher Saya');

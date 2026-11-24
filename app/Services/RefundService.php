@@ -30,7 +30,7 @@ class RefundService
 
     private const DEFAULT_PAYOUT_DAYS = 7;
 
-    public function __construct(private StaffNotifier $notifier, private CustomerBlockService $blocks) {}
+    public function __construct(private StaffNotifier $notifier, private CustomerBlockService $blocks, private CustomerNotifier $customers) {}
 
     // ---------- pelanggan ----------
 
@@ -104,6 +104,7 @@ class RefundService
             $refund->items()->createMany($lines);
             $this->history($refund, null, Refund::SUBMITTED, 'customer', null, null);
             $this->notify(['customer-service'], 'refund_submitted', $refund, "Pengajuan refund {$refund->refund_number} menunggu diproses", $this->reasonLabel($refund->reason_type));
+            $this->customers->refund($refund, 'submitted');
 
             return ['refund' => $refund, 'created' => true];
         }, 3);
@@ -144,6 +145,9 @@ class RefundService
 
             if ($complete) {
                 $this->notify(['owner'], 'refund_review', $locked, "Refund {$locked->refund_number} menunggu keputusan Pemilik", $this->reasonLabel($locked->reason_type));
+            } else {
+                // Catatan staf tidak ikut dikirim; pelanggan hanya diminta melengkapi video. Bisa berulang, jadi kuncinya bernomor urut.
+                $this->customers->refund($locked, 'evidence_insufficient', $locked->order->histories()->where('refund_id', $locked->id)->count());
             }
         });
     }
@@ -182,6 +186,7 @@ class RefundService
             $this->notify(['customer-service'], 'refund_approved', $locked, "Refund {$locked->refund_number} disetujui, dana menunggu dikembalikan", 'Hubungi pelanggan untuk data rekening, lalu transfer manual');
             // D-122: retur produk utuh yang disetujui bisa melengkapi hitungan berturut-turut dan memblokir pembelian baru.
             $this->blocks->evaluate($locked);
+            $this->customers->refund($locked, 'approved');
         });
     }
 
@@ -207,6 +212,8 @@ class RefundService
             $from = $locked->status;
             $locked->forceFill(['status' => Refund::REJECTED, 'rejection_reason' => $reason, 'decided_by_user_id' => $actor->id, 'decided_at' => now()])->save();
             $this->history($locked, $from, Refund::REJECTED, 'admin', $actor->id, $reason);
+            // Alasan yang ditulis staf tidak ikut dikirim (bisa berisi catatan internal).
+            $this->customers->refund($locked, 'rejected');
         });
     }
 
@@ -232,6 +239,7 @@ class RefundService
                 'refunded_at' => now(), 'refunded_by_user_id' => $actor->id, 'admin_note' => $note ?: $locked->admin_note,
             ])->save();
             $this->history($locked, Refund::APPROVED, Refund::REFUNDED, 'admin', $actor->id, trim("Referensi: {$reference}. ".($note ?? '')));
+            $this->customers->refund($locked, 'refunded');
         });
     }
 

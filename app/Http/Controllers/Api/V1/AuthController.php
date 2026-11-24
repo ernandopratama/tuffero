@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Api\V1;
 
 use App\Http\Controllers\Controller;
+use App\Http\Requests\Store\CheckoutRequest;
 use App\Models\LoginFailure;
 use App\Models\User;
 use App\Services\DeviceService;
@@ -28,9 +29,12 @@ class AuthController extends Controller
         $login = trim($credentials['login']);
 
         // Username tidak boleh memuat "@", jadi tidak ada tabrakan dengan email.
-        $user = str_contains($login, '@')
-            ? User::where('email', $login)->first()
-            : User::where('username', mb_strtolower($login))->first();
+        // Pelanggan boleh masuk dengan nomor HP (disimpan +628..., sama seperti pendaftaran).
+        $user = match (true) {
+            str_contains($login, '@') => User::where('email', $login)->first(),
+            (bool) preg_match('/^[+\d][\d\s-]{7,}$/', $login) => User::where('phone', CheckoutRequest::normalizePhone($login))->first(),
+            default => User::where('username', mb_strtolower($login))->first(),
+        };
 
         if (! $user || ! Auth::validate(['email' => $user->email, 'password' => $credentials['password'], 'is_active' => true])) {
             LoginFailure::record($login);

@@ -29,6 +29,8 @@ class RolePermissionSeeder extends Seeder
             // D-134: semua izin Gudang juga dimiliki Admin Toko (role Gudang akan dilebur ke Admin Toko; mengubah D-084).
             'orders.view_fulfillment', 'stock.adjust',
             'payments.view', 'settings.manage_contact', 'reviews.manage', 'faqs.manage', 'terms.manage', 'comments.create', 'news.view',
+            // D-150 (revisi 23 Nov 2026): Admin Toko dan Marketing mengisi metrik performa konten; Pemilik hanya melihat.
+            'content_metrics.manage', 'social_metrics.manage',
         ],
         'customer-service' => [
             'products.view', 'stock.view', 'orders.view', 'orders.cancel_request', 'shipments.view',
@@ -41,7 +43,7 @@ class RolePermissionSeeder extends Seeder
         ],
         'marketing' => [
             'reports.view_summary', 'products.view', 'vouchers.view', 'vouchers.manage',
-            'content.view', 'content.manage', 'comments.create', 'news.view', 'news.manage', 'marketing_drafts.manage',
+            'content.view', 'content.manage', 'comments.create', 'news.view', 'news.manage', 'marketing_drafts.manage', 'content_metrics.manage', 'social_metrics.manage',
         ],
     ];
 

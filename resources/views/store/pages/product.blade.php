@@ -30,6 +30,9 @@
 				<ol>
 					<li><a href="/">{{ $p['home'] }}</a></li>
 					<li><a href="{{ $site->route('products') }}">{{ $p['products'] }}</a></li>
+					@if ($categoryPage)
+						<li><a href="/kategori/{{ $x['cat'] }}">{{ $x['cat_name'][$locale] }}</a></li>
+					@endif
 					<li aria-current="page">{{ $name }}</li>
 				</ol>
 			</nav>

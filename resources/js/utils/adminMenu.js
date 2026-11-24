@@ -43,6 +43,8 @@ const MENU = [
             { label: 'Ulasan Produk', short: 'Ulasan', icon: 'star', any: ['product_reviews.view'], to: { name: 'AdminProductReviews' } },
             { label: 'Berita Popup', short: 'Berita', icon: 'bell', any: ['news.view'], to: { name: 'AdminNews' } },
             { label: 'Draf Konten', short: 'Draf', icon: 'edit', any: ['marketing_drafts.view'], to: { name: 'AdminMarketingDrafts' } },
+            { label: 'Performa Konten', short: 'Performa', icon: 'chart', any: ['marketing_drafts.manage', 'marketing_drafts.approve', 'content_metrics.manage'], to: { name: 'AdminContentMetrics' } },
+            { label: 'Performa Akun', short: 'Akun', icon: 'users', any: ['marketing_drafts.manage', 'marketing_drafts.approve', 'content_metrics.manage', 'social_metrics.manage'], to: { name: 'AdminSocialMetrics' } },
             { label: 'Generator Caption', short: 'Caption', icon: 'sparkles', any: ['marketing_drafts.manage'], to: { name: 'AdminCaptionGenerator' } },
         ],
     },
@@ -51,6 +53,15 @@ const MENU = [
         items: [
             { label: 'Laporan', icon: 'chart', any: ['reports.view', 'reports.view_summary'], to: { name: 'AdminReports' } },
             { label: 'Audit Log', icon: 'shield', any: ['audit.view'], to: { name: 'AdminAudit' } },
+        ],
+    },
+    {
+        // Super Admin dan Pemilik (izin reports.view yang sudah ada).
+        label: 'SEO',
+        items: [
+            { label: 'Ringkasan SEO', short: 'SEO', icon: 'search', any: ['reports.view'], to: { name: 'AdminSeo' } },
+            { label: 'Konten dan Pratinjau', short: 'Pratinjau', icon: 'eye', any: ['reports.view'], to: { name: 'AdminSeoContent' } },
+            { label: 'Search Console', short: 'Google', icon: 'chart', any: ['reports.view'], to: { name: 'AdminSeoGoogle' } },
         ],
     },
     {
